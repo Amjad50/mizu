@@ -1,0 +1,4 @@
+[workspace]
+members = [
+    "gb-emu-core"
+]
