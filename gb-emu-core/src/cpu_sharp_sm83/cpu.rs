@@ -194,6 +194,32 @@ impl Cpu {
         }
     }
 
+    fn stack_push(&mut self, data: u16) {
+        self.reg_sp = self.reg_sp.wrapping_sub(1);
+        self.write_bus(self.reg_sp, (data >> 8) as u8);
+        self.reg_sp = self.reg_sp.wrapping_sub(1);
+        self.write_bus(self.reg_sp, data as u8);
+    }
+
+    fn stack_pop(&mut self) -> u16 {
+        let low = self.read_bus(self.reg_sp);
+        self.reg_sp = self.reg_sp.wrapping_add(1);
+        let high = self.read_bus(self.reg_sp);
+        self.reg_sp = self.reg_sp.wrapping_add(1);
+
+        ((high as u16) << 8) | low as u16
+    }
+
+    fn check_cond(&self, cond: Condition) -> bool {
+        match cond {
+            Condition::NC => !self.flag_get(CpuFlags::C),
+            Condition::C => self.flag_get(CpuFlags::C),
+            Condition::NZ => !self.flag_get(CpuFlags::Z),
+            Condition::Z => self.flag_get(CpuFlags::Z),
+            Condition::Unconditional => true,
+        }
+    }
+
     fn exec_instruction(&mut self, instruction: Instruction) -> u16 {
         let src = self.read_operand(instruction.operand_types.1);
 
@@ -210,8 +236,11 @@ impl Cpu {
 
                 result
             }
-            Opcode::Push => todo!(),
-            Opcode::Pop => todo!(),
+            Opcode::Push => {
+                self.stack_push(src);
+                0
+            }
+            Opcode::Pop => self.stack_pop(),
             Opcode::Inc16 => src.wrapping_add(1),
             Opcode::Inc => {
                 let result = src.wrapping_add(1);
@@ -330,11 +359,36 @@ impl Cpu {
 
                 result
             }
-            Opcode::Jp(_) => todo!(),
-            Opcode::Jr(_) => todo!(),
-            Opcode::Call(_) => todo!(),
-            Opcode::Ret(_) => todo!(),
-            Opcode::Reti => todo!(),
+            Opcode::Jp(cond) => {
+                if self.check_cond(cond) {
+                    self.reg_pc = src;
+                }
+                0
+            }
+            Opcode::Jr(cond) => {
+                if self.check_cond(cond) {
+                    self.reg_pc = self.reg_pc.wrapping_add(src);
+                }
+                0
+            }
+            Opcode::Call(cond) => {
+                if self.check_cond(cond) {
+                    self.stack_push(self.reg_pc);
+                    self.reg_pc = src;
+                }
+                0
+            }
+            Opcode::Ret(cond) => {
+                if self.check_cond(cond) {
+                    self.reg_pc = self.stack_pop();
+                }
+                0
+            }
+            Opcode::Reti => {
+                self.reg_pc = self.stack_pop();
+                self.ime = true;
+                0
+            }
             Opcode::Rst => {
                 self.reg_pc = src;
                 0
