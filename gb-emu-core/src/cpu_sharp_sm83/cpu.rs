@@ -24,6 +24,8 @@ struct Cpu {
     reg_sp: u16,
 
     reg_pc: u16,
+
+    ime: bool,
 }
 
 impl Cpu {
@@ -197,21 +199,15 @@ impl Cpu {
 
         let a: u16 = match instruction.opcode {
             Opcode::Nop => 0,
-            Opcode::Stop => todo!(),
             Opcode::Ld => src,
             Opcode::LdHLSPSigned8 => {
                 let result = self.reg_sp.wrapping_add(src);
 
                 self.flag_set(CpuFlags::Z, false);
                 self.flag_set(CpuFlags::N, false);
-                self.flag_set(
-                    CpuFlags::H,
-                    (self.reg_sp & 0xf) + (src & 0xf) & 0x10 == 0x10,
-                );
-                self.flag_set(
-                    CpuFlags::C,
-                    (self.reg_sp & 0xff) + (src & 0xff) & 0x100 == 0x100,
-                );
+                self.flag_set(CpuFlags::H, (self.reg_sp & 0xf) > (result & 0xf));
+                self.flag_set(CpuFlags::C, result & 0xff00 != 0);
+
                 result
             }
             Opcode::Push => todo!(),
@@ -219,9 +215,11 @@ impl Cpu {
             Opcode::Inc16 => src.wrapping_add(1),
             Opcode::Inc => {
                 let result = src.wrapping_add(1);
+
                 self.flag_set(CpuFlags::Z, result == 0);
                 self.flag_set(CpuFlags::N, false);
-                self.flag_set(CpuFlags::H, result & 0xfff0 != 0);
+                self.flag_set(CpuFlags::H, result & 0x0f == 0);
+
                 result
             }
             Opcode::Dec16 => src.wrapping_sub(1),
@@ -229,8 +227,7 @@ impl Cpu {
                 let result = src.wrapping_sub(1);
                 self.flag_set(CpuFlags::Z, result == 0);
                 self.flag_set(CpuFlags::N, true);
-                // FIXME: check if its correct
-                self.flag_set(CpuFlags::H, result & 0xfff0 == 0);
+                self.flag_set(CpuFlags::H, result & 0x0f == 0x0f);
                 result
             }
             Opcode::Add => {
@@ -239,18 +236,18 @@ impl Cpu {
 
                 self.flag_set(CpuFlags::Z, result == 0);
                 self.flag_set(CpuFlags::N, false);
-                self.flag_set(CpuFlags::H, result & 0xfff0 != 0);
-                self.flag_set(CpuFlags::N, result & 0xff00 != 0);
+                self.flag_set(CpuFlags::H, (dest & 0xf) + (src & 0xf) > 0xf);
+                self.flag_set(CpuFlags::C, result & 0xff00 != 0);
 
                 result
             }
             Opcode::Add16 => {
-                let dest = self.read_operand(instruction.operand_types.0) as u32;
-                let result = dest.wrapping_add(src as u32);
+                let dest = self.read_operand(instruction.operand_types.0);
+                let result = (dest as u32).wrapping_add(src as u32);
 
                 self.flag_set(CpuFlags::N, false);
-                self.flag_set(CpuFlags::H, result & 0xfffff000 != 0);
-                self.flag_set(CpuFlags::N, result & 0xffff0000 != 0);
+                self.flag_set(CpuFlags::H, (dest & 0xfff) + (src & 0xfff) > 0xfff);
+                self.flag_set(CpuFlags::C, result & 0xffff0000 != 0);
 
                 result as u16
             }
@@ -261,66 +258,283 @@ impl Cpu {
                 self.flag_set(CpuFlags::Z, false);
                 self.flag_set(CpuFlags::N, false);
                 self.flag_set(CpuFlags::H, result & 0xfff0 != 0);
-                self.flag_set(CpuFlags::N, result & 0xff00 != 0);
+                self.flag_set(CpuFlags::C, result & 0xff00 != 0);
 
                 result
             }
             Opcode::Adc => {
                 let dest = self.read_operand(instruction.operand_types.0);
-                let result = dest
-                    .wrapping_add(src)
-                    .wrapping_add(self.flag_get(CpuFlags::C) as u16);
+                let carry = self.flag_get(CpuFlags::C) as u16;
+                let result = dest.wrapping_add(src).wrapping_add(carry);
 
                 self.flag_set(CpuFlags::Z, result == 0);
                 self.flag_set(CpuFlags::N, false);
-                self.flag_set(CpuFlags::H, result & 0xfff0 != 0);
-                self.flag_set(CpuFlags::N, result & 0xff00 != 0);
+                self.flag_set(CpuFlags::H, (dest & 0xf) + (src & 0xf) + carry > 0xf);
+                self.flag_set(CpuFlags::C, result & 0xff00 != 0);
 
                 result
             }
-            Opcode::Sub => {
+            Opcode::Cp | Opcode::Sub => {
                 let dest = self.read_operand(instruction.operand_types.0);
-                dest.wrapping_sub(src)
+                let result = dest.wrapping_sub(src);
+
+                self.flag_set(CpuFlags::Z, result == 0);
+                self.flag_set(CpuFlags::N, true);
+                self.flag_set(CpuFlags::H, (dest & 0xf) < (src & 0xf));
+                self.flag_set(CpuFlags::C, result & 0xff00 != 0);
+
+                result
             }
             Opcode::Sbc => {
                 let dest = self.read_operand(instruction.operand_types.0);
-                dest.wrapping_sub(src)
-                    .wrapping_sub(self.flag_get(CpuFlags::C) as u16)
+                let carry = self.flag_get(CpuFlags::C) as u16;
+                let result = dest.wrapping_sub(src).wrapping_sub(carry);
+
+                self.flag_set(CpuFlags::Z, result == 0);
+                self.flag_set(CpuFlags::N, true);
+                self.flag_set(CpuFlags::H, (dest & 0xf) < ((src + carry) & 0xf));
+                self.flag_set(CpuFlags::C, result & 0xff00 != 0);
+
+                result
             }
-            Opcode::And => todo!(),
-            Opcode::Xor => todo!(),
-            Opcode::Or => todo!(),
-            Opcode::Cp => todo!(),
+            Opcode::And => {
+                let dest = self.read_operand(instruction.operand_types.0);
+                let result = dest & src & 0xff;
+
+                self.flag_set(CpuFlags::Z, result == 0);
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, true);
+                self.flag_set(CpuFlags::C, false);
+
+                result
+            }
+            Opcode::Xor => {
+                let dest = self.read_operand(instruction.operand_types.0);
+                let result = (dest ^ src) & 0xff;
+
+                self.flag_set(CpuFlags::Z, result == 0);
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, false);
+                self.flag_set(CpuFlags::C, false);
+
+                result
+            }
+            Opcode::Or => {
+                let dest = self.read_operand(instruction.operand_types.0);
+                let result = (dest | src) & 0xff;
+
+                self.flag_set(CpuFlags::Z, result == 0);
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, false);
+                self.flag_set(CpuFlags::C, false);
+
+                result
+            }
             Opcode::Jp(_) => todo!(),
             Opcode::Jr(_) => todo!(),
             Opcode::Call(_) => todo!(),
             Opcode::Ret(_) => todo!(),
             Opcode::Reti => todo!(),
-            Opcode::Rst => todo!(),
-            Opcode::Di => todo!(),
-            Opcode::Ei => todo!(),
-            Opcode::Ccf => todo!(),
-            Opcode::Scf => todo!(),
-            Opcode::Daa => todo!(),
-            Opcode::Cpl => todo!(),
-            Opcode::Rlca => todo!(),
-            Opcode::Rla => todo!(),
-            Opcode::Rrca => todo!(),
-            Opcode::Rra => todo!(),
-            Opcode::Prefix => todo!(),
-            Opcode::Rlc => todo!(),
-            Opcode::Rrc => todo!(),
-            Opcode::Rl => todo!(),
-            Opcode::Rr => todo!(),
-            Opcode::Sla => todo!(),
-            Opcode::Sra => todo!(),
-            Opcode::Swap => todo!(),
-            Opcode::Srl => todo!(),
-            Opcode::Bit(_) => todo!(),
-            Opcode::Res(_) => todo!(),
-            Opcode::Set(_) => todo!(),
-            Opcode::Illegal => todo!(),
+            Opcode::Rst => {
+                self.reg_pc = src;
+                0
+            }
+            Opcode::Di => {
+                self.ime = false;
+                0
+            }
+            Opcode::Ei => {
+                self.ime = true;
+                0
+            }
+            Opcode::Ccf => {
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, false);
+                self.flag_set(CpuFlags::C, !self.flag_get(CpuFlags::C));
+                0
+            }
+            Opcode::Scf => {
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, false);
+                self.flag_set(CpuFlags::C, true);
+                0
+            }
+            Opcode::Daa => {
+                let mut correction = 0;
+
+                let neg = self.flag_get(CpuFlags::N);
+
+                if self.flag_get(CpuFlags::H) || (!neg && (self.reg_a & 0xf > 0x9)) {
+                    correction |= 0x6;
+                }
+
+                if self.flag_get(CpuFlags::C) || (!neg && (self.reg_a & 0xff > 0x99)) {
+                    correction |= 0x66;
+                    self.flag_set(CpuFlags::C, true);
+                }
+
+                self.reg_a += if neg {
+                    -(correction as i8) as u8
+                } else {
+                    correction
+                };
+
+                self.flag_set(CpuFlags::Z, self.reg_a == 0);
+                self.flag_set(CpuFlags::H, false);
+
+                0
+            }
+            Opcode::Cpl => {
+                self.reg_a = !self.reg_a;
+
+                self.flag_set(CpuFlags::N, true);
+                self.flag_set(CpuFlags::H, true);
+
+                0
+            }
+            Opcode::Rlca => {
+                let carry = (self.reg_a >> 7) & 1;
+                self.reg_a = self.reg_a.wrapping_shl(1) | carry;
+
+                self.flag_set(CpuFlags::Z, false);
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, false);
+                self.flag_set(CpuFlags::C, carry == 1);
+
+                0
+            }
+            Opcode::Rla => {
+                let carry = (self.reg_a >> 7) & 1;
+                self.reg_a = self.reg_a.wrapping_shl(1) | self.flag_get(CpuFlags::C) as u8;
+
+                self.flag_set(CpuFlags::Z, false);
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, false);
+                self.flag_set(CpuFlags::C, carry == 1);
+
+                0
+            }
+            Opcode::Rrca => {
+                let carry = self.reg_a & 1;
+                self.reg_a = self.reg_a.wrapping_shr(1) | (carry << 7);
+
+                self.flag_set(CpuFlags::Z, false);
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, false);
+                self.flag_set(CpuFlags::C, carry == 1);
+
+                0
+            }
+            Opcode::Rra => {
+                let carry = self.reg_a & 1;
+                self.reg_a = self.reg_a.wrapping_shr(1) | ((self.flag_get(CpuFlags::C) as u8) << 7);
+
+                self.flag_set(CpuFlags::Z, false);
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, false);
+                self.flag_set(CpuFlags::C, carry == 1);
+
+                0
+            }
+            Opcode::Rlc => {
+                let carry = (src >> 7) & 1;
+                let result = src.wrapping_shl(1) | carry;
+
+                self.flag_set(CpuFlags::Z, result == 0);
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, false);
+                self.flag_set(CpuFlags::C, carry == 1);
+
+                result
+            }
+            Opcode::Rrc => {
+                let carry = src & 1;
+                let result = src.wrapping_shr(1) | (carry << 7);
+
+                self.flag_set(CpuFlags::Z, result == 0);
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, false);
+                self.flag_set(CpuFlags::C, carry == 1);
+
+                result
+            }
+            Opcode::Rl => {
+                let carry = (src >> 7) & 1;
+                let result = src.wrapping_shl(1) | self.flag_get(CpuFlags::C) as u16;
+
+                self.flag_set(CpuFlags::Z, result == 0);
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, false);
+                self.flag_set(CpuFlags::C, carry == 1);
+
+                result
+            }
+            Opcode::Rr => {
+                let carry = src & 1;
+                let result = src.wrapping_shr(1) | ((self.flag_get(CpuFlags::C) as u16) << 7);
+
+                self.flag_set(CpuFlags::Z, result == 0);
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, false);
+                self.flag_set(CpuFlags::C, carry == 1);
+
+                result
+            }
+            Opcode::Sla => {
+                let carry = (src >> 7) & 1;
+                let result = src.wrapping_shl(1);
+
+                self.flag_set(CpuFlags::Z, result == 0);
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, false);
+                self.flag_set(CpuFlags::C, carry == 1);
+
+                result
+            }
+            Opcode::Sra => {
+                let carry = src & 1;
+                let result = src.wrapping_shr(1) | (src & 0x80);
+
+                self.flag_set(CpuFlags::Z, result == 0);
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, false);
+                self.flag_set(CpuFlags::C, carry == 1);
+
+                result
+            }
+            Opcode::Swap => {
+                let result = ((src >> 4) & 0xf) | ((src & 0xf) << 4);
+
+                self.flag_set(CpuFlags::Z, result == 0);
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, false);
+                self.flag_set(CpuFlags::C, false);
+
+                result
+            }
+            Opcode::Srl => {
+                let carry = src & 1;
+                let result = src.wrapping_shr(1);
+
+                self.flag_set(CpuFlags::Z, result == 0);
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, false);
+                self.flag_set(CpuFlags::C, carry == 1);
+
+                result
+            }
+            Opcode::Bit(bit) => {
+                self.flag_set(CpuFlags::Z, (src >> bit) & 1 == 0);
+                self.flag_set(CpuFlags::N, false);
+                self.flag_set(CpuFlags::H, false);
+                0
+            }
+            Opcode::Res(bit) => src & !((1 << bit) as u16),
+            Opcode::Set(bit) => src | ((1 << bit) as u16),
             Opcode::Halt => todo!(),
+            Opcode::Stop => todo!(),
+            Opcode::Illegal => todo!(),
+            Opcode::Prefix => unreachable!(),
         };
         a
     }

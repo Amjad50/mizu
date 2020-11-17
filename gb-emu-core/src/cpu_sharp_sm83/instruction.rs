@@ -103,13 +103,12 @@ pub enum Opcode {
     Add16,
     AddSPSigned8,
     Adc,
+    Cp, // = Sub (Implied, Reg8)
     Sub,
     Sbc,
     And,
     Xor,
     Or,
-    Cp,
-
     Jp(Condition),
     Jr(Condition),
 
