@@ -113,6 +113,7 @@ impl OperandType {
     }
 }
 
+#[derive(Clone, Copy)]
 enum Opcode {
     Nop,
     Stop,
@@ -151,7 +152,25 @@ enum Opcode {
     Daa,
     Cpl,
 
+    Rlca,
+    Rla,
+    Rrca,
+    Rra,
+
     Prefix,
+
+    Rlc,
+    Rrc,
+    Rl,
+    Rr,
+    Sla,
+    Sra,
+    Swap,
+    Srl,
+
+    Bit,
+    Res,
+    Set,
 
     Illegal,
 
@@ -159,7 +178,7 @@ enum Opcode {
 }
 
 impl Instruction {
-    pub fn from_byte(byte: u8) -> Option<Self> {
+    pub fn from_byte(byte: u8) -> Self {
         use Opcode::*;
         use OperandType::*;
 
@@ -309,6 +328,10 @@ impl Instruction {
                 0xCB => (Prefix, (Implied, Implied)),
                 0xE8 => (Add, (RegSP, Imm8)),
                 0xF8 => (Ld, (RegHL, RegSPImm8)),
+                0x07 => (Rlca, (Implied, Implied)),
+                0x17 => (Rla, (Implied, Implied)),
+                0x0F => (Rrca, (Implied, Implied)),
+                0x1F => (Rra, (Implied, Implied)),
 
                 // illegal instructions
                 0xD3 => (Illegal, (Implied, Implied)),
@@ -322,15 +345,43 @@ impl Instruction {
                 0xF4 => (Illegal, (Implied, Implied)),
                 0xFC => (Illegal, (Implied, Implied)),
                 0xFD => (Illegal, (Implied, Implied)),
-                _ => return None,
+                _ => unreachable!(),
             }
         };
 
-        Some(Instruction {
+        Instruction {
             opcode,
             operand_types,
             operand_data: 0,
-        })
+        }
+    }
+
+    fn from_prefix(byte: u8) -> Self {
+        use Opcode::*;
+
+        let x = (byte >> 6) & 0b11;
+        let y = (byte >> 3) & 0b111;
+        let src_dest = byte & 0b111;
+        let src_dest = OperandType::get_reg8(src_dest).unwrap();
+
+        let (opcode, operand_types, data) = match x {
+            0 => {
+                let opcode = *&[Rlc, Rrc, Rl, Rr, Sla, Sra, Swap, Srl][y as usize];
+
+                (opcode, (src_dest, src_dest), 0)
+            }
+            1 => (Bit, (src_dest, src_dest), y),
+            2 => (Res, (src_dest, src_dest), y),
+            3 => (Set, (src_dest, src_dest), y),
+            _ => unreachable!(),
+        };
+
+        Instruction {
+            opcode,
+            operand_types,
+            // used to indicate the bit number to change
+            operand_data: data as u16,
+        }
     }
 }
 
@@ -338,40 +389,17 @@ impl Instruction {
 mod tests {
     use super::Instruction;
 
-    #[rustfmt::skip]
-    const INTSTRUCTIONS_PRESENT: [u8;256] =
-        [1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0,
-         1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0,
-         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,];
-
     #[test]
     fn available_instructions() {
         for i in 0..=255u8 {
-            if i % 16 == 0 {
-                println!();
-            }
-            let v = Instruction::from_byte(i as u8).is_some() as u8;
+            Instruction::from_byte(i as u8);
+        }
+    }
 
-            print!("{}, ", v);
-
-            assert_eq!(
-                v,
-                INTSTRUCTIONS_PRESENT[i as usize],
-                "Instruction {:02X} it implemented and it shouldn't be or not implemented and it should be",
-                i);
+    #[test]
+    fn available_instructions_with_prefix_cb() {
+        for i in 0..=255u8 {
+            Instruction::from_prefix(i as u8);
         }
     }
 }
