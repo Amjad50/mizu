@@ -1,9 +1,9 @@
 use super::instructions_table;
 
-struct Instruction {
-    opcode: Opcode,
-    operand_types: (OperandType, OperandType),
-    operand_data: u16,
+pub(super) struct Instruction {
+    pub opcode: Opcode,
+    pub operand_types: (OperandType, OperandType),
+    pub operand_data: u16,
 }
 
 /// This is the location the operands will come from,
@@ -58,24 +58,29 @@ pub enum OperandType {
     RegHL,
 
     RegSP,
-    RegSPImm8,
 
     Imm8,
+    Imm8Signed,
     Imm16,
 
     HighAddr8,
     HighAddrC, // only for the C register
     Addr16,
+    Addr16Val16, // write 16bit value to address
 
-    Arg(u8),
+    RstLoc(u8),
 
     // Also for instructions with one operand as a fill
     Implied,
+}
 
-    CondC,
-    CondZ,
-    CondNC,
-    CondNZ,
+#[derive(Clone, Copy, Debug)]
+pub enum Condition {
+    NC,
+    C,
+    NZ,
+    Z,
+    Unconditional,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -84,14 +89,19 @@ pub enum Opcode {
     Stop,
 
     Ld,
+    LdHLSPSigned8,
 
     Push,
     Pop,
 
     Inc,
+    Inc16,
     Dec,
+    Dec16,
 
     Add,
+    Add16,
+    AddSPSigned8,
     Adc,
     Sub,
     Sbc,
@@ -100,11 +110,11 @@ pub enum Opcode {
     Or,
     Cp,
 
-    Jp,
-    Jr,
+    Jp(Condition),
+    Jr(Condition),
 
-    Call,
-    Ret,
+    Call(Condition),
+    Ret(Condition),
 
     Reti,
 
