@@ -56,6 +56,7 @@ pub enum OperandType {
     RegHL,
 
     RegSP,
+    RegSPImm8,
 
     Imm8,
     Imm16,
@@ -64,8 +65,15 @@ pub enum OperandType {
     HighAddrC, // only for the C register
     Addr16,
 
+    Arg(u8),
+
     // Also for instructions with one operand as a fill
     Implied,
+
+    CondC,
+    CondZ,
+    CondNC,
+    CondNZ,
 }
 
 impl OperandType {
@@ -93,6 +101,16 @@ impl OperandType {
             _ => None,
         }
     }
+
+    fn get_cond(id: u8) -> Option<Self> {
+        match id {
+            0 => Some(Self::CondNZ),
+            1 => Some(Self::CondZ),
+            2 => Some(Self::CondNC),
+            3 => Some(Self::CondC),
+            _ => None,
+        }
+    }
 }
 
 enum Opcode {
@@ -115,6 +133,27 @@ enum Opcode {
     Xor,
     Or,
     Cp,
+
+    Jp,
+    Jr,
+
+    Call,
+    Ret,
+
+    Reti,
+
+    Rst,
+
+    Di,
+    Ei,
+    Ccf,
+    Scf,
+    Daa,
+    Cpl,
+
+    Prefix,
+
+    Illegal,
 
     Halt,
 }
@@ -192,6 +231,49 @@ impl Instruction {
                 7 => (Cp, (RegA, src)),
                 _ => unreachable!(),
             }
+        } else if byte & 0xe7 == 0xc2 {
+            let dest = (byte >> 3) & 0b11;
+            let dest = OperandType::get_cond(dest).unwrap();
+
+            (Jp, (dest, Imm16))
+        } else if byte & 0xe7 == 0x20 {
+            let dest = (byte >> 3) & 0b11;
+            let dest = OperandType::get_cond(dest).unwrap();
+
+            (Jr, (dest, Imm8))
+        } else if byte & 0xe7 == 0xc4 {
+            let dest = (byte >> 3) & 0b11;
+            let dest = OperandType::get_cond(dest).unwrap();
+
+            (Call, (dest, Imm16))
+        } else if byte & 0xe7 == 0xc0 {
+            let dest = (byte >> 3) & 0b11;
+            let dest = OperandType::get_cond(dest).unwrap();
+
+            (Ret, (dest, Implied))
+        } else if byte & 0xc7 == 0xc7 {
+            let src = (byte >> 3) & 0b111;
+
+            (Rst, (Implied, Arg(src * 8)))
+        } else if byte & 0xcf == 0x9 {
+            let src = (byte & 0b110000) >> 4;
+            let src = OperandType::get_reg16(src, RegSP).unwrap();
+
+            (Add, (RegHL, src))
+        } else if byte & 0xc7 == 0xc6 {
+            let opcode = match (byte >> 3) & 0b111 {
+                0 => Add,
+                1 => Adc,
+                2 => Sub,
+                3 => Sbc,
+                4 => And,
+                5 => Xor,
+                6 => Or,
+                7 => Cp,
+                _ => unreachable!(),
+            };
+
+            (opcode, (RegA, Imm8))
         } else {
             match byte {
                 0x00 => (Nop, (Implied, Implied)),
@@ -212,6 +294,34 @@ impl Instruction {
                 0x22 => (Ld, (AddrHLInc, RegA)),
                 0x08 => (Ld, (Addr16, RegSP)),
                 0xF9 => (Ld, (RegSP, RegHL)),
+                0xC3 => (Jp, (Implied, Imm16)),
+                0xE9 => (Jp, (Implied, RegHL)),
+                0x18 => (Jr, (Implied, Imm8)),
+                0xcd => (Call, (Implied, Imm16)),
+                0xC9 => (Ret, (Implied, Implied)),
+                0xD9 => (Reti, (Implied, Implied)),
+                0xF3 => (Di, (Implied, Implied)),
+                0xFB => (Ei, (Implied, Implied)),
+                0x3F => (Ccf, (Implied, Implied)),
+                0x37 => (Scf, (Implied, Implied)),
+                0x27 => (Daa, (Implied, Implied)),
+                0x2F => (Cpl, (Implied, Implied)),
+                0xCB => (Prefix, (Implied, Implied)),
+                0xE8 => (Add, (RegSP, Imm8)),
+                0xF8 => (Ld, (RegHL, RegSPImm8)),
+
+                // illegal instructions
+                0xD3 => (Illegal, (Implied, Implied)),
+                0xDB => (Illegal, (Implied, Implied)),
+                0xDD => (Illegal, (Implied, Implied)),
+                0xE3 => (Illegal, (Implied, Implied)),
+                0xE4 => (Illegal, (Implied, Implied)),
+                0xEB => (Illegal, (Implied, Implied)),
+                0xEC => (Illegal, (Implied, Implied)),
+                0xED => (Illegal, (Implied, Implied)),
+                0xF4 => (Illegal, (Implied, Implied)),
+                0xFC => (Illegal, (Implied, Implied)),
+                0xFD => (Illegal, (Implied, Implied)),
                 _ => return None,
             }
         };
@@ -230,10 +340,8 @@ mod tests {
 
     #[rustfmt::skip]
     const INTSTRUCTIONS_PRESENT: [u8;256] =
-        [1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0,
-         1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0,
-         0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0,
-         0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0,
+        [1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0,
+         1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0,
          1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
          1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
          1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -242,10 +350,12 @@ mod tests {
          1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
          1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
          1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-         0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-         0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-         1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
-         1, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0,];
+         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,];
 
     #[test]
     fn available_instructions() {
