@@ -1,1 +1,1 @@
-pub mod cpu_sharp_sm83;
+pub mod cpu;

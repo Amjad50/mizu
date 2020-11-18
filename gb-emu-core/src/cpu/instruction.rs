@@ -10,7 +10,7 @@ pub(super) struct Instruction {
 /// a basic usage can be something like this
 ///
 /// ```
-/// # use gb_emu_core::cpu_sharp_sm83::instruction::OperandType;
+/// # use gb_emu_core::cpu::instruction::OperandType;
 /// struct CPU {
 ///   A: u8,
 /// }

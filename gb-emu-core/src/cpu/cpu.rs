@@ -1,4 +1,5 @@
 use super::instruction::{Condition, Instruction, Opcode, OperandType};
+use super::CpuBusProvider;
 
 use bitflags::bitflags;
 
@@ -11,7 +12,7 @@ bitflags! {
     }
 }
 
-struct Cpu {
+pub struct Cpu {
     reg_a: u8,
     reg_b: u8,
     reg_c: u8,
@@ -84,19 +85,13 @@ impl Cpu {
         self.reg_f.set(flag, value);
     }
 
-    fn read_bus(&mut self, addr: u16) -> u8 {
-        0
-    }
-
-    fn write_bus(&mut self, addr: u16, data: u8) {}
-
-    fn fetch_next_pc(&mut self) -> u8 {
-        let result = self.read_bus(self.reg_pc);
+    fn fetch_next_pc<P: CpuBusProvider>(&mut self, bus: &mut P) -> u8 {
+        let result = bus.read(self.reg_pc);
         self.reg_pc = self.reg_pc.wrapping_add(1);
         result
     }
 
-    fn read_operand(&mut self, ty: OperandType) -> u16 {
+    fn read_operand<P: CpuBusProvider>(&mut self, ty: OperandType, bus: &mut P) -> u16 {
         match ty {
             OperandType::RegA => self.reg_a as u16,
             OperandType::RegB => self.reg_b as u16,
@@ -105,39 +100,39 @@ impl Cpu {
             OperandType::RegE => self.reg_e as u16,
             OperandType::RegH => self.reg_h as u16,
             OperandType::RegL => self.reg_l as u16,
-            OperandType::AddrHL => self.read_bus(self.reg_hl_read()) as u16,
+            OperandType::AddrHL => bus.read(self.reg_hl_read()) as u16,
             OperandType::AddrHLDec => {
                 let hl = self.reg_hl_read();
-                let result = self.read_bus(hl) as u16;
+                let result = bus.read(hl) as u16;
                 self.reg_hl_write(hl.wrapping_sub(1));
                 result
             }
             OperandType::AddrHLInc => {
                 let hl = self.reg_hl_read();
-                let result = self.read_bus(hl) as u16;
+                let result = bus.read(hl) as u16;
                 self.reg_hl_write(hl.wrapping_add(1));
                 result
             }
-            OperandType::AddrBC => self.read_bus(self.reg_bc_read()) as u16,
-            OperandType::AddrDE => self.read_bus(self.reg_de_read()) as u16,
+            OperandType::AddrBC => bus.read(self.reg_bc_read()) as u16,
+            OperandType::AddrDE => bus.read(self.reg_de_read()) as u16,
             OperandType::RegAF => self.reg_af_read(),
             OperandType::RegBC => self.reg_bc_read(),
             OperandType::RegDE => self.reg_de_read(),
             OperandType::RegHL => self.reg_hl_read(),
             OperandType::RegSP => self.reg_sp,
-            OperandType::Imm8 => self.fetch_next_pc() as u16,
-            OperandType::Imm8Signed => self.fetch_next_pc() as i8 as i16 as u16,
+            OperandType::Imm8 => self.fetch_next_pc(bus) as u16,
+            OperandType::Imm8Signed => self.fetch_next_pc(bus) as i8 as i16 as u16,
             OperandType::Imm16 => {
-                ((self.fetch_next_pc() as u16) << 8) | self.fetch_next_pc() as u16
+                ((self.fetch_next_pc(bus) as u16) << 8) | self.fetch_next_pc(bus) as u16
             }
             OperandType::HighAddr8 => {
-                let addr = 0xFF00 | self.fetch_next_pc() as u16;
-                self.read_bus(addr) as u16
+                let addr = 0xFF00 | self.fetch_next_pc(bus) as u16;
+                bus.read(addr) as u16
             }
-            OperandType::HighAddrC => self.read_bus(0xFF00 | self.reg_c as u16) as u16,
+            OperandType::HighAddrC => bus.read(0xFF00 | self.reg_c as u16) as u16,
             OperandType::Addr16 => {
-                let addr = ((self.fetch_next_pc() as u16) << 8) | self.fetch_next_pc() as u16;
-                self.read_bus(addr) as u16
+                let addr = ((self.fetch_next_pc(bus) as u16) << 8) | self.fetch_next_pc(bus) as u16;
+                bus.read(addr) as u16
             }
             OperandType::RstLoc(location) => location as u16,
             OperandType::Implied => 0,
@@ -145,7 +140,7 @@ impl Cpu {
         }
     }
 
-    fn write_operand(&mut self, ty: OperandType, data: u16) {
+    fn write_operand<P: CpuBusProvider>(&mut self, ty: OperandType, data: u16, bus: &mut P) {
         match ty {
             OperandType::RegA => self.reg_a = data as u8,
             OperandType::RegB => self.reg_b = data as u8,
@@ -154,37 +149,37 @@ impl Cpu {
             OperandType::RegE => self.reg_e = data as u8,
             OperandType::RegH => self.reg_h = data as u8,
             OperandType::RegL => self.reg_l = data as u8,
-            OperandType::AddrHL => self.write_bus(self.reg_hl_read(), data as u8),
+            OperandType::AddrHL => bus.write(self.reg_hl_read(), data as u8),
             OperandType::AddrHLDec => {
                 let hl = self.reg_hl_read();
-                self.write_bus(hl, data as u8);
+                bus.write(hl, data as u8);
                 self.reg_hl_write(hl.wrapping_sub(1));
             }
             OperandType::AddrHLInc => {
                 let hl = self.reg_hl_read();
-                self.write_bus(hl, data as u8);
+                bus.write(hl, data as u8);
                 self.reg_hl_write(hl.wrapping_add(1));
             }
-            OperandType::AddrBC => self.write_bus(self.reg_bc_read(), data as u8),
-            OperandType::AddrDE => self.write_bus(self.reg_de_read(), data as u8),
+            OperandType::AddrBC => bus.write(self.reg_bc_read(), data as u8),
+            OperandType::AddrDE => bus.write(self.reg_de_read(), data as u8),
             OperandType::RegAF => self.reg_af_write(data),
             OperandType::RegBC => self.reg_bc_write(data),
             OperandType::RegDE => self.reg_de_write(data),
             OperandType::RegHL => self.reg_hl_write(data),
             OperandType::RegSP => self.reg_sp = data,
             OperandType::HighAddr8 => {
-                let addr = 0xFF00 | self.fetch_next_pc() as u16;
-                self.write_bus(addr, data as u8);
+                let addr = 0xFF00 | self.fetch_next_pc(bus) as u16;
+                bus.write(addr, data as u8);
             }
-            OperandType::HighAddrC => self.write_bus(0xFF00 | self.reg_c as u16, data as u8),
+            OperandType::HighAddrC => bus.write(0xFF00 | self.reg_c as u16, data as u8),
             OperandType::Addr16 => {
-                let addr = ((self.fetch_next_pc() as u16) << 8) | self.fetch_next_pc() as u16;
-                self.write_bus(addr, data as u8);
+                let addr = ((self.fetch_next_pc(bus) as u16) << 8) | self.fetch_next_pc(bus) as u16;
+                bus.write(addr, data as u8);
             }
             OperandType::Addr16Val16 => {
-                let addr = ((self.fetch_next_pc() as u16) << 8) | self.fetch_next_pc() as u16;
-                self.write_bus(addr, data as u8);
-                self.write_bus(addr.wrapping_add(1), (data >> 8) as u8);
+                let addr = ((self.fetch_next_pc(bus) as u16) << 8) | self.fetch_next_pc(bus) as u16;
+                bus.write(addr, data as u8);
+                bus.write(addr.wrapping_add(1), (data >> 8) as u8);
             }
             OperandType::Implied => {}
             OperandType::Imm16
@@ -194,17 +189,17 @@ impl Cpu {
         }
     }
 
-    fn stack_push(&mut self, data: u16) {
+    fn stack_push<P: CpuBusProvider>(&mut self, data: u16, bus: &mut P) {
         self.reg_sp = self.reg_sp.wrapping_sub(1);
-        self.write_bus(self.reg_sp, (data >> 8) as u8);
+        bus.write(self.reg_sp, (data >> 8) as u8);
         self.reg_sp = self.reg_sp.wrapping_sub(1);
-        self.write_bus(self.reg_sp, data as u8);
+        bus.write(self.reg_sp, data as u8);
     }
 
-    fn stack_pop(&mut self) -> u16 {
-        let low = self.read_bus(self.reg_sp);
+    fn stack_pop<P: CpuBusProvider>(&mut self, bus: &mut P) -> u16 {
+        let low = bus.read(self.reg_sp);
         self.reg_sp = self.reg_sp.wrapping_add(1);
-        let high = self.read_bus(self.reg_sp);
+        let high = bus.read(self.reg_sp);
         self.reg_sp = self.reg_sp.wrapping_add(1);
 
         ((high as u16) << 8) | low as u16
@@ -220,10 +215,10 @@ impl Cpu {
         }
     }
 
-    fn exec_instruction(&mut self, instruction: Instruction) -> u16 {
-        let src = self.read_operand(instruction.operand_types.1);
+    fn exec_instruction<P: CpuBusProvider>(&mut self, instruction: Instruction, bus: &mut P) {
+        let src = self.read_operand(instruction.operand_types.1, bus);
 
-        let a: u16 = match instruction.opcode {
+        let result = match instruction.opcode {
             Opcode::Nop => 0,
             Opcode::Ld => src,
             Opcode::LdHLSPSigned8 => {
@@ -237,10 +232,10 @@ impl Cpu {
                 result
             }
             Opcode::Push => {
-                self.stack_push(src);
+                self.stack_push(src, bus);
                 0
             }
-            Opcode::Pop => self.stack_pop(),
+            Opcode::Pop => self.stack_pop(bus),
             Opcode::Inc16 => src.wrapping_add(1),
             Opcode::Inc => {
                 let result = src.wrapping_add(1);
@@ -260,7 +255,7 @@ impl Cpu {
                 result
             }
             Opcode::Add => {
-                let dest = self.read_operand(instruction.operand_types.0);
+                let dest = self.read_operand(instruction.operand_types.0, bus);
                 let result = dest.wrapping_add(src);
 
                 self.flag_set(CpuFlags::Z, result == 0);
@@ -271,7 +266,7 @@ impl Cpu {
                 result
             }
             Opcode::Add16 => {
-                let dest = self.read_operand(instruction.operand_types.0);
+                let dest = self.read_operand(instruction.operand_types.0, bus);
                 let result = (dest as u32).wrapping_add(src as u32);
 
                 self.flag_set(CpuFlags::N, false);
@@ -281,7 +276,7 @@ impl Cpu {
                 result as u16
             }
             Opcode::AddSPSigned8 => {
-                let dest = self.read_operand(instruction.operand_types.0);
+                let dest = self.read_operand(instruction.operand_types.0, bus);
                 let result = dest.wrapping_add(src);
 
                 self.flag_set(CpuFlags::Z, false);
@@ -292,7 +287,7 @@ impl Cpu {
                 result
             }
             Opcode::Adc => {
-                let dest = self.read_operand(instruction.operand_types.0);
+                let dest = self.read_operand(instruction.operand_types.0, bus);
                 let carry = self.flag_get(CpuFlags::C) as u16;
                 let result = dest.wrapping_add(src).wrapping_add(carry);
 
@@ -304,7 +299,7 @@ impl Cpu {
                 result
             }
             Opcode::Cp | Opcode::Sub => {
-                let dest = self.read_operand(instruction.operand_types.0);
+                let dest = self.read_operand(instruction.operand_types.0, bus);
                 let result = dest.wrapping_sub(src);
 
                 self.flag_set(CpuFlags::Z, result == 0);
@@ -315,7 +310,7 @@ impl Cpu {
                 result
             }
             Opcode::Sbc => {
-                let dest = self.read_operand(instruction.operand_types.0);
+                let dest = self.read_operand(instruction.operand_types.0, bus);
                 let carry = self.flag_get(CpuFlags::C) as u16;
                 let result = dest.wrapping_sub(src).wrapping_sub(carry);
 
@@ -327,7 +322,7 @@ impl Cpu {
                 result
             }
             Opcode::And => {
-                let dest = self.read_operand(instruction.operand_types.0);
+                let dest = self.read_operand(instruction.operand_types.0, bus);
                 let result = dest & src & 0xff;
 
                 self.flag_set(CpuFlags::Z, result == 0);
@@ -338,7 +333,7 @@ impl Cpu {
                 result
             }
             Opcode::Xor => {
-                let dest = self.read_operand(instruction.operand_types.0);
+                let dest = self.read_operand(instruction.operand_types.0, bus);
                 let result = (dest ^ src) & 0xff;
 
                 self.flag_set(CpuFlags::Z, result == 0);
@@ -349,7 +344,7 @@ impl Cpu {
                 result
             }
             Opcode::Or => {
-                let dest = self.read_operand(instruction.operand_types.0);
+                let dest = self.read_operand(instruction.operand_types.0, bus);
                 let result = (dest | src) & 0xff;
 
                 self.flag_set(CpuFlags::Z, result == 0);
@@ -373,19 +368,19 @@ impl Cpu {
             }
             Opcode::Call(cond) => {
                 if self.check_cond(cond) {
-                    self.stack_push(self.reg_pc);
+                    self.stack_push(self.reg_pc, bus);
                     self.reg_pc = src;
                 }
                 0
             }
             Opcode::Ret(cond) => {
                 if self.check_cond(cond) {
-                    self.reg_pc = self.stack_pop();
+                    self.reg_pc = self.stack_pop(bus);
                 }
                 0
             }
             Opcode::Reti => {
-                self.reg_pc = self.stack_pop();
+                self.reg_pc = self.stack_pop(bus);
                 self.ime = true;
                 0
             }
@@ -590,6 +585,7 @@ impl Cpu {
             Opcode::Illegal => todo!(),
             Opcode::Prefix => unreachable!(),
         };
-        a
+
+        self.write_operand(instruction.operand_types.0, result, bus);
     }
 }
