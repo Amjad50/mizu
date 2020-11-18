@@ -1,5 +1,7 @@
+mod mbc1;
 mod no_mapper;
 
+pub(super) use mbc1::Mbc1;
 pub(super) use no_mapper::NoMapper;
 
 #[derive(Debug, Clone, Copy)]

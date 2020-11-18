@@ -1,4 +1,5 @@
 use super::error::CartridgeError;
+use super::mappers;
 use super::mappers::{Mapper, MapperType, MappingResult};
 use std::fs::File;
 use std::io::Read;
@@ -143,12 +144,13 @@ impl CartridgeType {
     }
 
     fn get_mapper(&self) -> Option<Box<dyn Mapper>> {
-        let mapper = match self.mapper_type {
-            MapperType::NoMapper => super::mappers::NoMapper::default(),
+        let mapper: Box<dyn Mapper> = match self.mapper_type {
+            MapperType::NoMapper => Box::new(mappers::NoMapper::default()),
+            MapperType::Mbc1 => Box::new(mappers::Mbc1::default()),
             _ => return None,
         };
 
-        Some(Box::new(mapper))
+        Some(mapper)
     }
 }
 
@@ -203,11 +205,12 @@ impl Cartridge {
         let cartridge_type =
             CartridgeType::from_byte(data[0x147]).ok_or(CartridgeError::InvalidCartridgeType)?;
 
-        if data[0x148] > 8 {
+        let num_rom_banks = data[0x148];
+        if num_rom_banks > 8 {
             return Err(CartridgeError::InvalidRomSizeIndex(data[0x148]));
         }
 
-        let rom_size = 0x8000 << data[0x148];
+        let rom_size = 0x8000 << num_rom_banks;
 
         if rom_size != data.len() {
             return Err(CartridgeError::InvalidRomSize(rom_size));
@@ -243,11 +246,14 @@ impl Cartridge {
             });
         }
 
-        let mapper = cartridge_type
-            .get_mapper()
-            .ok_or(CartridgeError::MapperNotImplemented(
-                cartridge_type.mapper_type,
-            ))?;
+        let mut mapper =
+            cartridge_type
+                .get_mapper()
+                .ok_or(CartridgeError::MapperNotImplemented(
+                    cartridge_type.mapper_type,
+                ))?;
+
+        mapper.init(num_rom_banks, ram_size);
 
         Ok(Self {
             file_path: file_path.as_ref().to_path_buf().into_boxed_path(),
