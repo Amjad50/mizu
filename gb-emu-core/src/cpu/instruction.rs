@@ -9,7 +9,7 @@ pub(super) struct Instruction {
 /// This is the location the operands will come from,
 /// a basic usage can be something like this
 ///
-/// ```
+/// ```ignore
 /// # use gb_emu_core::cpu::instruction::OperandType;
 /// struct CPU {
 ///   A: u8,
