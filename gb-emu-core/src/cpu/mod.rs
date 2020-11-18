@@ -4,7 +4,7 @@ mod instructions_table;
 
 pub use cpu::Cpu;
 
-trait CpuBusProvider {
+pub trait CpuBusProvider {
     fn read(&mut self, addr: u16) -> u8;
     fn write(&mut self, addr: u16, data: u8);
 
