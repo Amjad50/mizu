@@ -1,4 +1,5 @@
 use super::error::CartridgeError;
+use super::mappers::{Mapper, MapperType, MappingResult};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -6,17 +7,6 @@ use std::path::Path;
 enum GameBoyType {
     NonColor,
     Color,
-}
-
-enum MapperType {
-    NoMapper,
-    Mbc1,
-    Mbc2,
-    Mbc3 { timer: bool },
-    Mbc5 { rumble: bool },
-    Mmm01,
-    Mbc6,
-    Mbc7,
 }
 
 struct CartridgeType {
@@ -151,12 +141,22 @@ impl CartridgeType {
             _ => None,
         }
     }
+
+    fn get_mapper(&self) -> Option<Box<dyn Mapper>> {
+        let mapper = match self.mapper_type {
+            MapperType::NoMapper => super::mappers::NoMapper::default(),
+            _ => return None,
+        };
+
+        Some(Box::new(mapper))
+    }
 }
 
 pub struct Cartridge {
     file_path: Box<Path>,
     game_title: String,
     cartridge_type: CartridgeType,
+    mapper: Box<dyn Mapper>,
     rom: Vec<u8>,
     ram: Vec<u8>,
 }
@@ -243,10 +243,17 @@ impl Cartridge {
             });
         }
 
+        let mapper = cartridge_type
+            .get_mapper()
+            .ok_or(CartridgeError::MapperNotImplemented(
+                cartridge_type.mapper_type,
+            ))?;
+
         Ok(Self {
             file_path: file_path.as_ref().to_path_buf().into_boxed_path(),
             game_title,
             cartridge_type,
+            mapper,
             rom: data,
             ram: vec![0u8; ram_size],
         })
@@ -260,18 +267,24 @@ impl Cartridge {
     // TODO: implement mapper
     /// 0x4000-0x7FFF
     pub fn read_romx(&self, addr: u16) -> u8 {
-        self.rom[addr as usize]
+        let addr = self.mapper.map_read_romx(addr);
+
+        self.rom[addr]
     }
 
     /// 0x0000-0x7FFF
     pub fn write_to_bank_controller(&mut self, addr: u16, data: u8) {
-        // nothing for now
+        self.mapper.write_bank_controller_register(addr, data);
     }
 
     /// 0xA000-0xBFFF
-    pub fn read_ram(&self, addr: u16) -> u8 {
+    pub fn read_ram(&mut self, addr: u16) -> u8 {
         if self.cartridge_type.ram {
-            self.ram[(addr & 0x1FFF) as usize]
+            match self.mapper.map_ram_read(addr) {
+                MappingResult::Addr(addr) => self.ram[addr],
+                MappingResult::Value(value) => value,
+                MappingResult::NotMapped => 0xFF,
+            }
         } else {
             0xFF
         }
@@ -280,7 +293,10 @@ impl Cartridge {
     /// 0xA000-0xBFFF
     pub fn write_ram(&mut self, addr: u16, data: u8) {
         if self.cartridge_type.ram {
-            self.ram[(addr & 0x1FFF) as usize] = data;
+            match self.mapper.map_ram_write(addr, data) {
+                MappingResult::Addr(addr) => self.ram[addr] = data,
+                MappingResult::NotMapped | MappingResult::Value(_) => {}
+            }
         }
     }
 }

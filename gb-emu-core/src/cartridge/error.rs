@@ -1,3 +1,4 @@
+use super::mappers::MapperType;
 use std::convert::From;
 use std::error::Error;
 use std::fmt::Display;
@@ -17,6 +18,7 @@ pub enum CartridgeError {
     RamNotPresentError,
     NotNeededRamPresentError,
     InvalidChecksum { expected: u8, got: u8 },
+    MapperNotImplemented(MapperType),
 }
 
 impl CartridgeError {
@@ -60,6 +62,9 @@ impl CartridgeError {
                 "The header of the cartridge check sum {} does not match the expected {}",
                 got, expected
             ),
+            CartridgeError::MapperNotImplemented(mapper) => {
+                format!("The mapper {:?} is not yet implemented", mapper)
+            }
         }
     }
 }
