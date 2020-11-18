@@ -29,6 +29,19 @@ pub struct Cpu {
     ime: bool,
 }
 
+// pub
+impl Cpu {
+    pub fn reset(&mut self) {
+        // initial values of the registers (DMG)
+        self.reg_af_write(0x01B0);
+        self.reg_bc_write(0x0013);
+        self.reg_de_write(0x00D8);
+        self.reg_hl_write(0x014D);
+        self.reg_sp = 0xFFFE;
+        self.reg_pc = 0x0100;
+    }
+}
+
 impl Cpu {
     #[inline]
     fn reg_af_read(&self) -> u16 {
