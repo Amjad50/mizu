@@ -23,7 +23,7 @@ pub enum MappingResult {
 }
 
 pub trait Mapper {
-    fn init(&mut self, rom_banks: u8, ram_size: usize);
+    fn init(&mut self, rom_banks: u16, ram_size: usize);
 
     fn map_read_romx(&self, addr: u16) -> usize;
 

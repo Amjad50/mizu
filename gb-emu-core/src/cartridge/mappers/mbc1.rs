@@ -3,7 +3,7 @@ use super::{Mapper, MappingResult};
 pub struct Mbc1 {
     is_2k_ram: bool,
     ram_banks: u8,
-    rom_banks: u8,
+    rom_banks: u16,
     /// true for rom, false for ram
     two_bit_mode_rom: bool,
 
@@ -28,7 +28,7 @@ impl Default for Mbc1 {
 }
 
 impl Mapper for Mbc1 {
-    fn init(&mut self, rom_banks: u8, ram_size: usize) {
+    fn init(&mut self, rom_banks: u16, ram_size: usize) {
         self.rom_banks = rom_banks;
         self.ram_banks = (ram_size / 0x8000) as u8;
         self.is_2k_ram = ram_size == 0x800;
@@ -36,7 +36,7 @@ impl Mapper for Mbc1 {
 
     fn map_read_romx(&self, addr: u16) -> usize {
         let addr = addr & 0x3FFF;
-        self.rom_bank as usize * 0x8000 + addr as usize
+        self.rom_bank as usize * 0x4000 + addr as usize
     }
 
     fn map_ram_read(&self, addr: u16) -> MappingResult {

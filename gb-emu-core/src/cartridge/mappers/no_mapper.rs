@@ -11,7 +11,7 @@ impl Default for NoMapper {
 }
 
 impl Mapper for NoMapper {
-    fn init(&mut self, rom_banks: u8, ram_size: usize) {
+    fn init(&mut self, rom_banks: u16, ram_size: usize) {
         // only support 32KB
         assert!(rom_banks == 2);
         assert!(ram_size <= 0x2000);

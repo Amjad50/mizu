@@ -253,7 +253,7 @@ impl Cartridge {
                     cartridge_type.mapper_type,
                 ))?;
 
-        mapper.init(num_rom_banks, ram_size);
+        mapper.init((rom_size / 0x4000) as u16, ram_size);
 
         Ok(Self {
             file_path: file_path.as_ref().to_path_buf().into_boxed_path(),
