@@ -74,7 +74,7 @@ pub enum OperandType {
     Implied,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub enum Condition {
     NC,
     C,
@@ -83,7 +83,7 @@ pub enum Condition {
     Unconditional,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub enum Opcode {
     Nop,
     Stop,
@@ -162,7 +162,7 @@ impl Instruction {
         }
     }
 
-    fn from_prefix(byte: u8) -> Self {
+    pub fn from_prefix(byte: u8) -> Self {
         let (opcode, operand_types) = instructions_table::PREFIXED_INSTRUCTIONS[byte as usize];
 
         Instruction {

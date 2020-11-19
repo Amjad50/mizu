@@ -32,7 +32,7 @@ impl Ram {
     }
 }
 
-struct Bus {
+pub struct Bus {
     cartridge: Cartridge,
     ppu: Ppu,
     ram: Ram,
@@ -48,8 +48,19 @@ impl Bus {
     }
 }
 
+impl Bus {
+    fn on_cpu_machine_cycle(&mut self) {
+        // clock the ppu four times
+        for _ in 0..4 {
+            self.ppu.clock();
+        }
+    }
+}
+
 impl CpuBusProvider for Bus {
+    // each time the cpu reads, clock the ppu
     fn read(&mut self, addr: u16) -> u8 {
+        self.on_cpu_machine_cycle();
         match addr {
             0x0000..=0x3FFF => self.cartridge.read_rom0(addr), // rom0
             0x4000..=0x7FFF => self.cartridge.read_romx(addr), // romx

@@ -29,8 +29,28 @@ pub struct Cpu {
     ime: bool,
 }
 
-// pub
 impl Cpu {
+    pub fn new() -> Self {
+        let mut cpu = Self {
+            reg_a: 0,
+            reg_b: 0,
+            reg_c: 0,
+            reg_d: 0,
+            reg_e: 0,
+            reg_h: 0,
+            reg_l: 0,
+            reg_f: CpuFlags::from_bits_truncate(0),
+            reg_sp: 0,
+            reg_pc: 0,
+
+            ime: false,
+        };
+
+        cpu.reset();
+
+        cpu
+    }
+
     pub fn reset(&mut self) {
         // initial values of the registers (DMG)
         self.reg_af_write(0x01B0);
@@ -39,6 +59,15 @@ impl Cpu {
         self.reg_hl_write(0x014D);
         self.reg_sp = 0xFFFE;
         self.reg_pc = 0x0100;
+    }
+
+    pub fn next_instruction<P: CpuBusProvider>(&mut self, bus: &mut P) {
+        let mut instruction = Instruction::from_byte(self.fetch_next_pc(bus));
+        if instruction.opcode == Opcode::Prefix {
+            instruction = Instruction::from_prefix(self.fetch_next_pc(bus));
+        }
+
+        self.exec_instruction(instruction, bus);
     }
 }
 
