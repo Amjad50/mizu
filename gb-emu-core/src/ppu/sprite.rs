@@ -1,6 +1,7 @@
 use bitflags::bitflags;
 
 bitflags! {
+    #[derive(Default)]
     struct SpriteFlags: u8 {
         const PRIORITY = 1 << 7;
         const X_FLIP   = 1 << 6;
@@ -9,6 +10,7 @@ bitflags! {
     }
 }
 
+#[derive(Clone, Copy, Default)]
 pub struct Sprite {
     y: u8,
     x: u8,
@@ -37,5 +39,17 @@ impl Sprite {
                 .clone_from(&SpriteFlags::from_bits_truncate(data)),
             _ => unreachable!(),
         }
+    }
+
+    pub fn y(&self) -> u8 {
+        self.y
+    }
+
+    pub fn x(&self) -> u8 {
+        self.x
+    }
+
+    pub fn pattern(&self) -> u8 {
+        self.pattern
     }
 }

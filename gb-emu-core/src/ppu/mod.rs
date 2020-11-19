@@ -1,3 +1,4 @@
+mod fifo;
 mod ppu;
 mod sprite;
 

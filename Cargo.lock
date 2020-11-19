@@ -7,8 +7,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
+name = "fixed-vec-deque"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14c0bc0a5a14538da76b4127910be3eca0df0fb8fd6dc893fe620ecf583dda71"
+
+[[package]]
 name = "gb-emu-core"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "fixed-vec-deque",
 ]

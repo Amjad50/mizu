@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 bitflags = "1.2.1"
+fixed-vec-deque = "0.1.9"
