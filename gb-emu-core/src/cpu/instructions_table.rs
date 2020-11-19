@@ -259,7 +259,7 @@ pub(super) const INSTRUCTIONS: &[(Opcode, (OperandType, OperandType)); 256] = &[
     (Ei, (Implied, Implied)),
     (Illegal, (Implied, Implied)),
     (Illegal, (Implied, Implied)),
-    (Cp, (RegA, Imm8)),
+    (Cp, (Implied, Imm8)),
     (Rst, (Implied, RstLoc(56))),
 ];
 

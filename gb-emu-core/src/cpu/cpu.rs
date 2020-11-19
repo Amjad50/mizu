@@ -280,7 +280,7 @@ impl Cpu {
             Opcode::Pop => self.stack_pop(bus),
             Opcode::Inc16 => src.wrapping_add(1),
             Opcode::Inc => {
-                let result = src.wrapping_add(1);
+                let result = src.wrapping_add(1) & 0xff;
 
                 self.flag_set(CpuFlags::Z, result == 0);
                 self.flag_set(CpuFlags::N, false);
@@ -340,8 +340,19 @@ impl Cpu {
 
                 result
             }
-            Opcode::Cp | Opcode::Sub => {
+            Opcode::Sub => {
                 let dest = self.read_operand(instruction.operand_types.0, bus);
+                let result = dest.wrapping_sub(src);
+
+                self.flag_set(CpuFlags::Z, result == 0);
+                self.flag_set(CpuFlags::N, true);
+                self.flag_set(CpuFlags::H, (dest & 0xf) < (src & 0xf));
+                self.flag_set(CpuFlags::C, result & 0xff00 != 0);
+
+                result
+            }
+            Opcode::Cp => {
+                let dest = self.reg_a as u16;
                 let result = dest.wrapping_sub(src);
 
                 self.flag_set(CpuFlags::Z, result == 0);
