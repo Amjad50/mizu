@@ -23,4 +23,8 @@ impl GameBoy {
         // this will clock the Bus as well as many times as it needs
         self.cpu.next_instruction(&mut self.bus);
     }
+
+    pub fn screen_buffer(&self) -> Vec<u8> {
+        self.bus.screen_buffer()
+    }
 }

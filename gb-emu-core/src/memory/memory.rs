@@ -46,6 +46,10 @@ impl Bus {
             ram: Ram::default(),
         }
     }
+
+    pub fn screen_buffer(&self) -> Vec<u8> {
+        self.ppu.screen_buffer()
+    }
 }
 
 impl Bus {

@@ -108,14 +108,25 @@ impl LcdStatus {
 }
 
 // tmp
-#[derive(Default)]
 pub struct Lcd {
     x: u8,
     y: u8,
+    buf: [u8; 160 * 144],
+}
+
+impl Default for Lcd {
+    fn default() -> Self {
+        Self {
+            x: 0,
+            y: 0,
+            buf: [0; 160 * 144],
+        }
+    }
 }
 
 impl Lcd {
     fn push(&mut self, pixel: u8) {
+        self.buf[self.y as usize * 160 + self.x as usize] = (pixel & 3) * 85;
         self.x += 1;
     }
 
@@ -126,6 +137,15 @@ impl Lcd {
     fn next_line(&mut self) {
         self.x = 0;
         self.y += 1; // not needed?
+    }
+
+    fn next_frame(&mut self) {
+        self.x = 0;
+        self.y = 0;
+    }
+
+    fn screen_buffer(&self) -> Vec<u8> {
+        self.buf.to_vec()
     }
 }
 
@@ -256,6 +276,10 @@ impl Ppu {
         }
     }
 
+    pub fn screen_buffer(&self) -> Vec<u8> {
+        self.lcd.screen_buffer()
+    }
+
     pub fn clock(&mut self) {
         // change modes depending on cycle
         match (self.scanline, self.cycle) {
@@ -293,6 +317,7 @@ impl Ppu {
             self.scanline += 1;
             if self.scanline == 154 {
                 self.scanline = 0;
+                self.lcd.next_frame();
             }
         }
     }
@@ -302,7 +327,7 @@ impl Ppu {
     fn draw(&mut self) {
         if self.bg_fifo.len() > 8 {
             self.lcd.push(self.bg_fifo.pop().color());
-            if self.lcd.x() == 161 {
+            if self.lcd.x() == 160 {
                 self.lcd.next_line();
                 // clear for the next line
                 self.bg_fifo.clear();
@@ -346,9 +371,9 @@ impl Ppu {
 
     fn get_bg_tile(&self, tile_x: u8, tile_y: u8) -> u8 {
         let tile_map = self.lcd_control.bg_tilemap();
-        let index = tile_y * 32 + tile_x;
+        let index = tile_y as usize * 32 + tile_x as usize;
 
-        self.vram[tile_map as usize + index as usize]
+        self.vram[tile_map as usize + index]
     }
 
     fn get_bg_pattern(&self, tile: u8, y: u8) -> [u8; 8] {

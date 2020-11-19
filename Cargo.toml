@@ -1,4 +1,5 @@
 [workspace]
 members = [
-    "gb-emu-core"
+    "gb-emu-core",
+    "gb-emu-sfml"
 ]
