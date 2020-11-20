@@ -636,7 +636,7 @@ impl Cpu {
             Opcode::Bit(bit) => {
                 self.flag_set(CpuFlags::Z, (src >> bit) & 1 == 0);
                 self.flag_set(CpuFlags::N, false);
-                self.flag_set(CpuFlags::H, false);
+                self.flag_set(CpuFlags::H, true);
                 0
             }
             Opcode::Res(bit) => src & !((1 << bit) as u16),
