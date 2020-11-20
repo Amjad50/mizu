@@ -74,6 +74,8 @@ impl Cpu {
     pub fn next_instruction<P: CpuBusProvider>(&mut self, bus: &mut P) {
         match self.halt_mode {
             HaltMode::HaltRunInterrupt => {
+                // to run the clock
+                bus.read(0);
                 if bus.check_interrupts() {
                     self.halt_mode = HaltMode::NotHalting;
                     if let Some(int_vector) = bus.get_interrupts() {
@@ -85,11 +87,15 @@ impl Cpu {
                 }
             }
             HaltMode::HaltNoRunInterrupt => {
+                // to run the clock
+                bus.read(0);
                 if bus.check_interrupts() {
                     self.halt_mode = HaltMode::NotHalting;
                 }
             }
             HaltMode::HaltBug => {
+                // to run the clock
+                bus.read(0);
                 // TODO: implement halt bug
             }
             HaltMode::NotHalting => {
