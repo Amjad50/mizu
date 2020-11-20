@@ -1,5 +1,7 @@
 use super::instructions_table;
+use std::fmt::Display;
 
+#[derive(Debug)]
 pub(super) struct Instruction {
     pub opcode: Opcode,
     pub src: OperandType,
@@ -168,6 +170,106 @@ impl Instruction {
             src: operand_types.1,
             dest: operand_types.0,
         }
+    }
+}
+
+fn operand_str(operand: OperandType) -> String {
+    match operand {
+        OperandType::RegA => "A".into(),
+        OperandType::RegB => "B".into(),
+        OperandType::RegC => "C".into(),
+        OperandType::RegD => "D".into(),
+        OperandType::RegE => "E".into(),
+        OperandType::RegH => "H".into(),
+        OperandType::RegL => "L".into(),
+        OperandType::AddrHL => "(HL)".into(),
+        OperandType::AddrHLDec => "(HL-)".into(),
+        OperandType::AddrHLInc => "(HL+)".into(),
+        OperandType::AddrBC => "(BC)".into(),
+        OperandType::AddrDE => "(DE)".into(),
+        OperandType::RegAF => "AF".into(),
+        OperandType::RegBC => "BC".into(),
+        OperandType::RegDE => "DE".into(),
+        OperandType::RegHL => "HL".into(),
+        OperandType::RegSP => "SP".into(),
+        OperandType::Imm8 => "d8".into(),
+        OperandType::Imm8Signed => "r8".into(),
+        OperandType::Imm16 => "d16".into(),
+        OperandType::HighAddr8 => "(a8)".into(),
+        OperandType::HighAddrC => "(C)".into(),
+        OperandType::Addr16 => "(a16)".into(),
+        OperandType::Addr16Val16 => "(a16)".into(),
+        OperandType::Implied => "".into(),
+    }
+}
+
+impl Display for Instruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let opcode: String = match self.opcode {
+            Opcode::Nop => "NOP".into(),
+            Opcode::Stop => "STOP".into(),
+            Opcode::Ld => "LD".into(),
+            Opcode::LdHLSPSigned8 => "LDHLSP".into(),
+            Opcode::Push => "PUSH".into(),
+            Opcode::Pop => "POP".into(),
+            Opcode::Inc => "INC".into(),
+            Opcode::Inc16 => "INC".into(),
+            Opcode::Dec => "DEC".into(),
+            Opcode::Dec16 => "DEC".into(),
+            Opcode::Add => "ADD".into(),
+            Opcode::Add16 => "ADD".into(),
+            Opcode::AddSPSigned8 => "ADD".into(),
+            Opcode::Adc => "ADC".into(),
+            Opcode::Cp => "CP".into(),
+            Opcode::Sub => "SUB".into(),
+            Opcode::Sbc => "SBC".into(),
+            Opcode::And => "AND".into(),
+            Opcode::Xor => "XOR".into(),
+            Opcode::Or => "OR".into(),
+            Opcode::Jp(Condition::Unconditional) => "JP".into(),
+            Opcode::Jp(cond) => format!("JP {:?},", cond),
+            Opcode::Jr(Condition::Unconditional) => "JR".into(),
+            Opcode::Jr(cond) => format!("JR {:?},", cond),
+            Opcode::Call(Condition::Unconditional) => "CALL".into(),
+            Opcode::Call(cond) => format!("CALL {:?},", cond),
+            Opcode::Ret(Condition::Unconditional) => "RET".into(),
+            Opcode::Ret(cond) => format!("RET {:?},", cond),
+            Opcode::Reti => "RETI".into(),
+            Opcode::Rst(loc) => format!("RST {:02X}", loc),
+            Opcode::Di => "DI".into(),
+            Opcode::Ei => "EI".into(),
+            Opcode::Ccf => "CCF".into(),
+            Opcode::Scf => "SCF".into(),
+            Opcode::Daa => "DAA".into(),
+            Opcode::Cpl => "CPL".into(),
+            Opcode::Rlca => "RLCA".into(),
+            Opcode::Rla => "RLA".into(),
+            Opcode::Rrca => "RRCA".into(),
+            Opcode::Rra => "RRA".into(),
+            Opcode::Prefix => "PREFIX".into(),
+            Opcode::Rlc => "RLC".into(),
+            Opcode::Rrc => "RRC".into(),
+            Opcode::Rl => "RL".into(),
+            Opcode::Rr => "RR".into(),
+            Opcode::Sla => "SLA".into(),
+            Opcode::Sra => "SRA".into(),
+            Opcode::Swap => "SWAP".into(),
+            Opcode::Srl => "SRL".into(),
+            Opcode::Bit(n) => format!("BIT {},", n),
+            Opcode::Res(n) => format!("RES {},", n),
+            Opcode::Set(n) => format!("SET {},", n),
+            Opcode::Illegal => "ILLEGAL".into(),
+            Opcode::Halt => "HALT".into(),
+        };
+
+        let mut operands = operand_str(self.src);
+        if operands.is_empty() {
+            operands = operand_str(self.dest);
+        } else if !operand_str(self.dest).is_empty() {
+            operands += &format!(",{}", operand_str(self.dest));
+        }
+
+        write!(f, "{} {}", opcode, operands)
     }
 }
 
