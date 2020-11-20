@@ -165,7 +165,7 @@ impl Cpu {
             OperandType::Imm8 => self.fetch_next_pc(bus) as u16,
             OperandType::Imm8Signed => self.fetch_next_pc(bus) as i8 as i16 as u16,
             OperandType::Imm16 => {
-                ((self.fetch_next_pc(bus) as u16) << 8) | self.fetch_next_pc(bus) as u16
+                (self.fetch_next_pc(bus) as u16) | ((self.fetch_next_pc(bus) as u16) << 8)
             }
             OperandType::HighAddr8 => {
                 let addr = 0xFF00 | self.fetch_next_pc(bus) as u16;
@@ -173,7 +173,8 @@ impl Cpu {
             }
             OperandType::HighAddrC => bus.read(0xFF00 | self.reg_c as u16) as u16,
             OperandType::Addr16 => {
-                let addr = ((self.fetch_next_pc(bus) as u16) << 8) | self.fetch_next_pc(bus) as u16;
+                let addr =
+                    (self.fetch_next_pc(bus) as u16) | ((self.fetch_next_pc(bus) as u16) << 8);
                 bus.read(addr) as u16
             }
             OperandType::RstLoc(location) => location as u16,
@@ -215,11 +216,13 @@ impl Cpu {
             }
             OperandType::HighAddrC => bus.write(0xFF00 | self.reg_c as u16, data as u8),
             OperandType::Addr16 => {
-                let addr = ((self.fetch_next_pc(bus) as u16) << 8) | self.fetch_next_pc(bus) as u16;
+                let addr =
+                    (self.fetch_next_pc(bus) as u16) | ((self.fetch_next_pc(bus) as u16) << 8);
                 bus.write(addr, data as u8);
             }
             OperandType::Addr16Val16 => {
-                let addr = ((self.fetch_next_pc(bus) as u16) << 8) | self.fetch_next_pc(bus) as u16;
+                let addr =
+                    (self.fetch_next_pc(bus) as u16) | ((self.fetch_next_pc(bus) as u16) << 8);
                 bus.write(addr, data as u8);
                 bus.write(addr.wrapping_add(1), (data >> 8) as u8);
             }
