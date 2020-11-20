@@ -36,6 +36,7 @@ pub struct Bus {
     cartridge: Cartridge,
     ppu: Ppu,
     ram: Ram,
+    hram: [u8; 127],
 }
 
 impl Bus {
@@ -44,6 +45,7 @@ impl Bus {
             cartridge,
             ppu: Ppu::default(),
             ram: Ram::default(),
+            hram: [0; 127],
         }
     }
 
@@ -79,7 +81,7 @@ impl CpuBusProvider for Bus {
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.read_register(addr), // ppu io registers
             // 0xFF46 => 0xFF,                                    // dma start
             // 0xFF4C..=0xFF7F => 0xFF,                           // io registers
-            // 0xFF80..=0xFFFE => 0xFF,                           // hram
+            0xFF80..=0xFFFE => self.hram[addr as usize & 0x7F], // hram
             // 0xFFFF => 0xFF,                                    // ie register?
             _ => {
                 println!("Tried reading unmapped address {:04X}", addr);
@@ -102,7 +104,7 @@ impl CpuBusProvider for Bus {
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.write_register(addr, data), // ppu io registers
             // 0xFF46 => {}                                                              // dma start
             // 0xFF4C..=0xFF7F => {} // io registers
-            // 0xFF80..=0xFFFE => {} // hram
+            0xFF80..=0xFFFE => self.hram[addr as usize & 0x7F] = data, // hram
             // 0xFFFF => {}          // ie register?
             _ => {
                 println!(
