@@ -267,8 +267,8 @@ impl Cpu {
 
                 self.flag_set(CpuFlags::Z, false);
                 self.flag_set(CpuFlags::N, false);
-                self.flag_set(CpuFlags::H, (self.reg_sp & 0xf) > (result & 0xf));
-                self.flag_set(CpuFlags::C, result & 0xff00 != 0);
+                self.flag_set(CpuFlags::H, (self.reg_sp & 0xf) + (src & 0xf) > 0xf);
+                self.flag_set(CpuFlags::C, (self.reg_sp & 0xff) + (src & 0xff) > 0xff);
 
                 result
             }
@@ -322,8 +322,8 @@ impl Cpu {
 
                 self.flag_set(CpuFlags::Z, false);
                 self.flag_set(CpuFlags::N, false);
-                self.flag_set(CpuFlags::H, result & 0xfff0 != 0);
-                self.flag_set(CpuFlags::C, result & 0xff00 != 0);
+                self.flag_set(CpuFlags::H, (dest & 0xf) + (src & 0xf) > 0xf);
+                self.flag_set(CpuFlags::C, (dest & 0xff) + (src & 0xff) > 0xff);
 
                 result
             }
