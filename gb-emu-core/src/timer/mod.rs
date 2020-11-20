@@ -1,3 +1,3 @@
 mod timer;
 
-pub use timer::{Divider, Timer};
+pub use timer::Timer;

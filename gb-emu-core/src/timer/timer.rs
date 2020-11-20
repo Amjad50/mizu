@@ -14,12 +14,13 @@ impl TimerControl {
         self.intersects(Self::TIMER_ENABLE)
     }
 
-    fn freq_divider(&self) -> u16 {
+    fn freq_divider_selection_bit(&self) -> u16 {
+        // which bit to check for falling edge when incrementing
         match self.bits() & Self::FREQ_DIVIDER.bits {
-            0 => 1024,
-            1 => 16,
-            2 => 64,
-            3 => 256,
+            0 => 9,
+            1 => 3,
+            2 => 5,
+            3 => 7,
             _ => unreachable!(),
         }
     }
@@ -27,24 +28,26 @@ impl TimerControl {
 
 #[derive(Default)]
 pub struct Timer {
+    divider: u16,
     timer_counter: u8,
     timer_modulo: u8,
-    timer_offset: u16,
     timer_control: TimerControl,
 }
 
 impl Timer {
     pub fn read_register(&self, addr: u16) -> u8 {
         match addr {
+            0xFF04 => (self.divider >> 8) as u8,
             0xFF05 => self.timer_counter,
             0xFF06 => self.timer_modulo,
-            0xFF07 => self.timer_control.bits(),
+            0xFF07 => self.timer_control.bits() | 0xF8,
             _ => unreachable!(),
         }
     }
 
     pub fn write_register(&mut self, addr: u16, data: u8) {
         match addr {
+            0xFF04 => self.divider = 0, // reset
             0xFF05 => self.timer_counter = data,
             0xFF06 => self.timer_modulo = data,
             0xFF07 => self
@@ -54,45 +57,35 @@ impl Timer {
         }
     }
 
-    pub fn clock_timer<I: InterruptManager>(&mut self, interrupt: &mut I) {
-        if self.timer_control.timer_enabled() {
-            self.timer_offset += 4;
+    pub fn reset(&mut self) {
+        self.divider = 0xABCC;
+    }
 
-            if self.timer_offset == self.timer_control.freq_divider() {
-                self.timer_offset = 0;
-                let (new_counter, overflow) = self.timer_counter.overflowing_add(1);
+    pub fn clock_divider<I: InterruptManager>(&mut self, interrupt: &mut I) {
+        let bit = self.timer_control.freq_divider_selection_bit();
+        let saved_divider_bit = (self.divider >> bit) & 1;
 
-                if overflow {
-                    self.timer_counter = self.timer_modulo;
-                    // generate interrupt
-                    interrupt.request_interrupt(InterruptType::Timer);
-                } else {
-                    self.timer_counter = new_counter;
-                }
-            }
+        // because each CPU M-cycle is 4 T-cycles
+        self.divider = self.divider.wrapping_add(4);
+
+        let new_divider_bit = (self.divider >> bit) & 1;
+
+        if self.timer_control.timer_enabled() && saved_divider_bit == 1 && new_divider_bit == 0 {
+            self.increment_timer(interrupt)
         }
     }
 }
 
-#[derive(Default)]
-pub struct Divider(u16);
+impl Timer {
+    fn increment_timer<I: InterruptManager>(&mut self, interrupt: &mut I) {
+        let (new_counter, overflow) = self.timer_counter.overflowing_add(1);
 
-impl Divider {
-    pub fn reset(&mut self) {
-        self.0 = 0xABCC;
-    }
-    pub fn clock_divider(&mut self) {
-        // because each CPU M-cycle is 4 T-cycles
-        self.0 = self.0.wrapping_add(4);
-    }
-
-    pub fn read_divider(&mut self) -> u8 {
-        (self.0 >> 8) as u8
-    }
-
-    /// The value to write to the divider does not matter as
-    /// it will be reset to 0
-    pub fn write_divider(&mut self) {
-        self.0 = 0;
+        if overflow {
+            self.timer_counter = self.timer_modulo;
+            // generate interrupt
+            interrupt.request_interrupt(InterruptType::Timer);
+        } else {
+            self.timer_counter = new_counter;
+        }
     }
 }
