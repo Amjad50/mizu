@@ -62,6 +62,15 @@ impl Cpu {
     }
 
     pub fn next_instruction<P: CpuBusProvider>(&mut self, bus: &mut P) {
+        if self.ime {
+            if let Some(int_vector) = bus.get_interrupts() {
+                self.stack_push(self.reg_pc, bus);
+                self.reg_pc = int_vector as u16;
+                self.ime = false;
+                return;
+            }
+        }
+
         let mut instruction = Instruction::from_byte(self.fetch_next_pc(bus));
         if instruction.opcode == Opcode::Prefix {
             instruction = Instruction::from_prefix(self.fetch_next_pc(bus));

@@ -1,4 +1,5 @@
-use crate::cartridge::{Cartridge, CartridgeError};
+use super::interrupts::Interrupts;
+use crate::cartridge::Cartridge;
 use crate::cpu::CpuBusProvider;
 use crate::ppu::Ppu;
 
@@ -36,6 +37,7 @@ pub struct Bus {
     cartridge: Cartridge,
     ppu: Ppu,
     ram: Ram,
+    interrupts: Interrupts,
     hram: [u8; 127],
 }
 
@@ -45,6 +47,7 @@ impl Bus {
             cartridge,
             ppu: Ppu::default(),
             ram: Ram::default(),
+            interrupts: Interrupts::default(),
             hram: [0; 127],
         }
     }
@@ -58,7 +61,7 @@ impl Bus {
     fn on_cpu_machine_cycle(&mut self) {
         // clock the ppu four times
         for _ in 0..4 {
-            self.ppu.clock();
+            self.ppu.clock(&mut self.interrupts);
         }
     }
 }
@@ -78,11 +81,12 @@ impl CpuBusProvider for Bus {
             0xFE00..=0xFE9F => self.ppu.read_oam(addr), // ppu oam
             // 0xFEA0..=0xFEFF => 0xFF,                           // unused
             // 0xFF00..=0xFF3F => 0xFF,                           // io registers
+            0xFF0F => self.interrupts.read_interrupt_flags(),
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.read_register(addr), // ppu io registers
             // 0xFF46 => 0xFF,                                    // dma start
             // 0xFF4C..=0xFF7F => 0xFF,                           // io registers
             0xFF80..=0xFFFE => self.hram[addr as usize & 0x7F], // hram
-            // 0xFFFF => 0xFF,                                    // ie register?
+            0xFFFF => self.interrupts.read_interrupt_enable(),
             _ => {
                 println!("Tried reading unmapped address {:04X}", addr);
                 0xFF
@@ -101,11 +105,12 @@ impl CpuBusProvider for Bus {
             0xFE00..=0xFE9F => self.ppu.write_oam(addr, data), // ppu oam
             //0xFEA0..=0xFEFF => {}                                                   // unused
             //0xFF00..=0xFF3F => {}                                                   // io registers
+            0xFF0F => self.interrupts.write_interrupt_flags(data),
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.write_register(addr, data), // ppu io registers
             // 0xFF46 => {}                                                              // dma start
             // 0xFF4C..=0xFF7F => {} // io registers
             0xFF80..=0xFFFE => self.hram[addr as usize & 0x7F] = data, // hram
-            // 0xFFFF => {}          // ie register?
+            0xFFFF => self.interrupts.write_interrupt_enable(data),
             _ => {
                 println!(
                     "Tried writing to unmapped address {:04X}, data = {:02X}",
@@ -115,11 +120,7 @@ impl CpuBusProvider for Bus {
         }
     }
 
-    fn check_interrupts(&mut self) -> bool {
-        todo!()
-    }
-
-    fn ack_interrupt(&mut self) {
-        todo!()
+    fn get_interrupts(&mut self) -> Option<u8> {
+        self.interrupts.get_highest_interrupt_addr_and_ack()
     }
 }

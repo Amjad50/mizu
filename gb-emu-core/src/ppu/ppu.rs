@@ -1,6 +1,7 @@
 use super::fifo::Fifo;
 use super::lcd::Lcd;
 use super::sprite::Sprite;
+use crate::memory::{InterruptManager, InterruptType};
 use bitflags::bitflags;
 
 bitflags! {
@@ -96,6 +97,10 @@ impl LcdStatus {
         self.intersects(Self::MODE_0_HBLANK_INTERRUPT)
     }
 
+    fn coincidence_flag_set(&mut self, value: bool) {
+        self.set(Self::COINCIDENCE_FLAG, value);
+    }
+
     fn current_mode(&self) -> u8 {
         self.bits() & Self::MODE_FLAG.bits
     }
@@ -110,7 +115,7 @@ impl LcdStatus {
 
 pub struct Ppu {
     lcd_control: LcdControl,
-    lcdc_status: LcdStatus,
+    lcd_status: LcdStatus,
     scroll_y: u8,
     scroll_x: u8,
 
@@ -141,7 +146,7 @@ impl Default for Ppu {
     fn default() -> Self {
         let mut ppu = Self {
             lcd_control: LcdControl::from_bits_truncate(0),
-            lcdc_status: LcdStatus::from_bits_truncate(0),
+            lcd_status: LcdStatus::from_bits_truncate(0),
             scroll_y: 0,
             scroll_x: 0,
             lyc: 0,
@@ -201,7 +206,7 @@ impl Ppu {
     pub fn read_register(&mut self, addr: u16) -> u8 {
         match addr {
             0xFF40 => self.lcd_control.bits(),
-            0xFF41 => self.lcdc_status.bits(),
+            0xFF41 => self.lcd_status.bits(),
             0xFF42 => self.scroll_y,
             0xFF43 => self.scroll_x,
             0xFF44 => self.scanline,
@@ -221,7 +226,7 @@ impl Ppu {
                 .lcd_control
                 .clone_from(&LcdControl::from_bits_truncate(data)),
             0xFF41 => self
-                .lcdc_status
+                .lcd_status
                 .clone_from(&LcdStatus::from_bits_truncate(data & 0x78)),
             0xFF42 => self.scroll_y = data,
             0xFF43 => self.scroll_x = data,
@@ -242,33 +247,61 @@ impl Ppu {
         self.lcd.screen_buffer()
     }
 
-    pub fn clock(&mut self) {
+    pub fn clock<I: InterruptManager>(&mut self, interrupt_manager: &mut I) {
         // change modes depending on cycle
         match (self.scanline, self.cycle) {
             (0, 0) => {
                 // change to mode 2 from mode 1
-                self.lcdc_status.current_mode_set(2);
+                self.lcd_status.current_mode_set(2);
+
+                if self.lcd_status.mode_2_oam_interrupt() {
+                    interrupt_manager.request_interrupt(InterruptType::LcdStat);
+                }
             }
             (1..=143, 0) => {
                 // change to mode 2 from mode 0
-                self.lcdc_status.current_mode_set(2);
+                self.lcd_status.current_mode_set(2);
+
+                if self.lcd_status.mode_2_oam_interrupt() {
+                    interrupt_manager.request_interrupt(InterruptType::LcdStat);
+                }
             }
             (0..=143, 80) => {
                 // change to mode 3 from mode 2
-                self.lcdc_status.current_mode_set(3);
+                self.lcd_status.current_mode_set(3);
             }
             (144, 0) => {
                 // change to mode 1 from mode 0
-                self.lcdc_status.current_mode_set(1);
+                self.lcd_status.current_mode_set(1);
+
+                // FIXME: check if two interrupts are being fired
+                interrupt_manager.request_interrupt(InterruptType::Vblank);
+                if self.lcd_status.mode_1_vblank_interrupt() {
+                    interrupt_manager.request_interrupt(InterruptType::LcdStat);
+                }
             }
             _ => {}
         }
 
-        match self.lcdc_status.current_mode() {
+        if self.cycle == 0 {
+            let flag = self.scanline == self.lyc;
+
+            self.lcd_status.coincidence_flag_set(flag);
+
+            if flag && self.lcd_status.lyc_ly_interrupt() {
+                interrupt_manager.request_interrupt(InterruptType::LcdStat);
+            }
+        }
+
+        match self.lcd_status.current_mode() {
             0 => {}
             1 => {}
             2 => {}
-            3 => self.draw(),
+            3 => {
+                if self.draw() && self.lcd_status.mode_0_hblank_interrupt() {
+                    interrupt_manager.request_interrupt(InterruptType::LcdStat);
+                }
+            }
             _ => {}
         }
 
@@ -286,7 +319,9 @@ impl Ppu {
 }
 
 impl Ppu {
-    fn draw(&mut self) {
+    /// return true, if this is the last draw in the current scanline, and
+    /// mode 0 is being activated
+    fn draw(&mut self) -> bool {
         if self.bg_fifo.len() > 8 {
             self.lcd.push(self.bg_fifo.pop().color());
             if self.lcd.x() == 160 {
@@ -295,8 +330,8 @@ impl Ppu {
                 self.bg_fifo.clear();
                 self.fetcher_x = 0;
                 // change mode to 0 from 3
-                self.lcdc_status.current_mode_set(0);
-                return;
+                self.lcd_status.current_mode_set(0);
+                return true;
             }
         }
 
@@ -307,6 +342,8 @@ impl Ppu {
             self.bg_fifo.push_bg(bg_colors);
             self.fetcher_x += 1;
         }
+
+        false
     }
 
     fn get_bg_window_tile(&mut self) -> u8 {
