@@ -43,7 +43,7 @@ impl LcdControl {
     }
 
     fn bg_window_pattern_table_block_1(&self) -> bool {
-        self.intersects(Self::BG_WINDOW_PATTERN_TABLE)
+        !self.intersects(Self::BG_WINDOW_PATTERN_TABLE)
     }
 
     fn bg_tilemap(&self) -> u16 {
@@ -167,6 +167,8 @@ pub struct Ppu {
     selected_oam: [Sprite; 10],
     selected_oam_size: u8,
 
+    fetcher_x: u8,
+
     bg_fifo: Fifo,
     sprite_fifo: Fifo,
 
@@ -192,6 +194,7 @@ impl Default for Ppu {
             oam: [Sprite::default(); 40],
             selected_oam: [Sprite::default(); 10],
             selected_oam_size: 0,
+            fetcher_x: 0,
             bg_fifo: Fifo::default(),
             sprite_fifo: Fifo::default(),
             lcd: Lcd::default(),
@@ -291,7 +294,7 @@ impl Ppu {
                 // change to mode 2 from mode 0
                 self.lcdc_status.current_mode_set(2);
             }
-            (1..=143, 80) => {
+            (0..=143, 80) => {
                 // change to mode 3 from mode 2
                 self.lcdc_status.current_mode_set(3);
             }
@@ -331,16 +334,19 @@ impl Ppu {
                 self.lcd.next_line();
                 // clear for the next line
                 self.bg_fifo.clear();
+                self.fetcher_x = 0;
                 // change mode to 0 from 3
                 self.lcdc_status.current_mode_set(0);
+                return;
             }
         }
 
         let tile = self.get_bg_window_tile();
-        let bg_colors = self.get_bg_pattern(tile, self.scanline);
+        let bg_colors = self.get_bg_pattern(tile, self.scanline % 8);
 
         if self.bg_fifo.len() <= 8 {
             self.bg_fifo.push_bg(bg_colors);
+            self.fetcher_x += 1;
         }
     }
 
@@ -355,10 +361,10 @@ impl Ppu {
 
         //     self.get_window_tile(tile_x, tile_y);
         // } else {
-        tile_x = ((self.scroll_x / 8) + self.lcd.x()) & 0x1F;
-        tile_y = self.scanline + self.scroll_y;
+        tile_x = ((self.scroll_x / 8) + self.fetcher_x) & 0x1F;
+        tile_y = self.scanline.wrapping_add(self.scroll_y);
 
-        self.get_bg_tile(tile_x / 8, tile_y / 8)
+        self.get_bg_tile(tile_x, tile_y / 8)
         // }
     }
 
@@ -380,9 +386,10 @@ impl Ppu {
         let pattern_table = self.lcd_control.bg_window_pattern_table();
 
         let index = if self.lcd_control.bg_window_pattern_table_block_1() {
-            pattern_table.wrapping_add(tile as i8 as i16 as u16)
+            let tile_index = (tile as i8 as i16) * 16;
+            pattern_table.wrapping_add(tile_index as u16)
         } else {
-            pattern_table + (tile * 16) as u16
+            pattern_table + (tile as u16) * 16
         } as usize;
 
         let low = self.vram[index + (y as usize) * 2];
