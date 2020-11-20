@@ -177,7 +177,6 @@ impl Cpu {
                     (self.fetch_next_pc(bus) as u16) | ((self.fetch_next_pc(bus) as u16) << 8);
                 bus.read(addr) as u16
             }
-            OperandType::RstLoc(location) => location as u16,
             OperandType::Implied => 0,
             OperandType::Addr16Val16 => unreachable!(),
         }
@@ -227,10 +226,7 @@ impl Cpu {
                 bus.write(addr.wrapping_add(1), (data >> 8) as u8);
             }
             OperandType::Implied => {}
-            OperandType::Imm16
-            | OperandType::Imm8
-            | OperandType::RstLoc(_)
-            | OperandType::Imm8Signed => unreachable!(),
+            OperandType::Imm16 | OperandType::Imm8 | OperandType::Imm8Signed => unreachable!(),
         }
     }
 
@@ -444,8 +440,9 @@ impl Cpu {
                 self.ime = true;
                 0
             }
-            Opcode::Rst => {
-                self.reg_pc = src;
+            Opcode::Rst(loc) => {
+                self.stack_push(self.reg_pc, bus);
+                self.reg_pc = loc as u16;
                 0
             }
             Opcode::Di => {

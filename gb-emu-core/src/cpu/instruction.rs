@@ -68,8 +68,6 @@ pub enum OperandType {
     Addr16,
     Addr16Val16, // write 16bit value to address
 
-    RstLoc(u8),
-
     // Also for instructions with one operand as a fill
     Implied,
 }
@@ -117,7 +115,7 @@ pub enum Opcode {
 
     Reti,
 
-    Rst,
+    Rst(u8),
 
     Di,
     Ei,
