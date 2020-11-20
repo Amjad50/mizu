@@ -1,4 +1,5 @@
 mod fifo;
+mod lcd;
 mod ppu;
 mod sprite;
 

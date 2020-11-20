@@ -1,4 +1,5 @@
 use super::fifo::Fifo;
+use super::lcd::Lcd;
 use super::sprite::Sprite;
 use bitflags::bitflags;
 
@@ -104,48 +105,6 @@ impl LcdStatus {
             (self.bits() & !0b11) | data & 0b11,
         ));
         assert!(self.current_mode() == data & 0b11);
-    }
-}
-
-// tmp
-pub struct Lcd {
-    x: u8,
-    y: u8,
-    buf: [u8; 160 * 144],
-}
-
-impl Default for Lcd {
-    fn default() -> Self {
-        Self {
-            x: 0,
-            y: 0,
-            buf: [0; 160 * 144],
-        }
-    }
-}
-
-impl Lcd {
-    fn push(&mut self, pixel: u8) {
-        self.buf[self.y as usize * 160 + self.x as usize] = (pixel & 3) * 85;
-        self.x += 1;
-    }
-
-    fn x(&self) -> u8 {
-        self.x
-    }
-
-    fn next_line(&mut self) {
-        self.x = 0;
-        self.y += 1; // not needed?
-    }
-
-    fn next_frame(&mut self) {
-        self.x = 0;
-        self.y = 0;
-    }
-
-    fn screen_buffer(&self) -> Vec<u8> {
-        self.buf.to_vec()
     }
 }
 
