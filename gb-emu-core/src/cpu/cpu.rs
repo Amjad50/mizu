@@ -466,24 +466,27 @@ impl Cpu {
                 0
             }
             Opcode::Daa => {
-                let mut correction = 0;
+                let carry = self.flag_get(CpuFlags::C);
+                let halfcarry = self.flag_get(CpuFlags::H);
 
-                let neg = self.flag_get(CpuFlags::N);
+                if !self.flag_get(CpuFlags::N) {
+                    let mut correction = 0;
+                    if halfcarry || (self.reg_a & 0xf > 0x9) {
+                        correction |= 0x6;
+                    }
 
-                if self.flag_get(CpuFlags::H) || (!neg && (self.reg_a & 0xf > 0x9)) {
-                    correction |= 0x6;
-                }
+                    if carry || (self.reg_a & 0xff > 0x99) {
+                        correction |= 0x60;
+                        self.flag_set(CpuFlags::C, true);
+                    }
 
-                if self.flag_get(CpuFlags::C) || (!neg && (self.reg_a & 0xff > 0x99)) {
-                    correction |= 0x66;
+                    self.reg_a = self.reg_a.wrapping_add(correction);
+                } else if carry {
                     self.flag_set(CpuFlags::C, true);
+                    self.reg_a = self.reg_a.wrapping_add(if halfcarry { 0x9a } else { 0xa0 });
+                } else if halfcarry {
+                    self.reg_a = self.reg_a.wrapping_add(0xfa);
                 }
-
-                self.reg_a += if neg {
-                    -(correction as i8) as u8
-                } else {
-                    correction
-                };
 
                 self.flag_set(CpuFlags::Z, self.reg_a == 0);
                 self.flag_set(CpuFlags::H, false);
