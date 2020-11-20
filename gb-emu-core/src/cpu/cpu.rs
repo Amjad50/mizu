@@ -257,7 +257,7 @@ impl Cpu {
     }
 
     fn exec_instruction<P: CpuBusProvider>(&mut self, instruction: Instruction, bus: &mut P) {
-        let src = self.read_operand(instruction.operand_types.1, bus);
+        let src = self.read_operand(instruction.src, bus);
 
         let result = match instruction.opcode {
             Opcode::Nop => 0,
@@ -296,7 +296,7 @@ impl Cpu {
                 result
             }
             Opcode::Add => {
-                let dest = self.read_operand(instruction.operand_types.0, bus);
+                let dest = self.read_operand(instruction.dest, bus);
                 let result = dest.wrapping_add(src);
 
                 self.flag_set(CpuFlags::Z, result & 0xFF == 0);
@@ -307,7 +307,7 @@ impl Cpu {
                 result & 0xFF
             }
             Opcode::Add16 => {
-                let dest = self.read_operand(instruction.operand_types.0, bus);
+                let dest = self.read_operand(instruction.dest, bus);
                 let result = (dest as u32).wrapping_add(src as u32);
 
                 self.flag_set(CpuFlags::N, false);
@@ -317,7 +317,7 @@ impl Cpu {
                 result as u16
             }
             Opcode::AddSPSigned8 => {
-                let dest = self.read_operand(instruction.operand_types.0, bus);
+                let dest = self.read_operand(instruction.dest, bus);
                 let result = dest.wrapping_add(src);
 
                 self.flag_set(CpuFlags::Z, false);
@@ -328,7 +328,7 @@ impl Cpu {
                 result
             }
             Opcode::Adc => {
-                let dest = self.read_operand(instruction.operand_types.0, bus);
+                let dest = self.read_operand(instruction.dest, bus);
                 let carry = self.flag_get(CpuFlags::C) as u16;
                 let result = dest.wrapping_add(src).wrapping_add(carry);
 
@@ -340,7 +340,7 @@ impl Cpu {
                 result
             }
             Opcode::Sub => {
-                let dest = self.read_operand(instruction.operand_types.0, bus);
+                let dest = self.read_operand(instruction.dest, bus);
                 let result = dest.wrapping_sub(src);
 
                 self.flag_set(CpuFlags::Z, result & 0xFF == 0);
@@ -363,7 +363,7 @@ impl Cpu {
                 result & 0xFF
             }
             Opcode::Sbc => {
-                let dest = self.read_operand(instruction.operand_types.0, bus);
+                let dest = self.read_operand(instruction.dest, bus);
                 let carry = self.flag_get(CpuFlags::C) as u16;
                 let result = dest.wrapping_sub(src).wrapping_sub(carry);
 
@@ -378,7 +378,7 @@ impl Cpu {
                 result & 0xFF
             }
             Opcode::And => {
-                let dest = self.read_operand(instruction.operand_types.0, bus);
+                let dest = self.read_operand(instruction.dest, bus);
                 let result = dest & src & 0xff;
 
                 self.flag_set(CpuFlags::Z, result == 0);
@@ -389,7 +389,7 @@ impl Cpu {
                 result
             }
             Opcode::Xor => {
-                let dest = self.read_operand(instruction.operand_types.0, bus);
+                let dest = self.read_operand(instruction.dest, bus);
                 let result = (dest ^ src) & 0xff;
 
                 self.flag_set(CpuFlags::Z, result == 0);
@@ -400,7 +400,7 @@ impl Cpu {
                 result
             }
             Opcode::Or => {
-                let dest = self.read_operand(instruction.operand_types.0, bus);
+                let dest = self.read_operand(instruction.dest, bus);
                 let result = (dest | src) & 0xff;
 
                 self.flag_set(CpuFlags::Z, result == 0);
@@ -647,6 +647,6 @@ impl Cpu {
             Opcode::Prefix => unreachable!(),
         };
 
-        self.write_operand(instruction.operand_types.0, result, bus);
+        self.write_operand(instruction.dest, result, bus);
     }
 }

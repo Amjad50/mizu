@@ -2,8 +2,8 @@ use super::instructions_table;
 
 pub(super) struct Instruction {
     pub opcode: Opcode,
-    pub operand_types: (OperandType, OperandType),
-    pub operand_data: u16,
+    pub src: OperandType,
+    pub dest: OperandType,
 }
 
 /// This is the location the operands will come from,
@@ -155,8 +155,8 @@ impl Instruction {
 
         Instruction {
             opcode,
-            operand_types,
-            operand_data: 0,
+            src: operand_types.1,
+            dest: operand_types.0,
         }
     }
 
@@ -165,8 +165,8 @@ impl Instruction {
 
         Instruction {
             opcode,
-            operand_types,
-            operand_data: 0,
+            src: operand_types.1,
+            dest: operand_types.0,
         }
     }
 }
