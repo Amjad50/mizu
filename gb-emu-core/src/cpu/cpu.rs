@@ -72,12 +72,33 @@ impl Cpu {
     }
 
     pub fn next_instruction<P: CpuBusProvider>(&mut self, bus: &mut P) {
-        match self.halt_mode {
-            HaltMode::HaltRunInterrupt => {
-                // to run the clock
-                bus.read(0);
-                if bus.check_interrupts() {
-                    self.halt_mode = HaltMode::NotHalting;
+        if self.halt_mode == HaltMode::NotHalting || self.halt_mode == HaltMode::HaltBug {
+            if self.ime && bus.check_interrupts() {
+                if let Some(int_vector) = bus.get_interrupts() {
+                    self.stack_push(self.reg_pc, bus);
+                    self.reg_pc = int_vector as u16;
+                    self.ime = false;
+                    return;
+                }
+            }
+
+            let mut instruction = Instruction::from_byte(self.fetch_next_pc(bus));
+
+            if self.halt_mode == HaltMode::HaltBug {
+                self.halt_mode = HaltMode::NotHalting;
+                // do not add pc from the last fetch ^
+                self.reg_pc = self.reg_pc.wrapping_sub(1);
+            }
+
+            if instruction.opcode == Opcode::Prefix {
+                instruction = Instruction::from_prefix(self.fetch_next_pc(bus));
+            }
+
+            self.exec_instruction(instruction, bus);
+        } else {
+            bus.read(0);
+            if bus.check_interrupts() {
+                if self.halt_mode == HaltMode::HaltRunInterrupt {
                     if let Some(int_vector) = bus.get_interrupts() {
                         self.stack_push(self.reg_pc, bus);
                         self.reg_pc = int_vector as u16;
@@ -85,36 +106,7 @@ impl Cpu {
                         return;
                     }
                 }
-            }
-            HaltMode::HaltNoRunInterrupt => {
-                // to run the clock
-                bus.read(0);
-                if bus.check_interrupts() {
-                    self.halt_mode = HaltMode::NotHalting;
-                }
-            }
-            HaltMode::HaltBug => {
-                // to run the clock
-                bus.read(0);
-                // TODO: implement halt bug
-            }
-            HaltMode::NotHalting => {
-                // normal execution
-                if self.ime && bus.check_interrupts() {
-                    if let Some(int_vector) = bus.get_interrupts() {
-                        self.stack_push(self.reg_pc, bus);
-                        self.reg_pc = int_vector as u16;
-                        self.ime = false;
-                        return;
-                    }
-                }
-
-                let mut instruction = Instruction::from_byte(self.fetch_next_pc(bus));
-                if instruction.opcode == Opcode::Prefix {
-                    instruction = Instruction::from_prefix(self.fetch_next_pc(bus));
-                }
-
-                self.exec_instruction(instruction, bus);
+                self.halt_mode = HaltMode::NotHalting;
             }
         }
     }

@@ -58,7 +58,7 @@ impl Interrupts {
     }
 
     pub fn read_interrupt_enable(&self) -> u8 {
-        self.enabled.bits()
+        self.enabled.bits() | 0xE0
     }
 
     pub fn write_interrupt_flags(&mut self, data: u8) {
@@ -67,7 +67,7 @@ impl Interrupts {
     }
 
     pub fn read_interrupt_flags(&self) -> u8 {
-        self.requested.bits()
+        self.requested.bits() | 0xE0
     }
 
     pub fn is_interrupts_available(&self) -> bool {
