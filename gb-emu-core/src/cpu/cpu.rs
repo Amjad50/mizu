@@ -12,6 +12,14 @@ bitflags! {
     }
 }
 
+#[derive(PartialEq)]
+enum HaltMode {
+    NotHalting,
+    HaltRunInterrupt,
+    HaltNoRunInterrupt,
+    HaltBug,
+}
+
 pub struct Cpu {
     reg_a: u8,
     reg_b: u8,
@@ -27,6 +35,7 @@ pub struct Cpu {
     reg_pc: u16,
 
     ime: bool,
+    halt_mode: HaltMode,
 }
 
 impl Cpu {
@@ -44,6 +53,7 @@ impl Cpu {
             reg_pc: 0,
 
             ime: false,
+            halt_mode: HaltMode::NotHalting,
         };
 
         cpu.reset();
@@ -62,21 +72,45 @@ impl Cpu {
     }
 
     pub fn next_instruction<P: CpuBusProvider>(&mut self, bus: &mut P) {
-        if self.ime {
-            if let Some(int_vector) = bus.get_interrupts() {
-                self.stack_push(self.reg_pc, bus);
-                self.reg_pc = int_vector as u16;
-                self.ime = false;
-                return;
+        match self.halt_mode {
+            HaltMode::HaltRunInterrupt => {
+                if bus.check_interrupts() {
+                    self.halt_mode = HaltMode::NotHalting;
+                    if let Some(int_vector) = bus.get_interrupts() {
+                        self.stack_push(self.reg_pc, bus);
+                        self.reg_pc = int_vector as u16;
+                        self.ime = false;
+                        return;
+                    }
+                }
+            }
+            HaltMode::HaltNoRunInterrupt => {
+                if bus.check_interrupts() {
+                    self.halt_mode = HaltMode::NotHalting;
+                }
+            }
+            HaltMode::HaltBug => {
+                // TODO: implement halt bug
+            }
+            HaltMode::NotHalting => {
+                // normal execution
+                if self.ime && bus.check_interrupts() {
+                    if let Some(int_vector) = bus.get_interrupts() {
+                        self.stack_push(self.reg_pc, bus);
+                        self.reg_pc = int_vector as u16;
+                        self.ime = false;
+                        return;
+                    }
+                }
+
+                let mut instruction = Instruction::from_byte(self.fetch_next_pc(bus));
+                if instruction.opcode == Opcode::Prefix {
+                    instruction = Instruction::from_prefix(self.fetch_next_pc(bus));
+                }
+
+                self.exec_instruction(instruction, bus);
             }
         }
-
-        let mut instruction = Instruction::from_byte(self.fetch_next_pc(bus));
-        if instruction.opcode == Opcode::Prefix {
-            instruction = Instruction::from_prefix(self.fetch_next_pc(bus));
-        }
-
-        self.exec_instruction(instruction, bus);
     }
 }
 
@@ -650,7 +684,18 @@ impl Cpu {
             }
             Opcode::Res(bit) => src & !((1 << bit) as u16),
             Opcode::Set(bit) => src | ((1 << bit) as u16),
-            Opcode::Halt => todo!(),
+            Opcode::Halt => {
+                if self.ime {
+                    self.halt_mode = HaltMode::HaltRunInterrupt;
+                } else {
+                    if !bus.check_interrupts() {
+                        self.halt_mode = HaltMode::HaltNoRunInterrupt;
+                    } else {
+                        self.halt_mode = HaltMode::HaltBug;
+                    }
+                }
+                0
+            }
             Opcode::Stop => todo!(),
             Opcode::Illegal => todo!(),
             Opcode::Prefix => unreachable!(),

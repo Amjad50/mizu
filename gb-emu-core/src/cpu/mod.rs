@@ -9,4 +9,5 @@ pub trait CpuBusProvider {
     fn write(&mut self, addr: u16, data: u8);
 
     fn get_interrupts(&mut self) -> Option<u8>;
+    fn check_interrupts(&self) -> bool;
 }

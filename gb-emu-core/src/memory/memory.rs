@@ -123,4 +123,8 @@ impl CpuBusProvider for Bus {
     fn get_interrupts(&mut self) -> Option<u8> {
         self.interrupts.get_highest_interrupt_addr_and_ack()
     }
+
+    fn check_interrupts(&self) -> bool {
+        self.interrupts.is_interrupts_available()
+    }
 }
