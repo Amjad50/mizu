@@ -132,6 +132,8 @@ pub struct Ppu {
     selected_oam_size: u8,
 
     fetcher_x: u8,
+    is_drawing_window: bool,
+    window_y_counter: u8,
 
     bg_fifo: Fifo,
     sprite_fifo: Fifo,
@@ -159,6 +161,8 @@ impl Default for Ppu {
             selected_oam: [Sprite::default(); 10],
             selected_oam_size: 0,
             fetcher_x: 0,
+            is_drawing_window: false,
+            window_y_counter: 0,
             bg_fifo: Fifo::default(),
             sprite_fifo: Fifo::default(),
             lcd: Lcd::default(),
@@ -271,6 +275,9 @@ impl Ppu {
                 self.lcd_status.current_mode_set(3);
             }
             (144, 0) => {
+                // after drawing the screen reset the window y internal counter
+                self.window_y_counter = 0;
+
                 // change to mode 1 from mode 0
                 self.lcd_status.current_mode_set(1);
 
@@ -322,6 +329,17 @@ impl Ppu {
     /// return true, if this is the last draw in the current scanline, and
     /// mode 0 is being activated
     fn draw(&mut self) -> bool {
+        if self.lcd_control.window_enable()
+            && !self.is_drawing_window
+            && self.lcd.x() == self.windows_x.wrapping_sub(7)
+            && self.scanline >= self.windows_y
+        {
+            // start window drawing
+            self.bg_fifo.clear();
+            self.fetcher_x = 0;
+            self.is_drawing_window = true;
+        }
+
         if self.bg_fifo.len() > 8 {
             self.lcd.push(self.bg_fifo.pop().color());
             if self.lcd.x() == 160 {
@@ -331,6 +349,10 @@ impl Ppu {
                 self.fetcher_x = 0;
                 // change mode to 0 from 3
                 self.lcd_status.current_mode_set(0);
+                if self.is_drawing_window {
+                    self.window_y_counter += 1;
+                }
+                self.is_drawing_window = false;
                 return true;
             }
         }
@@ -347,21 +369,23 @@ impl Ppu {
     }
 
     fn get_bg_window_tile(&mut self) -> u8 {
-        let mut tile_x = 0;
-        let mut tile_y = 0;
-        let mut tile = 0;
+        let tile_x;
+        let tile_y;
+        let tile_map;
 
-        // if self.is_in_window(self.lcd.x(), self.scanline) {
-        //     tile_x = self.lcd.x();
-        //     tile_y = self.scanline;
+        if self.is_drawing_window {
+            tile_x = self.fetcher_x;
+            tile_y = self.window_y_counter;
 
-        //     self.get_window_tile(tile_x, tile_y);
-        // } else {
-        tile_x = ((self.scroll_x / 8) + self.fetcher_x) & 0x1F;
-        tile_y = self.scanline.wrapping_add(self.scroll_y);
+            tile_map = self.lcd_control.window_tilemap();
+        } else {
+            tile_x = ((self.scroll_x / 8) + self.fetcher_x) & 0x1F;
+            tile_y = self.scanline.wrapping_add(self.scroll_y);
 
-        self.get_bg_tile(tile_x, tile_y / 8)
-        // }
+            tile_map = self.lcd_control.bg_tilemap();
+        }
+
+        self.get_tile(tile_map, tile_x, tile_y / 8)
     }
 
     // ignore for now
@@ -369,10 +393,7 @@ impl Ppu {
         false
     }
 
-    fn get_window_tile(&self, tile_x: u8, tile_y: u8) {}
-
-    fn get_bg_tile(&self, tile_x: u8, tile_y: u8) -> u8 {
-        let tile_map = self.lcd_control.bg_tilemap();
+    fn get_tile(&self, tile_map: u16, tile_x: u8, tile_y: u8) -> u8 {
         let index = tile_y as usize * 32 + tile_x as usize;
 
         self.vram[tile_map as usize + index]
