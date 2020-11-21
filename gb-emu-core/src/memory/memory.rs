@@ -122,9 +122,9 @@ impl Bus {
             0xA000..=0xBFFF => self.cartridge.read_ram(addr),  // sram
             0xC000..=0xCFFF => self.ram.read_ram0(addr),       // wram0
             0xD000..=0xDFFF => self.ram.read_ramx(addr),       // wramx
-            // 0xE000..=0xFDFF => 0xFF,                           // echo
-            0xFE00..=0xFE9F => self.ppu.read_oam(addr), // ppu oam
-            // 0xFEA0..=0xFEFF => 0xFF,                           // unused
+            0xE000..=0xFDFF => self.read_not_ticked(0xC000 | (addr & 0x1FFF)), // echo
+            0xFE00..=0xFE9F => self.ppu.read_oam(addr),        // ppu oam
+            0xFEA0..=0xFEFF => 0,                              // unused
             0xFF00 => self.joypad.read_joypad(),
             0xFF04..=0xFF07 => self.timer.read_register(addr), // divider and timer
             0xFF0F => self.interrupts.read_interrupt_flags(),
@@ -156,9 +156,9 @@ impl CpuBusProvider for Bus {
             0xA000..=0xBFFF => self.cartridge.write_ram(addr, data),                // sram
             0xC000..=0xCFFF => self.ram.write_ram0(addr, data),                     // wram0
             0xD000..=0xDFFF => self.ram.write_ramx(addr, data),                     // wramx
-            // 0xE000..=0xFDFF => {}                                                   // echo
-            0xFE00..=0xFE9F => self.ppu.write_oam(addr, data), // ppu oam
-            //0xFEA0..=0xFEFF => {}                                                   // unused
+            0xE000..=0xFDFF => self.write(0xC000 | (addr & 0x1FFF), data),          // echo
+            0xFE00..=0xFE9F => self.ppu.write_oam(addr, data),                      // ppu oam
+            0xFEA0..=0xFEFF => {}                                                   // unused
             0xFF00 => self.joypad.write_joypad(data),
             0xFF04..=0xFF07 => self.timer.write_register(addr, data), // divider and timer
             0xFF0F => self.interrupts.write_interrupt_flags(data),
