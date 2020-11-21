@@ -431,8 +431,14 @@ impl Ppu {
     }
 
     fn fill_bg_fifo(&mut self) {
-        let tile = self.get_bg_window_tile();
-        let bg_colors = self.get_bg_pattern(tile, self.scanline % 8);
+        let bg_colors;
+
+        if self.lcd_control.bg_window_priority() {
+            let tile = self.get_bg_window_tile();
+            bg_colors = self.get_bg_pattern(tile, self.scanline % 8);
+        } else {
+            bg_colors = [0; 8];
+        }
 
         if self.fifo.len() <= 8 {
             self.fifo.push_bg(bg_colors);
