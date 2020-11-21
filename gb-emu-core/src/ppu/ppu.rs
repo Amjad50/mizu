@@ -36,11 +36,11 @@ impl LcdControl {
         self.intersects(Self::WINDOW_ENABLE)
     }
 
-    fn bg_window_pattern_table(&self) -> u16 {
+    fn bg_window_pattern_table_base(&self) -> u16 {
         if self.intersects(Self::BG_WINDOW_PATTERN_TABLE) {
             0x0000
         } else {
-            0x0800
+            0x1000
         }
     }
 
@@ -379,11 +379,11 @@ impl Ppu {
     }
 
     fn get_bg_pattern(&self, tile: u8, y: u8) -> [u8; 8] {
-        let pattern_table = self.lcd_control.bg_window_pattern_table();
+        let pattern_table = self.lcd_control.bg_window_pattern_table_base();
 
         let index = if self.lcd_control.bg_window_pattern_table_block_1() {
-            let tile_index = (tile as i8 as i16) * 16;
-            pattern_table.wrapping_add(tile_index as u16)
+            let tile_index = (tile as i8 as i16 as u16).wrapping_mul(16);
+            pattern_table.wrapping_add(tile_index)
         } else {
             pattern_table + (tile as u16) * 16
         } as usize;
