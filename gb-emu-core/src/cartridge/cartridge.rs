@@ -10,6 +10,7 @@ enum GameBoyType {
     Color,
 }
 
+#[derive(Debug)]
 struct CartridgeType {
     mapper_type: MapperType,
     ram: bool,
@@ -245,6 +246,8 @@ impl Cartridge {
                 expected: data[0x14d],
             });
         }
+
+        println!("LOG: {:?}", cartridge_type);
 
         let mut mapper =
             cartridge_type

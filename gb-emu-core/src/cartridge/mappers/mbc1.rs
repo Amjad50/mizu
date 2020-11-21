@@ -30,7 +30,7 @@ impl Default for Mbc1 {
 impl Mapper for Mbc1 {
     fn init(&mut self, rom_banks: u16, ram_size: usize) {
         self.rom_banks = rom_banks;
-        self.ram_banks = (ram_size / 0x8000) as u8;
+        self.ram_banks = (ram_size / 0x2000) as u8;
         self.is_2k_ram = ram_size == 0x800;
     }
 
