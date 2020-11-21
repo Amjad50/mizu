@@ -5,6 +5,32 @@ use crate::joypad::{Joypad, JoypadButton};
 use crate::ppu::Ppu;
 use crate::timer::Timer;
 
+#[derive(Default)]
+struct DMA {
+    address: u16,
+    in_transfer: bool,
+}
+
+impl DMA {
+    fn start_dma(&mut self, high_byte: u8) {
+        self.address = (high_byte as u16) << 8;
+        self.in_transfer = true;
+    }
+
+    fn read(&self) -> u8 {
+        (self.address >> 8) as u8
+    }
+
+    fn clock(&mut self, ppu: &mut Ppu, value: u8) {
+        ppu.write_oam(0xFE00 | (self.address & 0xFF), value);
+
+        self.address += 1;
+        if self.address & 0xFF == 0xA0 {
+            self.in_transfer = false;
+        }
+    }
+}
+
 struct Ram {
     // DMG mode only, Color can switch the second bank
     data: [u8; 0x2000],
@@ -42,6 +68,7 @@ pub struct Bus {
     interrupts: Interrupts,
     timer: Timer,
     joypad: Joypad,
+    dma: DMA,
     hram: [u8; 127],
 }
 
@@ -54,6 +81,7 @@ impl Bus {
             interrupts: Interrupts::default(),
             timer: Timer::default(),
             joypad: Joypad::default(),
+            dma: DMA::default(),
             hram: [0; 127],
         }
     }
@@ -79,14 +107,14 @@ impl Bus {
         }
         self.timer.clock_divider(&mut self.interrupts);
         self.joypad.update_interrupts(&mut self.interrupts);
+
+        if self.dma.in_transfer {
+            let value = self.read_not_ticked(self.dma.address);
+            self.dma.clock(&mut self.ppu, value);
+        }
     }
-}
 
-impl CpuBusProvider for Bus {
-    // each time the cpu reads, clock the ppu
-    fn read(&mut self, addr: u16) -> u8 {
-        self.on_cpu_machine_cycle();
-
+    fn read_not_ticked(&mut self, addr: u16) -> u8 {
         match addr {
             0x0000..=0x3FFF => self.cartridge.read_rom0(addr), // rom0
             0x4000..=0x7FFF => self.cartridge.read_romx(addr), // romx
@@ -101,7 +129,7 @@ impl CpuBusProvider for Bus {
             0xFF04..=0xFF07 => self.timer.read_register(addr), // divider and timer
             0xFF0F => self.interrupts.read_interrupt_flags(),
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.read_register(addr), // ppu io registers
-            // 0xFF46 => 0xFF,                                    // dma start
+            0xFF46 => self.dma.read(),                                         // dma start
             // 0xFF4C..=0xFF7F => 0xFF,                           // io registers
             0xFF80..=0xFFFE => self.hram[addr as usize & 0x7F], // hram
             0xFFFF => self.interrupts.read_interrupt_enable(),
@@ -110,6 +138,15 @@ impl CpuBusProvider for Bus {
                 0xFF
             }
         }
+    }
+}
+
+impl CpuBusProvider for Bus {
+    // each time the cpu reads, clock the ppu
+    fn read(&mut self, addr: u16) -> u8 {
+        self.on_cpu_machine_cycle();
+
+        self.read_not_ticked(addr)
     }
 
     fn write(&mut self, addr: u16, data: u8) {
@@ -126,7 +163,7 @@ impl CpuBusProvider for Bus {
             0xFF04..=0xFF07 => self.timer.write_register(addr, data), // divider and timer
             0xFF0F => self.interrupts.write_interrupt_flags(data),
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.write_register(addr, data), // ppu io registers
-            // 0xFF46 => {}                                                              // dma start
+            0xFF46 => self.dma.start_dma(data),                                       // dma start
             // 0xFF4C..=0xFF7F => {} // io registers
             0xFF80..=0xFFFE => self.hram[addr as usize & 0x7F] = data, // hram
             0xFFFF => self.interrupts.write_interrupt_enable(data),

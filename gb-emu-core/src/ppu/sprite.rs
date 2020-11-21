@@ -7,6 +7,7 @@ bitflags! {
         const Y_FLIP   = 1 << 6;
         const X_FLIP   = 1 << 5;
         const PALLETE  = 1 << 4;
+        const UNUSED   = 0xF;
     }
 }
 
