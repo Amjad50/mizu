@@ -135,6 +135,7 @@ pub struct Ppu {
     selected_oam: [Sprite; 10],
     selected_oam_size: u8,
 
+    fine_scroll_x_discard: u8,
     fetcher_x: u8,
     is_drawing_window: bool,
     window_y_counter: u8,
@@ -163,6 +164,7 @@ impl Default for Ppu {
             oam: [Sprite::default(); 40],
             selected_oam: [Sprite::default(); 10],
             selected_oam_size: 0,
+            fine_scroll_x_discard: 0,
             fetcher_x: 0,
             is_drawing_window: false,
             window_y_counter: 0,
@@ -274,6 +276,7 @@ impl Ppu {
             }
             (0..=143, 80) => {
                 // change to mode 3 from mode 2
+                self.fine_scroll_x_discard = self.scroll_x & 0x7;
                 self.lcd_status.current_mode_set(3);
             }
             (144, 0) => {
@@ -337,13 +340,18 @@ impl Ppu {
         self.try_enter_window();
 
         if self.fifo.len() > 8 {
-            self.try_add_sprite();
-            let (color, palette) = self.fifo.pop();
+            if self.fine_scroll_x_discard > 0 {
+                self.fine_scroll_x_discard -= 1;
+                self.fifo.pop();
+            } else {
+                self.try_add_sprite();
+                let (color, palette) = self.fifo.pop();
 
-            self.lcd.push(self.get_color(color, palette));
+                self.lcd.push(self.get_color(color, palette));
 
-            if self.lcd.x() == 160 {
-                return true;
+                if self.lcd.x() == 160 {
+                    return true;
+                }
             }
         } else {
             self.fill_bg_fifo();
