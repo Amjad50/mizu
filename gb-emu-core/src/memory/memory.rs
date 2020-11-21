@@ -1,6 +1,7 @@
 use super::interrupts::Interrupts;
 use crate::cartridge::Cartridge;
 use crate::cpu::CpuBusProvider;
+use crate::joypad::{Joypad, JoypadButton};
 use crate::ppu::Ppu;
 use crate::timer::Timer;
 
@@ -40,6 +41,7 @@ pub struct Bus {
     ram: Ram,
     interrupts: Interrupts,
     timer: Timer,
+    joypad: Joypad,
     hram: [u8; 127],
 }
 
@@ -51,12 +53,21 @@ impl Bus {
             ram: Ram::default(),
             interrupts: Interrupts::default(),
             timer: Timer::default(),
+            joypad: Joypad::default(),
             hram: [0; 127],
         }
     }
 
     pub fn screen_buffer(&self) -> Vec<u8> {
         self.ppu.screen_buffer()
+    }
+
+    pub fn press_joypad(&mut self, button: JoypadButton) {
+        self.joypad.press_joypad(button);
+    }
+
+    pub fn release_joypad(&mut self, button: JoypadButton) {
+        self.joypad.release_joypad(button);
     }
 }
 
@@ -67,6 +78,7 @@ impl Bus {
             self.ppu.clock(&mut self.interrupts);
         }
         self.timer.clock_divider(&mut self.interrupts);
+        self.joypad.update_interrupts(&mut self.interrupts);
     }
 }
 
@@ -85,6 +97,7 @@ impl CpuBusProvider for Bus {
             // 0xE000..=0xFDFF => 0xFF,                           // echo
             0xFE00..=0xFE9F => self.ppu.read_oam(addr), // ppu oam
             // 0xFEA0..=0xFEFF => 0xFF,                           // unused
+            0xFF00 => self.joypad.read_joypad(),
             0xFF04..=0xFF07 => self.timer.read_register(addr), // divider and timer
             0xFF0F => self.interrupts.read_interrupt_flags(),
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.read_register(addr), // ppu io registers
@@ -109,6 +122,7 @@ impl CpuBusProvider for Bus {
             // 0xE000..=0xFDFF => {}                                                   // echo
             0xFE00..=0xFE9F => self.ppu.write_oam(addr, data), // ppu oam
             //0xFEA0..=0xFEFF => {}                                                   // unused
+            0xFF00 => self.joypad.write_joypad(data),
             0xFF04..=0xFF07 => self.timer.write_register(addr, data), // divider and timer
             0xFF0F => self.interrupts.write_interrupt_flags(data),
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.write_register(addr, data), // ppu io registers

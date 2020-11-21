@@ -1,6 +1,7 @@
 use super::cartridge::{Cartridge, CartridgeError};
 use super::cpu::Cpu;
 use super::memory::Bus;
+use super::JoypadButton;
 
 use std::path::Path;
 
@@ -26,5 +27,13 @@ impl GameBoy {
 
     pub fn screen_buffer(&self) -> Vec<u8> {
         self.bus.screen_buffer()
+    }
+
+    pub fn press_joypad(&mut self, button: JoypadButton) {
+        self.bus.press_joypad(button);
+    }
+
+    pub fn release_joypad(&mut self, button: JoypadButton) {
+        self.bus.release_joypad(button);
     }
 }

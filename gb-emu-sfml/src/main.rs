@@ -1,4 +1,4 @@
-use gb_emu_core::GameBoy;
+use gb_emu_core::{GameBoy, JoypadButton};
 use std::env::args;
 
 use sfml::{
@@ -80,6 +80,28 @@ fn main() {
                 | Event::KeyPressed {
                     code: Key::Escape, ..
                 } => break 'main,
+                Event::KeyPressed { code: key, .. } => match key {
+                    Key::J => gameboy.press_joypad(JoypadButton::B),
+                    Key::K => gameboy.press_joypad(JoypadButton::A),
+                    Key::U => gameboy.press_joypad(JoypadButton::Select),
+                    Key::I => gameboy.press_joypad(JoypadButton::Start),
+                    Key::W => gameboy.press_joypad(JoypadButton::Up),
+                    Key::S => gameboy.press_joypad(JoypadButton::Down),
+                    Key::A => gameboy.press_joypad(JoypadButton::Left),
+                    Key::D => gameboy.press_joypad(JoypadButton::Right),
+                    _ => {}
+                },
+                Event::KeyReleased { code: key, .. } => match key {
+                    Key::J => gameboy.release_joypad(JoypadButton::B),
+                    Key::K => gameboy.release_joypad(JoypadButton::A),
+                    Key::U => gameboy.release_joypad(JoypadButton::Select),
+                    Key::I => gameboy.release_joypad(JoypadButton::Start),
+                    Key::W => gameboy.release_joypad(JoypadButton::Up),
+                    Key::S => gameboy.release_joypad(JoypadButton::Down),
+                    Key::A => gameboy.release_joypad(JoypadButton::Left),
+                    Key::D => gameboy.release_joypad(JoypadButton::Right),
+                    _ => {}
+                },
                 Event::Resized { width, height } => {
                     window.set_view(&get_view(width, height, TV_WIDTH as u32, TV_HEIGHT as u32));
                 }
