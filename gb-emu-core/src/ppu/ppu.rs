@@ -369,7 +369,7 @@ impl Ppu {
         (palette >> (2 * color)) & 0b11
     }
 
-    fn get_bg_window_tile(&mut self) -> u8 {
+    fn get_bg_window_tile_and_y(&mut self) -> (u8, u8) {
         let tile_x;
         let tile_y;
         let tile_map;
@@ -386,7 +386,7 @@ impl Ppu {
             tile_map = self.lcd_control.bg_tilemap();
         }
 
-        self.get_tile(tile_map, tile_x, tile_y / 8)
+        (self.get_tile(tile_map, tile_x, tile_y / 8), tile_y)
     }
 
     fn get_tile(&self, tile_map: u16, tile_x: u8, tile_y: u8) -> u8 {
@@ -442,8 +442,8 @@ impl Ppu {
         let bg_colors;
 
         if self.lcd_control.bg_window_priority() {
-            let tile = self.get_bg_window_tile();
-            bg_colors = self.get_bg_pattern(tile, self.scanline % 8);
+            let (tile, y) = self.get_bg_window_tile_and_y();
+            bg_colors = self.get_bg_pattern(tile, y % 8);
         } else {
             bg_colors = [0; 8];
         }
@@ -499,7 +499,8 @@ impl Ppu {
     fn try_enter_window(&mut self) {
         if self.lcd_control.window_enable()
             && !self.is_drawing_window
-            && self.lcd.x() == self.windows_x.wrapping_sub(7)
+                // handle if window's x is less than 7
+            && self.lcd.x() as u16 as i16 > (self.windows_x as i8 as i16) - 7
             && self.scanline >= self.windows_y
         {
             // start window drawing
