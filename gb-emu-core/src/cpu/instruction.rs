@@ -262,11 +262,11 @@ impl Display for Instruction {
             Opcode::Halt => "HALT".into(),
         };
 
-        let mut operands = operand_str(self.src);
+        let mut operands = operand_str(self.dest);
         if operands.is_empty() {
-            operands = operand_str(self.dest);
-        } else if !operand_str(self.dest).is_empty() {
-            operands += &format!(",{}", operand_str(self.dest));
+            operands = operand_str(self.src);
+        } else if !operand_str(self.src).is_empty() {
+            operands += &format!(",{}", operand_str(self.src));
         }
 
         write!(f, "{} {}", opcode, operands)
