@@ -56,8 +56,12 @@ impl LcdControl {
         }
     }
 
-    fn is_sprite_16(&self) -> bool {
-        self.intersects(Self::SPRITE_SIZE)
+    fn sprite_size(&self) -> u8 {
+        if self.intersects(Self::SPRITE_SIZE) {
+            16
+        } else {
+            8
+        }
     }
 
     fn sprite_enable(&self) -> bool {
@@ -406,8 +410,11 @@ impl Ppu {
         result
     }
 
-    // TODO: add flip support
-    fn get_sprite_pattern(&self, tile: u8, y: u8) -> [u8; 8] {
+    fn get_sprite_pattern(&self, mut tile: u8, y: u8) -> [u8; 8] {
+        if self.lcd_control.sprite_size() == 16 {
+            tile &= 0xFE;
+        }
+
         let index = 0x0000 + (tile as usize) * 16;
 
         let low = self.vram[index + (y as usize) * 2];
@@ -437,7 +444,7 @@ impl Ppu {
         let mut count = 0;
         for &sprite in self.oam.iter() {
             // in range
-            if self.scanline.wrapping_sub(sprite.screen_y()) < 8 {
+            if self.scanline.wrapping_sub(sprite.screen_y()) < self.lcd_control.sprite_size() {
                 self.selected_oam[count] = sprite;
                 count += 1;
 
@@ -459,7 +466,7 @@ impl Ppu {
                 if sprite.screen_x() == self.lcd.x() {
                     let mut y = self.scanline - sprite.screen_y();
                     if sprite.y_flipped() {
-                        y = 7 - y;
+                        y = (self.lcd_control.sprite_size() - 1) - y;
                     }
 
                     let mut colors = self.get_sprite_pattern(sprite.tile(), y);
