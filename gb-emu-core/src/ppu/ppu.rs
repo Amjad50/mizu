@@ -135,8 +135,7 @@ pub struct Ppu {
     is_drawing_window: bool,
     window_y_counter: u8,
 
-    bg_fifo: Fifo,
-    sprite_fifo: Fifo,
+    fifo: Fifo,
 
     lcd: Lcd,
 
@@ -163,8 +162,7 @@ impl Default for Ppu {
             fetcher_x: 0,
             is_drawing_window: false,
             window_y_counter: 0,
-            bg_fifo: Fifo::default(),
-            sprite_fifo: Fifo::default(),
+            fifo: Fifo::default(),
             lcd: Lcd::default(),
             cycle: 0,
             scanline: 0,
@@ -275,11 +273,9 @@ impl Ppu {
                 self.lcd_status.current_mode_set(3);
             }
             (144, 0) => {
-                // after drawing the screen reset the window y internal counter
-                self.window_y_counter = 0;
-
                 // change to mode 1 from mode 0
                 self.lcd_status.current_mode_set(1);
+                self.enter_vblank();
 
                 // FIXME: check if two interrupts are being fired
                 interrupt_manager.request_interrupt(InterruptType::Vblank);
@@ -303,10 +299,15 @@ impl Ppu {
         match self.lcd_status.current_mode() {
             0 => {}
             1 => {}
-            2 => {}
+            2 if self.cycle == 0 => self.load_selected_sprites_oam(),
             3 => {
-                if self.draw() && self.lcd_status.mode_0_hblank_interrupt() {
-                    interrupt_manager.request_interrupt(InterruptType::LcdStat);
+                if self.draw() {
+                    // change mode to 0 from 3
+                    self.lcd_status.current_mode_set(0);
+                    self.enter_hblank();
+                    if self.lcd_status.mode_0_hblank_interrupt() {
+                        interrupt_manager.request_interrupt(InterruptType::LcdStat);
+                    }
                 }
             }
             _ => {}
@@ -329,40 +330,17 @@ impl Ppu {
     /// return true, if this is the last draw in the current scanline, and
     /// mode 0 is being activated
     fn draw(&mut self) -> bool {
-        if self.lcd_control.window_enable()
-            && !self.is_drawing_window
-            && self.lcd.x() == self.windows_x.wrapping_sub(7)
-            && self.scanline >= self.windows_y
-        {
-            // start window drawing
-            self.bg_fifo.clear();
-            self.fetcher_x = 0;
-            self.is_drawing_window = true;
-        }
+        self.try_enter_window();
 
-        if self.bg_fifo.len() > 8 {
-            self.lcd.push(self.bg_fifo.pop().color());
+        if self.fifo.len() > 8 {
+            self.try_add_sprite();
+            self.lcd.push(self.fifo.pop().color());
+
             if self.lcd.x() == 160 {
-                self.lcd.next_line();
-                // clear for the next line
-                self.bg_fifo.clear();
-                self.fetcher_x = 0;
-                // change mode to 0 from 3
-                self.lcd_status.current_mode_set(0);
-                if self.is_drawing_window {
-                    self.window_y_counter += 1;
-                }
-                self.is_drawing_window = false;
                 return true;
             }
-        }
-
-        let tile = self.get_bg_window_tile();
-        let bg_colors = self.get_bg_pattern(tile, self.scanline % 8);
-
-        if self.bg_fifo.len() <= 8 {
-            self.bg_fifo.push_bg(bg_colors);
-            self.fetcher_x += 1;
+        } else {
+            self.fill_bg_fifo();
         }
 
         false
@@ -386,11 +364,6 @@ impl Ppu {
         }
 
         self.get_tile(tile_map, tile_x, tile_y / 8)
-    }
-
-    // ignore for now
-    fn is_in_window(&self, x: u8, y: u8) -> bool {
-        false
     }
 
     fn get_tile(&self, tile_map: u16, tile_x: u8, tile_y: u8) -> u8 {
@@ -420,5 +393,96 @@ impl Ppu {
         }
 
         result
+    }
+
+    // TODO: add flip support
+    fn get_sprite_pattern(&self, tile: u8, y: u8) -> [u8; 8] {
+        let index = 0x0000 + (tile as usize) * 16;
+
+        let low = self.vram[index + (y as usize) * 2];
+        let high = self.vram[index + (y as usize) * 2 + 1];
+
+        let mut result = [0; 8];
+
+        for i in 0..8 {
+            let bin_i = 7 - i;
+            result[i] = ((high >> bin_i) & 1) << 1 | ((low >> bin_i) & 1);
+        }
+
+        result
+    }
+
+    fn fill_bg_fifo(&mut self) {
+        let tile = self.get_bg_window_tile();
+        let bg_colors = self.get_bg_pattern(tile, self.scanline % 8);
+
+        if self.fifo.len() <= 8 {
+            self.fifo.push_bg(bg_colors);
+            self.fetcher_x += 1;
+        }
+    }
+
+    fn load_selected_sprites_oam(&mut self) {
+        let mut count = 0;
+        for &sprite in self.oam.iter() {
+            // in range
+            if self.scanline.wrapping_sub(sprite.screen_y()) < 8 {
+                self.selected_oam[count] = sprite;
+                count += 1;
+
+                if count == 10 {
+                    break;
+                }
+            }
+        }
+        self.selected_oam_size = count as u8;
+    }
+
+    fn try_add_sprite(&mut self) {
+        if self.lcd_control.sprite_enable() {
+            for sprite in self
+                .selected_oam
+                .iter()
+                .take(self.selected_oam_size as usize)
+            {
+                if sprite.screen_x() == self.lcd.x() {
+                    let colors =
+                        self.get_sprite_pattern(sprite.tile(), self.scanline - sprite.screen_y());
+
+                    self.fifo
+                        .mix_sprite(colors, sprite.palette_selector(), sprite.bg_priority())
+                }
+            }
+        }
+    }
+
+    fn try_enter_window(&mut self) {
+        if self.lcd_control.window_enable()
+            && !self.is_drawing_window
+            && self.lcd.x() == self.windows_x.wrapping_sub(7)
+            && self.scanline >= self.windows_y
+        {
+            // start window drawing
+            self.fifo.clear();
+            self.fetcher_x = 0;
+            self.is_drawing_window = true;
+        }
+    }
+
+    /// Ending stuff for mode 3
+    fn enter_hblank(&mut self) {
+        self.lcd.next_line();
+        // clear for the next line
+        self.fifo.clear();
+        self.fetcher_x = 0;
+        if self.is_drawing_window {
+            self.window_y_counter += 1;
+        }
+        self.is_drawing_window = false;
+    }
+
+    fn enter_vblank(&mut self) {
+        // after drawing the screen reset the window y internal counter
+        self.window_y_counter = 0;
     }
 }

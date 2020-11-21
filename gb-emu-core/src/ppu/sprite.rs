@@ -14,7 +14,7 @@ bitflags! {
 pub struct Sprite {
     y: u8,
     x: u8,
-    pattern: u8,
+    tile: u8,
     flags: SpriteFlags,
 }
 
@@ -23,7 +23,7 @@ impl Sprite {
         match offset {
             0 => self.y,
             1 => self.x,
-            2 => self.pattern,
+            2 => self.tile,
             3 => self.flags.bits(),
             _ => unreachable!(),
         }
@@ -33,7 +33,7 @@ impl Sprite {
         match offset {
             0 => self.y = data,
             1 => self.x = data,
-            2 => self.pattern = data,
+            2 => self.tile = data,
             3 => self
                 .flags
                 .clone_from(&SpriteFlags::from_bits_truncate(data)),
@@ -41,15 +41,24 @@ impl Sprite {
         }
     }
 
-    pub fn y(&self) -> u8 {
-        self.y
+    pub fn screen_y(&self) -> u8 {
+        self.y.wrapping_sub(16)
     }
 
-    pub fn x(&self) -> u8 {
-        self.x
+    pub fn screen_x(&self) -> u8 {
+        self.x.wrapping_sub(8)
     }
 
-    pub fn pattern(&self) -> u8 {
-        self.pattern
+    pub fn tile(&self) -> u8 {
+        self.tile
+    }
+
+    pub fn palette_selector(&self) -> u8 {
+        self.flags.intersects(SpriteFlags::PALLETE) as u8
+    }
+
+    /// False if its above background (1-3)
+    pub fn bg_priority(&self) -> bool {
+        self.flags.intersects(SpriteFlags::PRIORITY)
     }
 }
