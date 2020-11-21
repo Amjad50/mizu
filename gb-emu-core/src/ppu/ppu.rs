@@ -327,7 +327,7 @@ impl Ppu {
             self.scanline += 1;
             if self.scanline == 154 {
                 self.scanline = 0;
-                self.lcd.next_frame();
+                self.lcd.next_line();
             }
         }
     }
@@ -347,7 +347,7 @@ impl Ppu {
                 self.try_add_sprite();
                 let (color, palette) = self.fifo.pop();
 
-                self.lcd.push(self.get_color(color, palette));
+                self.lcd.push(self.get_color(color, palette), self.scanline);
 
                 if self.lcd.x() == 160 {
                     return true;
