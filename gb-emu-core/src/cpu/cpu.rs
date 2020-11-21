@@ -103,7 +103,6 @@ impl Cpu {
                         self.stack_push(self.reg_pc, bus);
                         self.reg_pc = int_vector as u16;
                         self.ime = false;
-                        return;
                     }
                 }
                 self.halt_mode = HaltMode::NotHalting;
