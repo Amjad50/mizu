@@ -1,31 +1,23 @@
 use fixed_vec_deque::FixedVecDeque;
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum PixelType {
+#[derive(Clone, Copy, PartialEq)]
+pub enum PaletteType {
     Background,
-    Sprite,
+    Sprite(u8),
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct FifoPixel {
-    ty: PixelType,
+#[derive(Clone, Copy)]
+struct FifoPixel {
     color: u8,
-    palette: u8,
+    palette: PaletteType,
 }
 
 impl Default for FifoPixel {
     fn default() -> Self {
         Self {
-            ty: PixelType::Background,
             color: 0,
-            palette: 0,
+            palette: PaletteType::Background,
         }
-    }
-}
-
-impl FifoPixel {
-    pub fn color(&self) -> u8 {
-        self.color
     }
 }
 
@@ -42,16 +34,17 @@ impl Default for Fifo {
 }
 
 impl Fifo {
-    pub fn pop(&mut self) -> FifoPixel {
-        *self.pixels.pop_front().unwrap()
+    pub fn pop(&mut self) -> (u8, PaletteType) {
+        let pixel = *self.pixels.pop_front().unwrap();
+
+        (pixel.color, pixel.palette)
     }
 
     pub fn push_bg(&mut self, colors: [u8; 8]) {
         for &color in colors.iter() {
             *self.pixels.push_back() = FifoPixel {
-                ty: PixelType::Background,
+                palette: PaletteType::Background,
                 color,
-                palette: 0xFF,
             };
         }
     }
@@ -60,10 +53,11 @@ impl Fifo {
         assert!(self.len() >= 8);
 
         for (pixel, &sprite_color) in self.pixels.iter_mut().take(8).zip(colors.iter()) {
-            if pixel.ty == PixelType::Background && !background_priority && sprite_color != 0 {
+            if pixel.palette == PaletteType::Background
+                && ((!background_priority && sprite_color != 0) || (pixel.color == 0))
+            {
                 pixel.color = sprite_color;
-                pixel.palette = palette;
-                pixel.ty = PixelType::Sprite;
+                pixel.palette = PaletteType::Sprite(palette);
             }
         }
     }

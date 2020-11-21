@@ -4,8 +4,8 @@ bitflags! {
     #[derive(Default)]
     struct SpriteFlags: u8 {
         const PRIORITY = 1 << 7;
-        const X_FLIP   = 1 << 6;
-        const Y_FLIP   = 1 << 5;
+        const Y_FLIP   = 1 << 6;
+        const X_FLIP   = 1 << 5;
         const PALLETE  = 1 << 4;
     }
 }
@@ -60,5 +60,13 @@ impl Sprite {
     /// False if its above background (1-3)
     pub fn bg_priority(&self) -> bool {
         self.flags.intersects(SpriteFlags::PRIORITY)
+    }
+
+    pub fn y_flipped(&self) -> bool {
+        self.flags.intersects(SpriteFlags::Y_FLIP)
+    }
+
+    pub fn x_flipped(&self) -> bool {
+        self.flags.intersects(SpriteFlags::X_FLIP)
     }
 }

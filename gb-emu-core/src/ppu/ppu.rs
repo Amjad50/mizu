@@ -1,4 +1,4 @@
-use super::fifo::Fifo;
+use super::fifo::{Fifo, PaletteType};
 use super::lcd::Lcd;
 use super::sprite::Sprite;
 use crate::memory::{InterruptManager, InterruptType};
@@ -334,7 +334,9 @@ impl Ppu {
 
         if self.fifo.len() > 8 {
             self.try_add_sprite();
-            self.lcd.push(self.fifo.pop().color());
+            let (color, palette) = self.fifo.pop();
+
+            self.lcd.push(self.get_color(color, palette));
 
             if self.lcd.x() == 160 {
                 return true;
@@ -344,6 +346,15 @@ impl Ppu {
         }
 
         false
+    }
+
+    fn get_color(&self, color: u8, palette_type: PaletteType) -> u8 {
+        let palette = match palette_type {
+            PaletteType::Sprite(index) => self.sprite_palette[index as usize],
+            PaletteType::Background => self.bg_palette,
+        };
+
+        (palette >> (2 * color)) & 0b11
     }
 
     fn get_bg_window_tile(&mut self) -> u8 {
@@ -446,8 +457,16 @@ impl Ppu {
                 .take(self.selected_oam_size as usize)
             {
                 if sprite.screen_x() == self.lcd.x() {
-                    let colors =
-                        self.get_sprite_pattern(sprite.tile(), self.scanline - sprite.screen_y());
+                    let mut y = self.scanline - sprite.screen_y();
+                    if sprite.y_flipped() {
+                        y = 7 - y;
+                    }
+
+                    let mut colors = self.get_sprite_pattern(sprite.tile(), y);
+
+                    if sprite.x_flipped() {
+                        colors.reverse();
+                    }
 
                     self.fifo
                         .mix_sprite(colors, sprite.palette_selector(), sprite.bg_priority())
