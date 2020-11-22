@@ -125,14 +125,14 @@ impl Bus {
             0xE000..=0xFDFF => self.read_not_ticked(0xC000 | (addr & 0x1FFF)), // echo
             0xFE00..=0xFE9F => self.ppu.read_oam(addr),        // ppu oam
             0xFEA0..=0xFEFF => 0,                              // unused
-            0xFF00 => self.joypad.read_joypad(),
+            0xFF00 => self.joypad.read_joypad(),               // joypad
             0xFF04..=0xFF07 => self.timer.read_register(addr), // divider and timer
-            0xFF0F => self.interrupts.read_interrupt_flags(),
+            0xFF0F => self.interrupts.read_interrupt_flags(),  // interrupts flags
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.read_register(addr), // ppu io registers
-            0xFF46 => self.dma.read(),                                         // dma start
+            0xFF46 => self.dma.read(),                         // dma start
             // 0xFF4C..=0xFF7F => 0xFF,                           // io registers
             0xFF80..=0xFFFE => self.hram[addr as usize & 0x7F], // hram
-            0xFFFF => self.interrupts.read_interrupt_enable(),
+            0xFFFF => self.interrupts.read_interrupt_enable(),  //interrupts enable
             _ => {
                 println!("Tried reading unmapped address {:04X}", addr);
                 0xFF
@@ -159,14 +159,14 @@ impl CpuBusProvider for Bus {
             0xE000..=0xFDFF => self.write(0xC000 | (addr & 0x1FFF), data),          // echo
             0xFE00..=0xFE9F => self.ppu.write_oam(addr, data),                      // ppu oam
             0xFEA0..=0xFEFF => {}                                                   // unused
-            0xFF00 => self.joypad.write_joypad(data),
+            0xFF00 => self.joypad.write_joypad(data),                               // joypad
             0xFF04..=0xFF07 => self.timer.write_register(addr, data), // divider and timer
-            0xFF0F => self.interrupts.write_interrupt_flags(data),
+            0xFF0F => self.interrupts.write_interrupt_flags(data),    // interrupts flags
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.write_register(addr, data), // ppu io registers
             0xFF46 => self.dma.start_dma(data),                                       // dma start
             // 0xFF4C..=0xFF7F => {} // io registers
             0xFF80..=0xFFFE => self.hram[addr as usize & 0x7F] = data, // hram
-            0xFFFF => self.interrupts.write_interrupt_enable(data),
+            0xFFFF => self.interrupts.write_interrupt_enable(data),    // interrupts enable
             _ => {
                 println!(
                     "Tried writing to unmapped address {:04X}, data = {:02X}",
