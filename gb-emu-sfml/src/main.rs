@@ -109,7 +109,7 @@ fn main() {
             }
         }
 
-        for _ in 0..100000 {
+        for _ in 0..17476 {
             gameboy.clock();
         }
 
