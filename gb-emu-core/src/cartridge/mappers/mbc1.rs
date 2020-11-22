@@ -4,13 +4,14 @@ pub struct Mbc1 {
     is_2k_ram: bool,
     ram_banks: u8,
     rom_banks: u16,
+
     /// true for rom, false for ram
-    two_bit_mode_rom: bool,
+    mode: bool,
+    two_bit_bank2: u8,
 
     ram_enable: bool,
 
-    rom_bank: u8,
-    ram_bank: u8,
+    rom_bank1: u8,
 }
 
 impl Default for Mbc1 {
@@ -19,10 +20,10 @@ impl Default for Mbc1 {
             is_2k_ram: false,
             ram_banks: 0,
             rom_banks: 0,
-            two_bit_mode_rom: true,
+            mode: false,
+            two_bit_bank2: 0,
             ram_enable: false,
-            rom_bank: 1,
-            ram_bank: 0,
+            rom_bank1: 1,
         }
     }
 }
@@ -34,9 +35,23 @@ impl Mapper for Mbc1 {
         self.is_2k_ram = ram_size == 0x800;
     }
 
+    fn map_read_rom0(&self, addr: u16) -> usize {
+        let bank = if self.mode {
+            (self.two_bit_bank2 << 5) % self.rom_banks as u8
+        } else {
+            0
+        } as usize;
+
+        bank * 0x4000 + addr as usize
+    }
+
     fn map_read_romx(&self, addr: u16) -> usize {
         let addr = addr & 0x3FFF;
-        self.rom_bank as usize * 0x4000 + addr as usize
+
+        let bank = (self.rom_bank1 | (self.two_bit_bank2 << 5)) as usize;
+        let bank = bank % self.rom_banks as usize;
+
+        bank as usize * 0x4000 + addr as usize
     }
 
     fn map_ram_read(&self, addr: u16) -> MappingResult {
@@ -51,7 +66,8 @@ impl Mapper for Mbc1 {
                 MappingResult::NotMapped
             } else {
                 let addr = addr & 0x1FFF;
-                MappingResult::Addr(self.ram_bank as usize * 0x2000 + addr as usize)
+                let bank = if self.mode { self.two_bit_bank2 } else { 0 } % self.ram_banks;
+                MappingResult::Addr(bank as usize * 0x2000 + addr as usize)
             }
         }
     }
@@ -68,26 +84,14 @@ impl Mapper for Mbc1 {
                 if data == 0 {
                     data = 1;
                 }
-                self.rom_bank &= 0xE0;
-                self.rom_bank |= data;
+                self.rom_bank1 = data;
             }
             0x4000..=0x5FFF => {
                 let data = data & 0x3;
-                if self.two_bit_mode_rom {
-                    self.rom_bank &= 0x1F;
-                    self.rom_bank |= data << 5;
-                } else {
-                    self.ram_bank = data;
-                }
+                self.two_bit_bank2 = data;
             }
             0x6000..=0x7FFF => {
-                if data & 1 == 0 {
-                    // clear two bits of ram bank
-                    self.ram_bank = 0;
-                } else {
-                    // clear two bits of rom bank
-                    self.rom_bank &= 0x1F;
-                }
+                self.mode = data & 1 == 1;
             }
             _ => unreachable!(),
         }

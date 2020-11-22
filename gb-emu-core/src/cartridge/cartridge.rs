@@ -221,7 +221,7 @@ impl Cartridge {
             0 => 0,
             1 => 0x800,
             2 => 0x2000,
-            3 => 0x4000,
+            3 => 0x8000,
             4 => 0x20000,
             5 => 0x10000,
             _ => {
@@ -270,7 +270,9 @@ impl Cartridge {
 
     /// 0x0000-0x3FFF
     pub fn read_rom0(&self, addr: u16) -> u8 {
-        self.rom[addr as usize]
+        let addr = self.mapper.map_read_rom0(addr);
+
+        self.rom[addr]
     }
 
     // TODO: implement mapper

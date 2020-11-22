@@ -19,6 +19,10 @@ impl Mapper for NoMapper {
         self.ram_size = ram_size;
     }
 
+    fn map_read_rom0(&self, addr: u16) -> usize {
+        addr as usize
+    }
+
     fn map_read_romx(&self, addr: u16) -> usize {
         // return the same address
         addr as usize
