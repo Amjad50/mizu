@@ -10,6 +10,7 @@ struct DMA {
     address: u16,
     in_transfer: bool,
     starting_delay: u8,
+    blocking: bool,
 }
 
 impl DMA {
@@ -28,12 +29,18 @@ impl DMA {
     fn transfer_clock(&mut self, ppu: &mut Ppu, value: u8) {
         if self.starting_delay > 0 {
             self.starting_delay -= 1;
+
+            // block after 1 M-cycle delay
+            if self.starting_delay == 0 {
+                self.blocking = true;
+            }
         } else {
             ppu.write_oam(0xFE00 | (self.address & 0xFF), value);
 
             self.address += 1;
             if self.address & 0xFF == 0xA0 {
                 self.in_transfer = false;
+                self.blocking = false;
             }
         }
     }
@@ -173,14 +180,14 @@ impl Bus {
 impl CpuBusProvider for Bus {
     /// each time the cpu reads, clock the components on the bus
     fn read(&mut self, addr: u16) -> u8 {
-        let result = self.read_not_ticked(addr, self.dma.in_transfer);
+        let result = self.read_not_ticked(addr, self.dma.blocking);
         self.on_cpu_machine_cycle();
         result
     }
 
     /// each time the cpu writes, clock the components on the bus
     fn write(&mut self, addr: u16, data: u8) {
-        self.write_not_ticked(addr, data, self.dma.in_transfer);
+        self.write_not_ticked(addr, data, self.dma.blocking);
         self.on_cpu_machine_cycle();
     }
 
