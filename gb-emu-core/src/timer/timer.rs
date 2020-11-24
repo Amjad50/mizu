@@ -57,10 +57,6 @@ impl Timer {
         }
     }
 
-    pub fn reset(&mut self) {
-        self.divider = 0xABCC;
-    }
-
     pub fn clock_divider<I: InterruptManager>(&mut self, interrupt: &mut I) {
         let bit = self.timer_control.freq_divider_selection_bit();
         let saved_divider_bit = (self.divider >> bit) & 1;

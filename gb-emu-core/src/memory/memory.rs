@@ -144,18 +144,8 @@ impl Bus {
             _ => 0xFF,
         }
     }
-}
 
-impl CpuBusProvider for Bus {
-    // each time the cpu reads, clock the ppu
-    fn read(&mut self, addr: u16) -> u8 {
-        self.on_cpu_machine_cycle();
-        self.read_not_ticked(addr, self.dma.in_transfer)
-    }
-
-    fn write(&mut self, addr: u16, data: u8) {
-        let block_for_dma = self.dma.in_transfer;
-
+    fn write_not_ticked(&mut self, addr: u16, data: u8, block_for_dma: bool) {
         match addr {
             0x0000..=0x7FFF if !block_for_dma => {
                 self.cartridge.write_to_bank_controller(addr, data) // rom0
@@ -177,6 +167,21 @@ impl CpuBusProvider for Bus {
             0xFFFF => self.interrupts.write_interrupt_enable(data),    // interrupts enable
             _ => {}
         }
+    }
+}
+
+impl CpuBusProvider for Bus {
+    /// each time the cpu reads, clock the components on the bus
+    fn read(&mut self, addr: u16) -> u8 {
+        let result = self.read_not_ticked(addr, self.dma.in_transfer);
+        self.on_cpu_machine_cycle();
+        result
+    }
+
+    /// each time the cpu writes, clock the components on the bus
+    fn write(&mut self, addr: u16, data: u8) {
+        self.write_not_ticked(addr, data, self.dma.in_transfer);
+        self.on_cpu_machine_cycle();
     }
 
     fn get_interrupts(&mut self) -> Option<u8> {
