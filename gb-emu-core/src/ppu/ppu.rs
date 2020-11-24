@@ -230,9 +230,14 @@ impl Ppu {
 
     pub fn write_register(&mut self, addr: u16, data: u8) {
         match addr {
-            0xFF40 => self
-                .lcd_control
-                .clone_from(&LcdControl::from_bits_truncate(data)),
+            0xFF40 => {
+                self.lcd_control
+                    .clone_from(&LcdControl::from_bits_truncate(data));
+
+                if !self.lcd_control.display_enable() {
+                    self.lcd.clear();
+                }
+            }
             0xFF41 => self
                 .lcd_status
                 .clone_from(&LcdStatus::from_bits_truncate(data & 0x78)),
@@ -256,6 +261,10 @@ impl Ppu {
     }
 
     pub fn clock<I: InterruptManager>(&mut self, interrupt_manager: &mut I) {
+        if !self.lcd_control.display_enable() {
+            return;
+        }
+
         // change modes depending on cycle
         match (self.scanline, self.cycle) {
             (0, 0) => {

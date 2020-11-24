@@ -34,4 +34,10 @@ impl Lcd {
     pub fn screen_buffer(&self) -> Vec<u8> {
         self.buf.to_vec()
     }
+
+    pub fn clear(&mut self) {
+        for i in &mut self.buf {
+            *i = 0;
+        }
+    }
 }
