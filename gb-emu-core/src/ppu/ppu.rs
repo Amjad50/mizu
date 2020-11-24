@@ -512,6 +512,9 @@ impl Ppu {
             && self.lcd.x() as u16 as i16 > (self.windows_x as i8 as i16) - 7
             && self.scanline >= self.windows_y
         {
+            if self.windows_x < 7 {
+                self.fine_scroll_x_discard = 7 - self.windows_x;
+            }
             // start window drawing
             self.fifo.clear();
             self.fetcher_x = 0;
