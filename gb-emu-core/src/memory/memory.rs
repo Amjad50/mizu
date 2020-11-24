@@ -15,7 +15,9 @@ struct DMA {
 impl DMA {
     fn start_dma(&mut self, high_byte: u8) {
         self.address = (high_byte as u16) << 8;
-        self.starting_delay = 1;
+        // 8 T-cycles here for delay instead of 4, this is to ensure correct
+        // DMA timing
+        self.starting_delay = 2;
         self.in_transfer = true;
     }
 
@@ -147,12 +149,8 @@ impl Bus {
 impl CpuBusProvider for Bus {
     // each time the cpu reads, clock the ppu
     fn read(&mut self, addr: u16) -> u8 {
-        let result = self.read_not_ticked(addr, self.dma.in_transfer);
-
-        // we clock after the read so that DMA can have proper timing
         self.on_cpu_machine_cycle();
-
-        result
+        self.read_not_ticked(addr, self.dma.in_transfer)
     }
 
     fn write(&mut self, addr: u16, data: u8) {
