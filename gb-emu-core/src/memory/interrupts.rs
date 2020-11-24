@@ -78,7 +78,7 @@ impl Interrupts {
         if self.requested.is_empty() {
             None
         } else {
-            let mut bits = self.requested.bits();
+            let mut bits = self.requested.bits() & self.enabled.bits();
             let mut counter = 0;
             while bits != 0 {
                 if bits & 1 == 1 {
@@ -99,8 +99,6 @@ impl InterruptManager for Interrupts {
     fn request_interrupt(&mut self, interrupt: InterruptType) {
         let interrupt = interrupt.into();
 
-        if self.enabled.intersects(interrupt) {
-            self.requested.insert(interrupt);
-        }
+        self.requested.insert(interrupt);
     }
 }
