@@ -270,6 +270,10 @@ impl Cpu {
         }
     }
 
+    fn dummy_fetch<P: CpuBusProvider>(&mut self, bus: &mut P) {
+        bus.read(0);
+    }
+
     fn stack_push<P: CpuBusProvider>(&mut self, data: u16, bus: &mut P) {
         self.reg_sp = self.reg_sp.wrapping_sub(1);
         bus.write(self.reg_sp, (data >> 8) as u8);
@@ -302,7 +306,13 @@ impl Cpu {
         let result = match instruction.opcode {
             Opcode::Nop => 0,
             Opcode::Ld => src,
+            Opcode::LdSPHL => {
+                self.dummy_fetch(bus);
+                self.reg_sp = self.reg_hl_read();
+                0
+            }
             Opcode::LdHLSPSigned8 => {
+                self.dummy_fetch(bus);
                 let result = self.reg_sp.wrapping_add(src);
 
                 self.flag_set(CpuFlags::Z, false);
@@ -313,11 +323,16 @@ impl Cpu {
                 result
             }
             Opcode::Push => {
+                self.dummy_fetch(bus);
                 self.stack_push(src, bus);
                 0
             }
             Opcode::Pop => self.stack_pop(bus),
-            Opcode::Inc16 => src.wrapping_add(1),
+            Opcode::Inc16 => {
+                self.dummy_fetch(bus);
+                src.wrapping_add(1)
+            }
+
             Opcode::Inc => {
                 let result = src.wrapping_add(1) & 0xff;
 
@@ -327,7 +342,10 @@ impl Cpu {
 
                 result
             }
-            Opcode::Dec16 => src.wrapping_sub(1),
+            Opcode::Dec16 => {
+                self.dummy_fetch(bus);
+                src.wrapping_sub(1)
+            }
             Opcode::Dec => {
                 let result = src.wrapping_sub(1);
                 self.flag_set(CpuFlags::Z, result == 0);
@@ -347,6 +365,7 @@ impl Cpu {
                 result & 0xFF
             }
             Opcode::Add16 => {
+                self.dummy_fetch(bus);
                 let dest = self.read_operand(instruction.dest, bus);
                 let result = (dest as u32).wrapping_add(src as u32);
 
@@ -357,6 +376,8 @@ impl Cpu {
                 result as u16
             }
             Opcode::AddSPSigned8 => {
+                self.dummy_fetch(bus);
+                self.dummy_fetch(bus);
                 let dest = self.read_operand(instruction.dest, bus);
                 let result = dest.wrapping_add(src);
 
@@ -452,35 +473,46 @@ impl Cpu {
             }
             Opcode::Jp(cond) => {
                 if self.check_cond(cond) {
+                    if instruction.src != OperandType::RegHL {
+                        self.dummy_fetch(bus);
+                    }
                     self.reg_pc = src;
                 }
                 0
             }
             Opcode::Jr(cond) => {
                 if self.check_cond(cond) {
+                    self.dummy_fetch(bus);
                     self.reg_pc = self.reg_pc.wrapping_add(src);
                 }
                 0
             }
             Opcode::Call(cond) => {
                 if self.check_cond(cond) {
+                    self.dummy_fetch(bus);
                     self.stack_push(self.reg_pc, bus);
                     self.reg_pc = src;
                 }
                 0
             }
             Opcode::Ret(cond) => {
+                if cond != Condition::Unconditional {
+                    self.dummy_fetch(bus);
+                }
                 if self.check_cond(cond) {
+                    self.dummy_fetch(bus);
                     self.reg_pc = self.stack_pop(bus);
                 }
                 0
             }
             Opcode::Reti => {
+                self.dummy_fetch(bus);
                 self.reg_pc = self.stack_pop(bus);
                 self.ime = true;
                 0
             }
             Opcode::Rst(loc) => {
+                self.dummy_fetch(bus);
                 self.stack_push(self.reg_pc, bus);
                 self.reg_pc = loc as u16;
                 0

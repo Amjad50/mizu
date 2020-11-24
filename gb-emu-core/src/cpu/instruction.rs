@@ -89,6 +89,7 @@ pub enum Opcode {
     Stop,
 
     Ld,
+    LdSPHL,
     LdHLSPSigned8,
 
     Push,
@@ -209,6 +210,7 @@ impl Display for Instruction {
             Opcode::Nop => "NOP".into(),
             Opcode::Stop => "STOP".into(),
             Opcode::Ld => "LD".into(),
+            Opcode::LdSPHL => "LD SP, HL".into(),
             Opcode::LdHLSPSigned8 => "LDHLSP".into(),
             Opcode::Push => "PUSH".into(),
             Opcode::Pop => "POP".into(),
