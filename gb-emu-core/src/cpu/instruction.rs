@@ -3,6 +3,7 @@ use std::fmt::Display;
 
 #[derive(Debug)]
 pub(super) struct Instruction {
+    pub pc: u16,
     pub opcode: Opcode,
     pub src: OperandType,
     pub dest: OperandType,
@@ -91,6 +92,7 @@ pub enum Opcode {
     Ld,
     LdSPHL,
     LdHLSPSigned8,
+    LdBB, // used for breakpoint
 
     Push,
     Pop,
@@ -154,20 +156,22 @@ pub enum Opcode {
 }
 
 impl Instruction {
-    pub fn from_byte(byte: u8) -> Self {
+    pub fn from_byte(byte: u8, pc: u16) -> Self {
         let (opcode, operand_types) = instructions_table::INSTRUCTIONS[byte as usize];
 
         Instruction {
+            pc,
             opcode,
             src: operand_types.1,
             dest: operand_types.0,
         }
     }
 
-    pub fn from_prefix(byte: u8) -> Self {
+    pub fn from_prefix(byte: u8, pc: u16) -> Self {
         let (opcode, operand_types) = instructions_table::PREFIXED_INSTRUCTIONS[byte as usize];
 
         Instruction {
+            pc,
             opcode,
             src: operand_types.1,
             dest: operand_types.0,
@@ -213,6 +217,7 @@ impl Display for Instruction {
             Opcode::Ld => "LD".into(),
             Opcode::LdSPHL => "LD SP, HL".into(),
             Opcode::LdHLSPSigned8 => "LDHLSP".into(),
+            Opcode::LdBB => "LD B,B".into(),
             Opcode::Push => "PUSH".into(),
             Opcode::Pop => "POP".into(),
             Opcode::Inc => "INC".into(),
@@ -284,14 +289,14 @@ mod tests {
     #[test]
     fn available_instructions() {
         for i in 0..=255u8 {
-            Instruction::from_byte(i as u8);
+            Instruction::from_byte(i as u8, 0);
         }
     }
 
     #[test]
     fn available_instructions_with_prefix_cb() {
         for i in 0..=255u8 {
-            Instruction::from_prefix(i as u8);
+            Instruction::from_prefix(i as u8, 0);
         }
     }
 }

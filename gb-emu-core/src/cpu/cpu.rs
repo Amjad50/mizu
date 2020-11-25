@@ -9,6 +9,7 @@ pub enum CpuState {
     InfiniteLoop,
     Halting,
     RunningInterrupt(u8),
+    Breakpoint(u16),
 }
 
 bitflags! {
@@ -90,16 +91,17 @@ impl Cpu {
                 }
             }
 
-            let mut instruction = Instruction::from_byte(self.fetch_next_pc(bus));
+            let pc = self.reg_pc;
+            let mut instruction = Instruction::from_byte(self.fetch_next_pc(bus), pc);
 
             if self.halt_mode == HaltMode::HaltBug {
                 self.halt_mode = HaltMode::NotHalting;
                 // do not add pc from the last fetch ^
-                self.reg_pc = self.reg_pc.wrapping_sub(1);
+                self.reg_pc = pc;
             }
 
             if instruction.opcode == Opcode::Prefix {
-                instruction = Instruction::from_prefix(self.fetch_next_pc(bus));
+                instruction = Instruction::from_prefix(self.fetch_next_pc(bus), pc);
             }
 
             self.exec_instruction(instruction, bus)
@@ -324,6 +326,14 @@ impl Cpu {
         let result = match instruction.opcode {
             Opcode::Nop => 0,
             Opcode::Ld => src,
+            Opcode::LdBB => {
+                self.reg_b = self.reg_b; // why not?
+                println!("Break point at {:04X} was hit", instruction.pc);
+
+                cpu_state = CpuState::Breakpoint(instruction.pc);
+
+                0
+            }
             Opcode::LdSPHL => {
                 self.dummy_fetch(bus);
                 self.reg_sp = self.reg_hl_read();
@@ -492,7 +502,7 @@ impl Cpu {
             Opcode::Jp(cond) => {
                 if self.check_cond(cond) {
                     self.dummy_fetch(bus);
-                    if cond == Condition::Unconditional && src == self.reg_pc.wrapping_sub(3) {
+                    if cond == Condition::Unconditional && src == instruction.pc {
                         cpu_state = CpuState::InfiniteLoop;
                     }
 
@@ -501,7 +511,7 @@ impl Cpu {
                 0
             }
             Opcode::JpHL => {
-                if src == self.reg_pc.wrapping_sub(3) {
+                if src == instruction.pc {
                     cpu_state = CpuState::InfiniteLoop;
                 }
 
@@ -513,7 +523,7 @@ impl Cpu {
                     self.dummy_fetch(bus);
                     let new_pc = self.reg_pc.wrapping_add(src);
 
-                    if cond == Condition::Unconditional && new_pc == self.reg_pc.wrapping_sub(2) {
+                    if cond == Condition::Unconditional && new_pc == instruction.pc {
                         cpu_state = CpuState::InfiniteLoop;
                     }
 

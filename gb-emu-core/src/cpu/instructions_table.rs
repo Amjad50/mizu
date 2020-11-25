@@ -69,7 +69,7 @@ pub(super) const INSTRUCTIONS: &[(Opcode, (OperandType, OperandType)); 256] = &[
     (Dec, (RegA, RegA)),
     (Ld, (RegA, Imm8)),
     (Ccf, (Implied, Implied)),
-    (Ld, (RegB, RegB)),
+    (LdBB, (Implied, Implied)),
     (Ld, (RegB, RegC)),
     (Ld, (RegB, RegD)),
     (Ld, (RegB, RegE)),
