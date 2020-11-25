@@ -9,7 +9,17 @@ use super::memory::Bus;
 use std::path::Path;
 
 macro_rules! gb_tests {
-    ($($test_name: ident, $file_path: expr, $crc_checksome: expr;)*) => {
+    // clock until infinite loop
+    (inf; $($test_name: ident, $file_path: expr, $crc_checksome: expr;)*) => {
+        gb_tests!($($test_name, $file_path, $crc_checksome;)*, clock_until_infinte_loop);
+    };
+
+    // clock until breakpoint
+    (brk; $($test_name: ident, $file_path: expr, $crc_checksome: expr;)*) => {
+        gb_tests!($($test_name, $file_path, $crc_checksome;)*, clock_until_breakpoint);
+    };
+
+    ($($test_name: ident, $file_path: expr, $crc_checksome: expr;)*, $looping_statement: tt) => {
         $(
             /// Run the test and check the checksum of the screen buffer
             #[test]
@@ -18,7 +28,7 @@ macro_rules! gb_tests {
                     concat!("../test_roms/", $file_path)
                 )?;
 
-                gb.clock_until_infinte_loop();
+                gb.$looping_statement();
 
                 let screen_buffer = gb.screen_buffer();
                 crate::tests::print_screen_buffer(&screen_buffer);
@@ -35,6 +45,7 @@ macro_rules! gb_tests {
 }
 
 // defined after the macro so that it can use it
+mod acid2_test;
 mod blargg_tests;
 
 fn print_screen_buffer(buffer: &[u8]) {
@@ -77,5 +88,13 @@ impl TestingGameBoy {
 
     pub fn clock_until_infinte_loop(&mut self) {
         while self.cpu.next_instruction(&mut self.bus) != CpuState::InfiniteLoop {}
+    }
+
+    pub fn clock_until_breakpoint(&mut self) {
+        loop {
+            if let CpuState::Breakpoint(_) = self.cpu.next_instruction(&mut self.bus) {
+                break;
+            }
+        }
     }
 }

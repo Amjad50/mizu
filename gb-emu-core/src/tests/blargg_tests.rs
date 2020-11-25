@@ -1,4 +1,6 @@
 gb_tests!(
+    inf; // clock until infinite loop
+
     blargg_cpu_instrs,
     "blargg-gb-tests/cpu_instrs/cpu_instrs.gb",
     2413260581157633908;

@@ -509,7 +509,7 @@ impl Ppu {
         if self.lcd_control.window_enable()
             && !self.is_drawing_window
                 // handle if window's x is less than 7
-            && self.lcd.x() as u16 as i16 > (self.windows_x as i8 as i16) - 7
+            && (self.lcd.x() == self.windows_x.wrapping_sub(7) || (self.lcd.x() == 0 && self.windows_x < 7))
             && self.scanline >= self.windows_y
         {
             if self.windows_x < 7 {
