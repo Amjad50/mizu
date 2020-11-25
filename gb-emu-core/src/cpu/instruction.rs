@@ -111,6 +111,7 @@ pub enum Opcode {
     Xor,
     Or,
     Jp(Condition),
+    JpHL,
     Jr(Condition),
 
     Call(Condition),
@@ -230,6 +231,7 @@ impl Display for Instruction {
             Opcode::Or => "OR".into(),
             Opcode::Jp(Condition::Unconditional) => "JP".into(),
             Opcode::Jp(cond) => format!("JP {:?},", cond),
+            Opcode::JpHL => "JP".into(),
             Opcode::Jr(Condition::Unconditional) => "JR".into(),
             Opcode::Jr(cond) => format!("JR {:?},", cond),
             Opcode::Call(Condition::Unconditional) => "CALL".into(),

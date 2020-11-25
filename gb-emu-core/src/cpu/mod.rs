@@ -2,7 +2,7 @@ mod cpu;
 pub mod instruction;
 mod instructions_table;
 
-pub use cpu::Cpu;
+pub use cpu::{Cpu, CpuState};
 
 pub trait CpuBusProvider {
     fn read(&mut self, addr: u16) -> u8;

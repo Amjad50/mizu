@@ -6,5 +6,8 @@ mod memory;
 mod ppu;
 mod timer;
 
+#[cfg(test)]
+mod tests;
+
 pub use backend::GameBoy;
 pub use joypad::JoypadButton;

@@ -3,6 +3,14 @@ use super::CpuBusProvider;
 
 use bitflags::bitflags;
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum CpuState {
+    Normal,
+    InfiniteLoop,
+    Halting,
+    RunningInterrupt(u8),
+}
+
 bitflags! {
     struct CpuFlags: u8 {
         const Z = 1 << 7;
@@ -71,14 +79,14 @@ impl Cpu {
         self.reg_pc = 0x0100;
     }
 
-    pub fn next_instruction<P: CpuBusProvider>(&mut self, bus: &mut P) {
+    pub fn next_instruction<P: CpuBusProvider>(&mut self, bus: &mut P) -> CpuState {
         if self.halt_mode == HaltMode::NotHalting || self.halt_mode == HaltMode::HaltBug {
             if self.ime && bus.check_interrupts() {
                 if let Some(int_vector) = bus.get_interrupts() {
                     self.stack_push(self.reg_pc, bus);
                     self.reg_pc = int_vector as u16;
                     self.ime = false;
-                    return;
+                    return CpuState::RunningInterrupt(int_vector);
                 }
             }
 
@@ -94,7 +102,7 @@ impl Cpu {
                 instruction = Instruction::from_prefix(self.fetch_next_pc(bus));
             }
 
-            self.exec_instruction(instruction, bus);
+            self.exec_instruction(instruction, bus)
         } else {
             bus.read(0);
             if bus.check_interrupts() {
@@ -106,6 +114,10 @@ impl Cpu {
                     }
                 }
                 self.halt_mode = HaltMode::NotHalting;
+
+                CpuState::Normal
+            } else {
+                CpuState::Halting
             }
         }
     }
@@ -300,8 +312,14 @@ impl Cpu {
         }
     }
 
-    fn exec_instruction<P: CpuBusProvider>(&mut self, instruction: Instruction, bus: &mut P) {
+    fn exec_instruction<P: CpuBusProvider>(
+        &mut self,
+        instruction: Instruction,
+        bus: &mut P,
+    ) -> CpuState {
         let src = self.read_operand(instruction.src, bus);
+
+        let mut cpu_state = CpuState::Normal;
 
         let result = match instruction.opcode {
             Opcode::Nop => 0,
@@ -473,17 +491,33 @@ impl Cpu {
             }
             Opcode::Jp(cond) => {
                 if self.check_cond(cond) {
-                    if instruction.src != OperandType::RegHL {
-                        self.dummy_fetch(bus);
+                    self.dummy_fetch(bus);
+                    if cond == Condition::Unconditional && src == self.reg_pc.wrapping_sub(3) {
+                        cpu_state = CpuState::InfiniteLoop;
                     }
+
                     self.reg_pc = src;
                 }
+                0
+            }
+            Opcode::JpHL => {
+                if src == self.reg_pc.wrapping_sub(3) {
+                    cpu_state = CpuState::InfiniteLoop;
+                }
+
+                self.reg_pc = src;
                 0
             }
             Opcode::Jr(cond) => {
                 if self.check_cond(cond) {
                     self.dummy_fetch(bus);
-                    self.reg_pc = self.reg_pc.wrapping_add(src);
+                    let new_pc = self.reg_pc.wrapping_add(src);
+
+                    if cond == Condition::Unconditional && new_pc == self.reg_pc.wrapping_sub(2) {
+                        cpu_state = CpuState::InfiniteLoop;
+                    }
+
+                    self.reg_pc = new_pc;
                 }
                 0
             }
@@ -731,5 +765,7 @@ impl Cpu {
         };
 
         self.write_operand(instruction.dest, result, bus);
+
+        cpu_state
     }
 }

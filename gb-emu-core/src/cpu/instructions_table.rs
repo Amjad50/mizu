@@ -238,7 +238,7 @@ pub(super) const INSTRUCTIONS: &[(Opcode, (OperandType, OperandType)); 256] = &[
     (And, (RegA, Imm8)),
     (Rst(32), (Implied, Implied)),
     (AddSPSigned8, (RegSP, Imm8Signed)),
-    (Jp(Unconditional), (Implied, RegHL)),
+    (JpHL, (Implied, RegHL)),
     (Ld, (Addr16, RegA)),
     (Illegal, (Implied, Implied)),
     (Illegal, (Implied, Implied)),
