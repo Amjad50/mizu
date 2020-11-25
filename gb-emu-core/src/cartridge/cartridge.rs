@@ -203,7 +203,7 @@ impl Cartridge {
             GameBoyType::NonColor
         };
 
-        let cartridge_type =
+        let mut cartridge_type =
             CartridgeType::from_byte(data[0x147]).ok_or(CartridgeError::InvalidCartridgeType)?;
 
         let num_rom_banks = data[0x148];
@@ -230,7 +230,8 @@ impl Cartridge {
         };
 
         if cartridge_type.ram && ram_size == 0 {
-            return Err(CartridgeError::RamNotPresentError);
+            cartridge_type.ram = false;
+        // return Err(CartridgeError::RamNotPresentError);
         } else if !cartridge_type.ram && ram_size != 0 {
             return Err(CartridgeError::NotNeededRamPresentError);
         }
