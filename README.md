@@ -1,4 +1,6 @@
 # GB-emu
+[![Build status](https://github.com/Amjad50/GB-emu/workflows/Rust/badge.svg)](https://github.com/Amjad50/GB-emu/actions?query=workflow%3ARust)
+[![codecov](https://codecov.io/gh/Amjad50/GB-emu/branch/master/graph/badge.svg)](https://codecov.io/gh/Amjad50/GB-emu)
 
 GB-emu (maybe I'll change the name) is a Gameboy emulator built in Rust.
 
