@@ -512,7 +512,11 @@ impl Ppu {
             && (self.lcd.x() == self.windows_x.wrapping_sub(7) || (self.lcd.x() == 0 && self.windows_x < 7))
             && self.scanline >= self.windows_y
         {
-            if self.windows_x < 7 {
+            // override the scroll_x if:
+            // - the window_x is lower than 7; to discard the bits *from* the window
+            // - there is already fine scroll; to reset the scrolling and for the window
+            //   to stay in place
+            if self.windows_x < 7 || self.fine_scroll_x_discard != 0 {
                 self.fine_scroll_x_discard = 7 - self.windows_x;
             }
             // start window drawing
