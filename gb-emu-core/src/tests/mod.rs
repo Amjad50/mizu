@@ -3,7 +3,7 @@
 mod error;
 
 use super::cartridge::{Cartridge, CartridgeError};
-use super::cpu::{Cpu, CpuBusProvider, CpuState};
+use super::cpu::{Cpu, CpuBusProvider, CpuRegisters, CpuState};
 use super::memory::Bus;
 
 use std::path::Path;
@@ -47,6 +47,7 @@ macro_rules! gb_tests {
 // defined after the macro so that it can use it
 mod acid2_test;
 mod blargg_tests;
+mod mooneye_tests;
 
 fn print_screen_buffer(buffer: &[u8]) {
     const TV_WIDTH: u32 = 160;
@@ -90,10 +91,10 @@ impl TestingGameBoy {
         while self.cpu.next_instruction(&mut self.bus) != CpuState::InfiniteLoop {}
     }
 
-    pub fn clock_until_breakpoint(&mut self) {
+    pub fn clock_until_breakpoint(&mut self) -> CpuRegisters {
         loop {
-            if let CpuState::Breakpoint(_) = self.cpu.next_instruction(&mut self.bus) {
-                break;
+            if let CpuState::Breakpoint(regs) = self.cpu.next_instruction(&mut self.bus) {
+                return regs;
             }
         }
     }

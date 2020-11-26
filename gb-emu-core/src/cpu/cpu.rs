@@ -3,13 +3,27 @@ use super::CpuBusProvider;
 
 use bitflags::bitflags;
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct CpuRegisters {
+    pub a: u8,
+    pub b: u8,
+    pub c: u8,
+    pub d: u8,
+    pub e: u8,
+    pub f: u8,
+    pub h: u8,
+    pub l: u8,
+    pub sp: u16,
+    pub pc: u16,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CpuState {
     Normal,
     InfiniteLoop,
     Halting,
     RunningInterrupt(u8),
-    Breakpoint(u16),
+    Breakpoint(CpuRegisters),
 }
 
 bitflags! {
@@ -181,6 +195,21 @@ impl Cpu {
         self.reg_f.set(flag, value);
     }
 
+    fn registers(&self) -> CpuRegisters {
+        CpuRegisters {
+            a: self.reg_a,
+            b: self.reg_b,
+            c: self.reg_c,
+            d: self.reg_d,
+            e: self.reg_e,
+            f: self.reg_f.bits(),
+            h: self.reg_h,
+            l: self.reg_l,
+            sp: self.reg_sp,
+            pc: self.reg_pc,
+        }
+    }
+
     fn fetch_next_pc<P: CpuBusProvider>(&mut self, bus: &mut P) -> u8 {
         let result = bus.read(self.reg_pc);
         self.reg_pc = self.reg_pc.wrapping_add(1);
@@ -330,7 +359,7 @@ impl Cpu {
                 self.reg_b = self.reg_b; // why not?
                 println!("Break point at {:04X} was hit", instruction.pc);
 
-                cpu_state = CpuState::Breakpoint(instruction.pc);
+                cpu_state = CpuState::Breakpoint(self.registers());
 
                 0
             }
