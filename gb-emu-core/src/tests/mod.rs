@@ -1,7 +1,5 @@
 #![cfg(test)]
 
-mod error;
-
 use super::cartridge::{Cartridge, CartridgeError};
 use super::cpu::{Cpu, CpuBusProvider, CpuRegisters, CpuState};
 use super::memory::Bus;
@@ -23,10 +21,10 @@ macro_rules! gb_tests {
         $(
             /// Run the test and check the checksum of the screen buffer
             #[test]
-            fn $test_name() -> Result<(), crate::tests::error::TestError> {
+            fn $test_name() {
                 let mut gb = crate::tests::TestingGameBoy::new(
                     concat!("../test_roms/", $file_path)
-                )?;
+                ).unwrap();
 
                 gb.$looping_statement();
 
@@ -37,8 +35,6 @@ macro_rules! gb_tests {
                     crc::crc64::checksum_ecma(&screen_buffer),
                     $crc_checksome
                 );
-
-                Ok(())
             }
         )*
     };
