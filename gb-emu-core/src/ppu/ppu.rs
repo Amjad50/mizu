@@ -487,7 +487,7 @@ impl Ppu {
                 .take(self.selected_oam_size as usize)
             {
                 if sprite.screen_x() == self.lcd.x() {
-                    let mut y = self.scanline - sprite.screen_y();
+                    let mut y = self.scanline.wrapping_sub(sprite.screen_y());
                     if sprite.y_flipped() {
                         y = (self.lcd_control.sprite_size() - 1) - y;
                     }
