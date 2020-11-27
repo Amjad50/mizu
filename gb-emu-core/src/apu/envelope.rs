@@ -28,11 +28,17 @@ impl EnvelopGenerator {
 
     pub fn clock(&mut self) {
         if self.period != 0 {
-            let change = if self.sweep_increase { 1 } else { -1 };
-            let current_volume = self.current_volume as i8 + change;
+            if self.counter == 0 {
+                self.counter = self.period;
 
-            if current_volume >= 0 && current_volume <= 15 {
-                self.current_volume = current_volume as u8;
+                let change = if self.sweep_increase { 1 } else { -1 };
+                let current_volume = self.current_volume as i8 + change;
+
+                if current_volume >= 0 && current_volume <= 15 {
+                    self.current_volume = current_volume as u8;
+                }
+            } else {
+                self.counter -= 1;
             }
         }
     }

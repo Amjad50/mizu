@@ -6,6 +6,7 @@ pub use apu::Apu;
 
 trait ApuChannel {
     fn output(&mut self) -> u8;
+    fn muted(&self) -> bool;
 }
 
 struct LengthCountedChannel<C: ApuChannel> {
@@ -77,5 +78,9 @@ impl<C: ApuChannel> ApuChannel for LengthCountedChannel<C> {
         } else {
             self.channel.output()
         }
+    }
+
+    fn muted(&self) -> bool {
+        self.muted || self.channel.muted()
     }
 }

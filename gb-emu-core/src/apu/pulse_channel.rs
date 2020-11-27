@@ -96,6 +96,10 @@ impl PulseChannel {
 
 impl ApuChannel for PulseChannel {
     fn output(&mut self) -> u8 {
-        (self.sequencer_data[self.sequencer_position]) * self.envelope.current_volume()
+        self.sequencer_data[self.sequencer_position] * self.envelope.current_volume()
+    }
+
+    fn muted(&self) -> bool {
+        self.envelope.current_volume() == 0
     }
 }

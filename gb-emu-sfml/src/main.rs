@@ -1,4 +1,6 @@
 use gb_emu_core::{GameBoy, JoypadButton};
+use sdl2::audio::{AudioQueue, AudioSpecDesired};
+use sdl2::{AudioSubsystem, Sdl};
 use std::env::args;
 use std::sync::Arc;
 
@@ -14,53 +16,22 @@ const TV_HEIGHT: u32 = 144;
 const SCREEN_WIDTH: u32 = TV_WIDTH * 3;
 const SCREEN_HEIGHT: u32 = TV_HEIGHT * 3;
 
-struct Player {
-    buffer: ringbuf::Consumer<f32>,
-}
+fn open_sdl_audio() -> Option<(AudioQueue<f32>, Sdl, AudioSubsystem)> {
+    let desired_spec = AudioSpecDesired {
+        freq: Some(44100),
+        channels: Some(2),
+        samples: None,
+    };
 
-impl Iterator for Player {
-    type Item = f32;
+    let sdl_context = sdl2::init().unwrap();
+    let audio_context = sdl_context.audio().unwrap();
 
-    fn next(&mut self) -> Option<Self::Item> {
-        Some(self.buffer.pop().unwrap_or(0.))
-    }
-}
-
-impl rodio::Source for Player {
-    fn current_frame_len(&self) -> Option<usize> {
+    if let Ok(device) = audio_context.open_queue(None, &desired_spec) {
+        device.resume();
+        Some((device, sdl_context, audio_context))
+    } else {
         None
     }
-
-    fn channels(&self) -> u16 {
-        2
-    }
-
-    fn sample_rate(&self) -> u32 {
-        44100
-    }
-
-    fn total_duration(&self) -> Option<std::time::Duration> {
-        None
-    }
-}
-
-fn get_player(buffer: ringbuf::Consumer<f32>) -> Option<(rodio::OutputStream, rodio::Sink)> {
-    let (stream, stream_handle) = rodio::OutputStream::try_default().ok()?;
-
-    // bug in rodio, that it panics if the device does not support any format
-    // it is fixed now in github, not sure when is the release coming
-    let sink = rodio::Sink::try_new(&stream_handle).ok()?;
-
-    // let (input, output) = rodio::queue::queue::<f32>(true);
-
-    let low_pass_player = rodio::source::Source::low_pass(Player { buffer }, 10000);
-
-    sink.append(low_pass_player);
-    sink.set_volume(0.15);
-
-    sink.pause();
-
-    Some((stream, sink))
 }
 
 fn get_view(
@@ -102,12 +73,7 @@ fn main() {
 
     let mut gameboy = GameBoy::new(&args[1]).unwrap();
 
-    let buffer = ringbuf::RingBuffer::<f32>::new(20000);
-    let (mut producer, consumer) = buffer.split();
-
-    let (_stream, sink) = get_player(consumer).unwrap();
-
-    sink.play();
+    let (audio_queue, _sdl_context, _audio_context) = open_sdl_audio().unwrap();
 
     let mut window = RenderWindow::new(
         (SCREEN_WIDTH, SCREEN_HEIGHT),
@@ -169,7 +135,11 @@ fn main() {
         gameboy.clock_for_frame();
 
         let buffer = gameboy.audio_buffer();
-        producer.push_slice(&buffer);
+
+        audio_queue.queue(&buffer);
+        if audio_queue.size() < 44100 / 2 {
+            continue;
+        }
 
         window.clear(Color::WHITE);
 
