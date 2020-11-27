@@ -136,17 +136,11 @@ impl Apu {
 
         self.pulse1.channel_mut().clock();
 
-        // TODO: change frame counter stuff
-        match self.cycle {
-            4096 | 12288 => {
-                // quarter frame
+        match self.cycle / 2048 {
+            1 | 3 | 5 | 7 => {
                 self.pulse1.clock_length_counter();
             }
-            8192 => {
-                // half frame
-                self.pulse1.clock_length_counter();
-            }
-            16384 => {
+            8 => {
                 // full frame
                 self.pulse1.clock_length_counter();
                 self.pulse1.channel_mut().envelope_mut().clock();
