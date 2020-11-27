@@ -9,16 +9,22 @@ trait ApuChannel {
 }
 
 struct LengthCountedChannel<C: ApuChannel> {
+    max_length: u8,
     length: u8,
-    enable: bool,
+    current_counter: u8,
+    counter_decrease_enable: bool,
+    muted: bool,
     channel: C,
 }
 
 impl<C: ApuChannel> LengthCountedChannel<C> {
-    pub fn new(channel: C) -> Self {
+    pub fn new(channel: C, max_length: u8) -> Self {
         Self {
+            max_length,
             length: 0,
-            enable: false,
+            current_counter: 0,
+            counter_decrease_enable: false,
+            muted: false,
             channel,
         }
     }
@@ -31,21 +37,42 @@ impl<C: ApuChannel> LengthCountedChannel<C> {
     }
 
     pub fn write_sound_length(&mut self, data: u8) {
-        self.length = data;
+        self.length = self.max_length - data;
+        self.current_counter = self.length;
     }
 
     pub fn write_length_enable(&mut self, data: bool) {
-        self.enable = data;
+        self.counter_decrease_enable = data;
+        self.current_counter = self.length;
     }
 
     pub fn read_length_enable(&self) -> bool {
-        self.enable
+        self.counter_decrease_enable
+    }
+
+    pub fn restart_channel(&mut self) {
+        self.muted = false;
+        self.current_counter = self.length;
+    }
+
+    pub fn clock_length_counter(&mut self) {
+        if self.counter_decrease_enable {
+            if self.current_counter == 0 {
+                self.muted = true;
+            } else {
+                self.current_counter -= 1;
+                if self.current_counter == 0 {
+                    self.muted = true;
+                    self.counter_decrease_enable = false;
+                }
+            }
+        }
     }
 }
 
 impl<C: ApuChannel> ApuChannel for LengthCountedChannel<C> {
     fn output(&mut self) -> u8 {
-        if self.length == 0 && self.enable {
+        if self.muted {
             0
         } else {
             self.channel.output()

@@ -6,6 +6,8 @@ pub struct Apu {
 
     sample_counter: f64,
     buffer: Vec<f32>,
+
+    cycle: u16,
 }
 
 impl Default for Apu {
@@ -13,7 +15,8 @@ impl Default for Apu {
         Self {
             buffer: Vec::new(),
             sample_counter: 0.,
-            pulse1: LengthCountedChannel::new(PulseChannel::default()),
+            pulse1: LengthCountedChannel::new(PulseChannel::default(), 64),
+            cycle: 0,
         }
     }
 }
@@ -55,6 +58,7 @@ impl Apu {
 
                 if data & 0x80 != 0 {
                     // restart
+                    self.pulse1.restart_channel();
                 }
             }
             _ => {}
@@ -66,18 +70,41 @@ impl Apu {
     }
 
     pub fn clock(&mut self) {
-        const SAMPLE_RATE: f64 = 22050.;
+        self.cycle += 1;
+
+        const SAMPLE_RATE: f64 = 44100.;
         const SAMPLE_EVERY_N_CLOCKS: f64 = (((16384 * 256) / 4) as f64) / SAMPLE_RATE;
 
         self.sample_counter += 1.;
         if self.sample_counter >= SAMPLE_EVERY_N_CLOCKS {
             let sample = self.pulse1.output();
 
+            // one for the right, one for the left
+            self.buffer.push(sample as f32 / 0xF as f32);
             self.buffer.push(sample as f32 / 0xF as f32);
 
             self.sample_counter -= SAMPLE_EVERY_N_CLOCKS;
         }
 
         self.pulse1.channel_mut().clock();
+
+        // TODO: change frame counter stuff
+        match self.cycle {
+            4096 | 12288 => {
+                // quarter frame
+                self.pulse1.clock_length_counter();
+            }
+            8192 => {
+                // half frame
+                self.pulse1.clock_length_counter();
+            }
+            16384 => {
+                // full frame
+                self.pulse1.clock_length_counter();
+                self.pulse1.channel_mut().envelope_mut().clock();
+                self.cycle = 0;
+            }
+            _ => {}
+        }
     }
 }

@@ -32,11 +32,11 @@ impl rodio::Source for Player {
     }
 
     fn channels(&self) -> u16 {
-        1
+        2
     }
 
     fn sample_rate(&self) -> u32 {
-        22050
+        44100
     }
 
     fn total_duration(&self) -> Option<std::time::Duration> {

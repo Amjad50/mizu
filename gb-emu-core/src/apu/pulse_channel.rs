@@ -1,13 +1,19 @@
 use super::envelope::EnvelopGenerator;
 use super::ApuChannel;
 
-const DUTY_CYCLE_SEQUENCES: [u8; 4] = [0b10000000, 0b11000000, 0b11110000, 0b00111111];
+const DUTY_CYCLE_SEQUENCES: [[u8; 8]; 4] = [
+    [1, 0, 0, 0, 0, 0, 0, 0],
+    [1, 1, 0, 0, 0, 0, 0, 0],
+    [1, 1, 1, 1, 0, 0, 0, 0],
+    [0, 0, 1, 1, 1, 1, 1, 1],
+];
 
 pub struct PulseChannel {
     sweep_time: u8,
     is_sweep_decrese: bool,
     sweep_shift_n: u8,
-    sequencer_data: u8,
+    sequencer_data: [u8; 8],
+    sequencer_position: usize,
     duty: u8,
     envelope: EnvelopGenerator,
     frequency: u16,
@@ -23,6 +29,7 @@ impl Default for PulseChannel {
             sweep_shift_n: 0,
             duty: 0,
             sequencer_data: DUTY_CYCLE_SEQUENCES[0],
+            sequencer_position: 0,
             envelope: EnvelopGenerator::default(),
             frequency: 0,
             current_timer: 0,
@@ -83,12 +90,12 @@ impl PulseChannel {
 
 impl PulseChannel {
     fn clock_sequencer(&mut self) {
-        self.sequencer_data = self.sequencer_data.rotate_right(1);
+        self.sequencer_position = (self.sequencer_position + 1) % 8;
     }
 }
 
 impl ApuChannel for PulseChannel {
     fn output(&mut self) -> u8 {
-        (self.sequencer_data & 1) * self.envelope.current_volume()
+        (self.sequencer_data[self.sequencer_position]) * self.envelope.current_volume()
     }
 }
