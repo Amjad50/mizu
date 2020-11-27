@@ -87,6 +87,8 @@ pub struct Bus {
     dma: DMA,
     apu: Apu,
     hram: [u8; 127],
+
+    cpu_cycles: u32,
 }
 
 impl Bus {
@@ -101,6 +103,8 @@ impl Bus {
             dma: DMA::default(),
             apu: Apu::default(),
             hram: [0; 127],
+
+            cpu_cycles: 0,
         }
     }
 
@@ -119,10 +123,15 @@ impl Bus {
     pub fn release_joypad(&mut self, button: JoypadButton) {
         self.joypad.release_joypad(button);
     }
+
+    pub fn elapsed_cpu_cycles(&mut self) -> u32 {
+        std::mem::replace(&mut self.cpu_cycles, 0)
+    }
 }
 
 impl Bus {
     fn on_cpu_machine_cycle(&mut self) {
+        self.cpu_cycles += 1;
         // clock the ppu four times
         for _ in 0..4 {
             self.ppu.clock(&mut self.interrupts);

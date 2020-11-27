@@ -166,9 +166,7 @@ fn main() {
             }
         }
 
-        for _ in 0..7476 {
-            gameboy.clock();
-        }
+        gameboy.clock_for_frame();
 
         let buffer = gameboy.audio_buffer();
         producer.push_slice(&buffer);

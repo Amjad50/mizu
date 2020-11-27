@@ -20,9 +20,16 @@ impl GameBoy {
         })
     }
 
-    pub fn clock(&mut self) {
-        // this will clock the Bus as well as many times as it needs
-        self.cpu.next_instruction(&mut self.bus);
+    /// Note entirly accurate, but its better than looping over a fixed
+    /// number of CPU instructions per frame
+    pub fn clock_for_frame(&mut self) {
+        const CPU_CYCLES_PER_FRAME: u32 = 16384 * 256 / 4 / 60;
+        let mut cycles = 0u32;
+        while cycles < CPU_CYCLES_PER_FRAME {
+            self.cpu.next_instruction(&mut self.bus);
+
+            cycles += self.bus.elapsed_cpu_cycles() as u32;
+        }
     }
 
     pub fn screen_buffer(&self) -> Vec<u8> {
