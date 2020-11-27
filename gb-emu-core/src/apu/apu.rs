@@ -74,6 +74,8 @@ impl Apu {
             let sample = self.pulse1.output();
 
             self.buffer.push(sample as f32 / 0xF as f32);
+
+            self.sample_counter -= SAMPLE_EVERY_N_CLOCKS;
         }
 
         self.pulse1.channel_mut().clock();
