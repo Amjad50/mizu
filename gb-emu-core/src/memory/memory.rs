@@ -1,4 +1,5 @@
 use super::interrupts::Interrupts;
+use crate::apu::Apu;
 use crate::cartridge::Cartridge;
 use crate::cpu::CpuBusProvider;
 use crate::joypad::{Joypad, JoypadButton};
@@ -84,6 +85,7 @@ pub struct Bus {
     timer: Timer,
     joypad: Joypad,
     dma: DMA,
+    apu: Apu,
     hram: [u8; 127],
 }
 
@@ -97,12 +99,17 @@ impl Bus {
             timer: Timer::default(),
             joypad: Joypad::default(),
             dma: DMA::default(),
+            apu: Apu::default(),
             hram: [0; 127],
         }
     }
 
     pub fn screen_buffer(&self) -> Vec<u8> {
         self.ppu.screen_buffer()
+    }
+
+    pub fn audio_buffer(&mut self) -> Vec<f32> {
+        self.apu.get_buffer()
     }
 
     pub fn press_joypad(&mut self, button: JoypadButton) {
@@ -120,6 +127,7 @@ impl Bus {
         for _ in 0..4 {
             self.ppu.clock(&mut self.interrupts);
         }
+        self.apu.clock();
         self.timer.clock_divider(&mut self.interrupts);
         self.joypad.update_interrupts(&mut self.interrupts);
 
@@ -143,6 +151,7 @@ impl Bus {
             0xFF00 => self.joypad.read_joypad(),                          // joypad
             0xFF04..=0xFF07 => self.timer.read_register(addr),            // divider and timer
             0xFF0F => self.interrupts.read_interrupt_flags(),             // interrupts flags
+            0xFF10..=0xFF26 => self.apu.read_register(addr),              // apu
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.read_register(addr), // ppu io registers
             0xFF46 => self.dma.read(),                                    // dma start
             // 0xFF4C..=0xFF7F => 0xFF,                           // io registers
@@ -167,6 +176,7 @@ impl Bus {
             0xFF00 => self.joypad.write_joypad(data),                             // joypad
             0xFF04..=0xFF07 => self.timer.write_register(addr, data), // divider and timer
             0xFF0F => self.interrupts.write_interrupt_flags(data),    // interrupts flags
+            0xFF10..=0xFF26 => self.apu.write_register(addr, data),   // apu
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.write_register(addr, data), // ppu io registers
             0xFF46 => self.dma.start_dma(data),                                       // dma start
             // 0xFF4C..=0xFF7F => {} // io registers

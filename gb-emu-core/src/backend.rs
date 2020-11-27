@@ -29,6 +29,10 @@ impl GameBoy {
         self.bus.screen_buffer()
     }
 
+    pub fn audio_buffer(&mut self) -> Vec<f32> {
+        self.bus.audio_buffer()
+    }
+
     pub fn press_joypad(&mut self, button: JoypadButton) {
         self.bus.press_joypad(button);
     }
