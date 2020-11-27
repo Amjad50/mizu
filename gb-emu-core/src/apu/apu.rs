@@ -36,6 +36,7 @@ bitflags! {
 
 pub struct Apu {
     pulse1: LengthCountedChannel<PulseChannel>,
+    pulse2: LengthCountedChannel<PulseChannel>,
 
     channels_control: ChannelsControl,
     channels_selection: ChannelsSelection,
@@ -54,6 +55,7 @@ impl Default for Apu {
             buffer: Vec::new(),
             sample_counter: 0.,
             pulse1: LengthCountedChannel::new(PulseChannel::default(), 64),
+            pulse2: LengthCountedChannel::new(PulseChannel::default(), 64),
             cycle: 0,
         }
     }
@@ -102,6 +104,31 @@ impl Apu {
                     self.pulse1.restart_channel();
                 }
             }
+            0xFF16 => {
+                self.pulse2.channel_mut().write_pattern_duty(data >> 5);
+                self.pulse2.write_sound_length(data & 0x3F);
+            }
+            0xFF17 => self
+                .pulse2
+                .channel_mut()
+                .envelope_mut()
+                .write_envelope_register(data),
+            0xFF18 => {
+                let freq = (self.pulse2.channel().frequency() & 0xFF00) | data as u16;
+                self.pulse2.channel_mut().write_frequency(freq);
+            }
+            0xFF19 => {
+                let freq =
+                    (self.pulse2.channel().frequency() & 0xFF) | (((data as u16) & 0x7) << 8);
+                self.pulse2.channel_mut().write_frequency(freq);
+
+                self.pulse2.write_length_enable((data >> 6) & 1 == 1);
+
+                if data & 0x80 != 0 {
+                    // restart
+                    self.pulse2.restart_channel();
+                }
+            }
 
             0xFF24 => self
                 .channels_control
@@ -135,15 +162,16 @@ impl Apu {
         }
 
         self.pulse1.channel_mut().clock();
+        self.pulse2.channel_mut().clock();
 
         match self.cycle / 2048 {
             1 | 3 | 5 | 7 => {
                 self.pulse1.clock_length_counter();
+                self.pulse2.clock_length_counter();
             }
             8 => {
-                // full frame
-                self.pulse1.clock_length_counter();
                 self.pulse1.channel_mut().envelope_mut().clock();
+                self.pulse2.channel_mut().envelope_mut().clock();
                 self.cycle = 0;
             }
             _ => {}
@@ -161,12 +189,18 @@ impl Apu {
         } else {
             self.pulse1.output() as f32 / 15.
         };
+        let pulse2 = if self.pulse2.muted() {
+            0.
+        } else {
+            self.pulse2.output() as f32 / 15.
+        };
 
         if self
             .channels_selection
             .contains(ChannelsSelection::PULSE1_LEFT)
         {
             left += pulse1;
+            left += pulse2;
         }
 
         if self
@@ -174,6 +208,7 @@ impl Apu {
             .contains(ChannelsSelection::PULSE1_RIGHT)
         {
             right += pulse1;
+            right += pulse2;
         }
 
         (right, left)
