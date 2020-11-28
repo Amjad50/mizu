@@ -1,8 +1,8 @@
 use super::mappers::MapperType;
 use std::convert::From;
 use std::error::Error;
-use std::fmt::Display;
-use std::io::Error as ioError;
+use std::fmt::{Debug, Display};
+use std::io::{Error as ioError, ErrorKind as ioErrorKind};
 
 #[derive(Debug)]
 pub enum CartridgeError {
@@ -80,5 +80,39 @@ impl Display for CartridgeError {
 impl From<ioError> for CartridgeError {
     fn from(from: ioError) -> Self {
         Self::FileError(from)
+    }
+}
+
+#[derive(Debug)]
+pub enum SramError {
+    NoSramFileFound,
+    SramFileSizeDoesNotMatch,
+    FailedToSaveSramFile,
+    Others,
+}
+
+impl From<ioError> for SramError {
+    fn from(from: ioError) -> Self {
+        match from.kind() {
+            ioErrorKind::NotFound => Self::NoSramFileFound,
+            ioErrorKind::PermissionDenied => Self::FailedToSaveSramFile,
+            _ => Self::Others,
+        }
+    }
+}
+
+impl Error for SramError {}
+
+impl Display for SramError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message =         match self {
+            Self::NoSramFileFound => "Could not load cartridge save file",
+            Self::SramFileSizeDoesNotMatch => "There is a conflict in the size \
+                                            of SRAM save file in the Cartridge header and the file in disk",
+            Self::FailedToSaveSramFile => "Could not save cartridge save file",
+            Self::Others => "Unknown error occured while trying to save/load \
+                          cartridge save file",
+        };
+        write!(f, "{}", message)
     }
 }

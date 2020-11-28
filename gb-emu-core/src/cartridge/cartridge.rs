@@ -1,8 +1,8 @@
-use super::error::CartridgeError;
+use super::error::{CartridgeError, SramError};
 use super::mappers;
 use super::mappers::{Mapper, MapperType, MappingResult};
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::Path;
 
 enum GameBoyType {
@@ -236,6 +236,14 @@ impl Cartridge {
             return Err(CartridgeError::NotNeededRamPresentError);
         }
 
+        let mut ram = vec![0; ram_size];
+
+        if cartridge_type.battery {
+            if let Ok(saved_ram) = Self::load_sram_file(file_path.as_ref(), ram_size) {
+                ram = saved_ram;
+            }
+        }
+
         let mut checksum = 0u8;
         for &i in data[0x134..=0x14c].iter() {
             checksum = checksum.wrapping_sub(i).wrapping_sub(1);
@@ -265,7 +273,7 @@ impl Cartridge {
             cartridge_type,
             mapper,
             rom: data,
-            ram: vec![0u8; ram_size],
+            ram,
         })
     }
 
@@ -309,6 +317,47 @@ impl Cartridge {
                 MappingResult::Addr(addr) => self.ram[addr] = data,
                 MappingResult::NotMapped | MappingResult::Value(_) => {}
             }
+        }
+    }
+}
+
+impl Cartridge {
+    fn load_sram_file<P: AsRef<Path>>(path: P, sram_size: usize) -> Result<Vec<u8>, SramError> {
+        let path = path.as_ref().with_extension("gb.sav");
+        println!("Loading SRAM file data from {:?}", path);
+
+        let mut file = File::open(path)?;
+        let mut result = vec![0; sram_size];
+
+        file.read_exact(&mut result)
+            .map_err(|_| SramError::SramFileSizeDoesNotMatch)?;
+
+        Ok(result)
+    }
+
+    fn save_sram_file(&self) -> Result<(), SramError> {
+        let path = self.file_path.with_extension("gb.sav");
+        println!("Writing SRAM file data to {:?}", path);
+
+        let mut file = File::create(&path)?;
+
+        let size = file.write(&self.ram)?;
+
+        if size != self.ram.len() {
+            file.sync_all()?;
+            // remove the file so it will not be loaded next time the game is run
+            std::fs::remove_file(path).expect("Could not remove `gb.sav` file");
+            Err(SramError::FailedToSaveSramFile)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl Drop for Cartridge {
+    fn drop(&mut self) {
+        if self.cartridge_type.battery {
+            self.save_sram_file().unwrap();
         }
     }
 }
