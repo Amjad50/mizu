@@ -1,5 +1,5 @@
 use super::pulse_channel::PulseChannel;
-use super::{ApuChannel, LengthCountedChannel};
+use super::{Dac, LengthCountedChannel};
 use bitflags::bitflags;
 
 bitflags! {
@@ -35,8 +35,8 @@ bitflags! {
 }
 
 pub struct Apu {
-    pulse1: LengthCountedChannel<PulseChannel>,
-    pulse2: LengthCountedChannel<PulseChannel>,
+    pulse1: Dac<LengthCountedChannel<PulseChannel>>,
+    pulse2: Dac<LengthCountedChannel<PulseChannel>>,
 
     channels_control: ChannelsControl,
     channels_selection: ChannelsSelection,
@@ -54,8 +54,8 @@ impl Default for Apu {
             channels_selection: ChannelsSelection::from_bits_truncate(0),
             buffer: Vec::new(),
             sample_counter: 0.,
-            pulse1: LengthCountedChannel::new(PulseChannel::default(), 64),
-            pulse2: LengthCountedChannel::new(PulseChannel::default(), 64),
+            pulse1: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
+            pulse2: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
             cycle: 0,
         }
     }
@@ -184,18 +184,8 @@ impl Apu {
         let mut right = 0.;
         let mut left = 0.;
 
-        let pulse1 = if self.pulse1.muted() {
-            0.
-        } else {
-            // divide by 8 because we will multiply by master volume
-            self.pulse1.output() as f32 / 15. / 8.
-        };
-        let pulse2 = if self.pulse2.muted() {
-            0.
-        } else {
-            // divide by 8 because we will multiply by master volume
-            self.pulse2.output() as f32 / 15. / 8.
-        };
+        let pulse1 = self.pulse1.dac_output() / 8.;
+        let pulse2 = self.pulse2.dac_output() / 8.;
 
         if self
             .channels_selection
