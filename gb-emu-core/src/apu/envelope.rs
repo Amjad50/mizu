@@ -42,4 +42,9 @@ impl EnvelopGenerator {
             }
         }
     }
+
+    pub fn trigger(&mut self) {
+        self.counter = self.period;
+        self.current_volume = self.starting_volume;
+    }
 }

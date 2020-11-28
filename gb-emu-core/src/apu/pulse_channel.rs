@@ -9,45 +9,53 @@ const DUTY_CYCLE_SEQUENCES: [[u8; 8]; 4] = [
 ];
 
 pub struct PulseChannel {
-    sweep_time: u8,
-    is_sweep_decrese: bool,
+    sweep_period: u8,
+    sweep_current_time: u8,
+    sweep_internal_enable: bool,
+    sweep_frequency_shadow: u16,
+    sweep_negate: bool,
     sweep_shift_n: u8,
+
     sequencer_data: [u8; 8],
     sequencer_position: usize,
     duty: u8,
     envelope: EnvelopGenerator,
     frequency: u16,
 
-    current_timer: u16,
+    frequency_timer: u16,
+
+    channel_enabled: bool,
 }
 
 impl Default for PulseChannel {
     fn default() -> Self {
         Self {
-            sweep_time: 0,
-            is_sweep_decrese: false,
+            sweep_internal_enable: false,
+            sweep_frequency_shadow: 0,
+            sweep_period: 0,
+            sweep_current_time: 0,
+            sweep_negate: false,
             sweep_shift_n: 0,
             duty: 0,
             sequencer_data: DUTY_CYCLE_SEQUENCES[0],
             sequencer_position: 0,
             envelope: EnvelopGenerator::default(),
             frequency: 0,
-            current_timer: 0,
+            frequency_timer: 0,
+            channel_enabled: false,
         }
     }
 }
 
 impl PulseChannel {
     pub fn write_sweep_register(&mut self, data: u8) {
-        self.sweep_time = (data >> 4) & 7;
-        self.is_sweep_decrese = (data >> 3) & 1 == 1;
+        self.sweep_period = (data >> 4) & 7;
+        self.sweep_negate = (data >> 3) & 1 == 1;
         self.sweep_shift_n = data & 7;
     }
 
     pub fn read_sweep_register(&self) -> u8 {
-        ((self.sweep_time & 7) << 4)
-            | ((self.is_sweep_decrese as u8) << 3)
-            | (self.sweep_shift_n & 7)
+        ((self.sweep_period & 7) << 4) | ((self.sweep_negate as u8) << 3) | (self.sweep_shift_n & 7)
     }
 
     pub fn write_pattern_duty(&mut self, data: u8) {
@@ -77,13 +85,25 @@ impl PulseChannel {
     }
 
     pub fn clock(&mut self) {
-        if self.current_timer == 0 {
+        if self.frequency_timer == 0 {
             self.clock_sequencer();
 
             // reload timer
-            self.current_timer = 0x7FF - self.frequency;
+            self.frequency_timer = 0x7FF - self.frequency;
         } else {
-            self.current_timer -= 1;
+            self.frequency_timer -= 1;
+        }
+    }
+
+    pub fn clock_sweeper(&mut self) {
+        if self.sweep_internal_enable && self.sweep_period != 0 {
+            let new_freq = self.sweep_calculation();
+
+            if new_freq <= 2047 && self.sweep_shift_n != 0 {
+                self.frequency = new_freq;
+                self.sweep_frequency_shadow = new_freq;
+                self.sweep_calculation();
+            }
         }
     }
 }
@@ -91,6 +111,31 @@ impl PulseChannel {
 impl PulseChannel {
     fn clock_sequencer(&mut self) {
         self.sequencer_position = (self.sequencer_position + 1) % 8;
+    }
+
+    fn sweep_trigger(&mut self) {
+        self.sweep_frequency_shadow = self.frequency;
+        self.sweep_current_time = self.sweep_period;
+        self.sweep_internal_enable = self.sweep_period != 0 || self.sweep_shift_n != 0;
+
+        if self.sweep_shift_n != 0 {
+            self.sweep_calculation();
+        }
+    }
+
+    fn sweep_calculation(&mut self) -> u16 {
+        let mut shifted_freq = self.sweep_frequency_shadow >> self.sweep_shift_n;
+        if self.sweep_negate {
+            shifted_freq = ((shifted_freq as i16) * -1) as u16;
+        }
+
+        let new_freq = self.sweep_frequency_shadow.wrapping_add(shifted_freq);
+
+        if new_freq > 2047 {
+            self.channel_enabled = false;
+        }
+
+        new_freq
     }
 }
 
@@ -101,5 +146,19 @@ impl ApuChannel for PulseChannel {
 
     fn muted(&self) -> bool {
         self.envelope.current_volume() == 0
+    }
+
+    fn trigger(&mut self) {
+        self.frequency_timer = 0x7FF - self.frequency;
+        self.envelope.trigger();
+        self.sweep_trigger();
+    }
+
+    fn set_enable(&mut self, enabled: bool) {
+        self.channel_enabled = enabled;
+    }
+
+    fn enabled(&self) -> bool {
+        self.channel_enabled
     }
 }

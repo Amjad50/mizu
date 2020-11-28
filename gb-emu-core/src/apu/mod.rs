@@ -7,6 +7,9 @@ pub use apu::Apu;
 trait ApuChannel {
     fn output(&mut self) -> u8;
     fn muted(&self) -> bool;
+    fn set_enable(&mut self, enabled: bool);
+    fn enabled(&self) -> bool;
+    fn trigger(&mut self);
 }
 
 struct LengthCountedChannel<C: ApuChannel> {
@@ -14,7 +17,6 @@ struct LengthCountedChannel<C: ApuChannel> {
     length: u8,
     current_counter: u8,
     counter_decrease_enable: bool,
-    muted: bool,
     channel: C,
 }
 
@@ -25,7 +27,6 @@ impl<C: ApuChannel> LengthCountedChannel<C> {
             length: 0,
             current_counter: 0,
             counter_decrease_enable: false,
-            muted: false,
             channel,
         }
     }
@@ -51,19 +52,14 @@ impl<C: ApuChannel> LengthCountedChannel<C> {
         self.counter_decrease_enable
     }
 
-    pub fn restart_channel(&mut self) {
-        self.muted = false;
-        self.current_counter = self.length;
-    }
-
     pub fn clock_length_counter(&mut self) {
         if self.counter_decrease_enable {
             if self.current_counter == 0 {
-                self.muted = true;
+                self.set_enable(false);
             } else {
                 self.current_counter -= 1;
                 if self.current_counter == 0 {
-                    self.muted = true;
+                    self.set_enable(false);
                     self.counter_decrease_enable = false;
                 }
             }
@@ -73,7 +69,7 @@ impl<C: ApuChannel> LengthCountedChannel<C> {
 
 impl<C: ApuChannel> ApuChannel for LengthCountedChannel<C> {
     fn output(&mut self) -> u8 {
-        if self.muted {
+        if !self.channel.enabled() {
             0
         } else {
             self.channel.output()
@@ -81,7 +77,24 @@ impl<C: ApuChannel> ApuChannel for LengthCountedChannel<C> {
     }
 
     fn muted(&self) -> bool {
-        self.muted || self.channel.muted()
+        !self.channel.enabled() || self.channel.muted()
+    }
+
+    fn trigger(&mut self) {
+        self.set_enable(true);
+        if self.current_counter == 0 {
+            self.current_counter = self.max_length;
+        }
+
+        self.channel.trigger();
+    }
+
+    fn set_enable(&mut self, enabled: bool) {
+        self.channel.set_enable(enabled);
+    }
+
+    fn enabled(&self) -> bool {
+        self.channel.enabled()
     }
 }
 

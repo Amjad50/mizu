@@ -1,5 +1,5 @@
 use super::pulse_channel::PulseChannel;
-use super::{Dac, LengthCountedChannel};
+use super::{ApuChannel, Dac, LengthCountedChannel};
 use bitflags::bitflags;
 
 bitflags! {
@@ -64,12 +64,13 @@ impl Default for Apu {
 impl Apu {
     pub fn read_register(&mut self, addr: u16) -> u8 {
         match addr {
-            0xFF10 => self.pulse1.channel_mut().read_sweep_register(),
+            0xFF10 => 0x80 | self.pulse1.channel_mut().read_sweep_register(),
             0xFF11 => 0x3F | (self.pulse1.channel_mut().read_pattern_duty() << 6),
             0xFF12 => self.pulse1.channel().envelope().read_envelope_register(),
             0xFF13 => 0xFF,
             0xFF14 => 0xBF | ((self.pulse1.read_length_enable() as u8) << 6),
 
+            0xFF15 => 0xFF,
             0xFF16 => 0x3F | (self.pulse2.channel_mut().read_pattern_duty() << 6),
             0xFF17 => self.pulse2.channel().envelope().read_envelope_register(),
             0xFF18 => 0xFF,
@@ -77,6 +78,10 @@ impl Apu {
 
             0xFF24 => self.channels_control.bits(),
             0xFF25 => self.channels_selection.bits(),
+            0xFF26 => {
+                // for now no available way to shutdown the apu
+                0x80 | 0x7C | ((self.pulse2.enabled() as u8) << 1) | self.pulse1.enabled() as u8
+            }
             _ => 0xFF,
         }
     }
@@ -106,7 +111,7 @@ impl Apu {
 
                 if data & 0x80 != 0 {
                     // restart
-                    self.pulse1.restart_channel();
+                    self.pulse1.trigger();
                 }
             }
             0xFF16 => {
@@ -131,7 +136,7 @@ impl Apu {
 
                 if data & 0x80 != 0 {
                     // restart
-                    self.pulse2.restart_channel();
+                    self.pulse2.trigger();
                 }
             }
 
@@ -170,7 +175,12 @@ impl Apu {
         self.pulse2.channel_mut().clock();
 
         match self.cycle / 2048 {
-            1 | 3 | 5 | 7 => {
+            1 | 5 => {
+                self.pulse1.clock_length_counter();
+                self.pulse2.clock_length_counter();
+            }
+            3 | 7 => {
+                self.pulse1.channel_mut().clock_sweeper();
                 self.pulse1.clock_length_counter();
                 self.pulse2.clock_length_counter();
             }
