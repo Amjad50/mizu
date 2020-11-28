@@ -200,6 +200,12 @@ impl Apu {
             .contains(ChannelsSelection::PULSE1_LEFT)
         {
             left += pulse1;
+        }
+
+        if self
+            .channels_selection
+            .contains(ChannelsSelection::PULSE2_LEFT)
+        {
             left += pulse2;
         }
 
@@ -208,6 +214,12 @@ impl Apu {
             .contains(ChannelsSelection::PULSE1_RIGHT)
         {
             right += pulse1;
+        }
+
+        if self
+            .channels_selection
+            .contains(ChannelsSelection::PULSE2_RIGHT)
+        {
             right += pulse2;
         }
 

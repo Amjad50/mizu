@@ -137,7 +137,7 @@ fn main() {
         let buffer = gameboy.audio_buffer();
 
         audio_queue.queue(&buffer);
-        if audio_queue.size() < 44100 / 2 {
+        if audio_queue.size() < 44100 {
             continue;
         }
 
