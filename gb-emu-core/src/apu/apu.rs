@@ -187,12 +187,14 @@ impl Apu {
         let pulse1 = if self.pulse1.muted() {
             0.
         } else {
-            self.pulse1.output() as f32 / 15.
+            // divide by 8 because we will multiply by master volume
+            self.pulse1.output() as f32 / 15. / 8.
         };
         let pulse2 = if self.pulse2.muted() {
             0.
         } else {
-            self.pulse2.output() as f32 / 15.
+            // divide by 8 because we will multiply by master volume
+            self.pulse2.output() as f32 / 15. / 8.
         };
 
         if self
@@ -223,6 +225,9 @@ impl Apu {
             right += pulse2;
         }
 
-        (right, left)
+        let right_vol = self.channels_control.vol_right() as f32 + 1.;
+        let left_vol = self.channels_control.vol_left() as f32 + 1.;
+
+        (right * right_vol, left * left_vol)
     }
 }

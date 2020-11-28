@@ -2,7 +2,6 @@ use gb_emu_core::{GameBoy, JoypadButton};
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::{AudioSubsystem, Sdl};
 use std::env::args;
-use std::sync::Arc;
 
 use sfml::{
     graphics::{Color, FloatRect, Image, RenderTarget, RenderWindow, Sprite, Texture, View},
