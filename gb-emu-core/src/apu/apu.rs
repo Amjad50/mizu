@@ -70,6 +70,11 @@ impl Apu {
             0xFF13 => 0xFF,
             0xFF14 => 0xBF | ((self.pulse1.read_length_enable() as u8) << 6),
 
+            0xFF16 => 0x3F | (self.pulse2.channel_mut().read_pattern_duty() << 6),
+            0xFF17 => self.pulse2.channel().envelope().read_envelope_register(),
+            0xFF18 => 0xFF,
+            0xFF19 => 0xBF | ((self.pulse2.read_length_enable() as u8) << 6),
+
             0xFF24 => self.channels_control.bits(),
             0xFF25 => self.channels_selection.bits(),
             _ => 0xFF,
