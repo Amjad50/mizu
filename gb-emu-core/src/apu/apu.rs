@@ -174,22 +174,24 @@ impl Apu {
         self.pulse1.channel_mut().clock();
         self.pulse2.channel_mut().clock();
 
-        match self.cycle / 2048 {
-            1 | 5 => {
-                self.pulse1.clock_length_counter();
-                self.pulse2.clock_length_counter();
+        if self.cycle % 2048 == 0 {
+            match self.cycle / 2048 {
+                1 | 5 => {
+                    self.pulse1.clock_length_counter();
+                    self.pulse2.clock_length_counter();
+                }
+                3 | 7 => {
+                    self.pulse1.channel_mut().clock_sweeper();
+                    self.pulse1.clock_length_counter();
+                    self.pulse2.clock_length_counter();
+                }
+                8 => {
+                    self.pulse1.channel_mut().envelope_mut().clock();
+                    self.pulse2.channel_mut().envelope_mut().clock();
+                    self.cycle = 0;
+                }
+                _ => {}
             }
-            3 | 7 => {
-                self.pulse1.channel_mut().clock_sweeper();
-                self.pulse1.clock_length_counter();
-                self.pulse2.clock_length_counter();
-            }
-            8 => {
-                self.pulse1.channel_mut().envelope_mut().clock();
-                self.pulse2.channel_mut().envelope_mut().clock();
-                self.cycle = 0;
-            }
-            _ => {}
         }
     }
 }
