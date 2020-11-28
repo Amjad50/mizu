@@ -96,14 +96,24 @@ impl PulseChannel {
     }
 
     pub fn clock_sweeper(&mut self) {
-        if self.sweep_internal_enable && self.sweep_period != 0 {
-            let new_freq = self.sweep_calculation();
+        if self.sweep_current_time == 0 {
+            self.sweep_current_time = self.sweep_period;
 
-            if new_freq <= 2047 && self.sweep_shift_n != 0 {
-                self.frequency = new_freq;
-                self.sweep_frequency_shadow = new_freq;
-                self.sweep_calculation();
+            if self.sweep_current_time == 0 {
+                self.sweep_current_time = 8;
             }
+
+            if self.sweep_internal_enable && self.sweep_period != 0 {
+                let new_freq = self.sweep_calculation();
+
+                if new_freq <= 2047 && self.sweep_shift_n != 0 {
+                    self.frequency = new_freq;
+                    self.sweep_frequency_shadow = new_freq;
+                    self.sweep_calculation();
+                }
+            }
+        } else {
+            self.sweep_current_time -= 1;
         }
     }
 }
