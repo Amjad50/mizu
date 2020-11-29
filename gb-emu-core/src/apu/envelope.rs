@@ -5,6 +5,8 @@ pub struct EnvelopGenerator {
     sweep_increase: bool,
     period: u8,
 
+    envelope_can_run: bool,
+
     counter: u8,
 }
 
@@ -23,22 +25,30 @@ impl EnvelopGenerator {
     }
 
     pub fn current_volume(&self) -> u8 {
-        self.starting_volume
+        self.current_volume
     }
 
     pub fn clock(&mut self) {
-        if self.period != 0 {
+        self.counter = self.counter.saturating_sub(1);
+
+        if self.counter == 0 {
+            self.counter = self.period;
             if self.counter == 0 {
-                self.counter = self.period;
+                self.counter = 8;
+            }
 
-                let change = if self.sweep_increase { 1 } else { -1 };
-                let current_volume = self.current_volume as i8 + change;
-
-                if current_volume >= 0 && current_volume <= 15 {
-                    self.current_volume = current_volume as u8;
+            if self.envelope_can_run && self.period != 0 {
+                if self.sweep_increase {
+                    if self.current_volume < 15 {
+                        self.current_volume += 1;
+                    }
+                } else {
+                    self.current_volume = self.current_volume.saturating_sub(1);
                 }
-            } else {
-                self.counter -= 1;
+
+                if self.current_volume == 0 || self.current_volume == 15 {
+                    self.envelope_can_run = false;
+                }
             }
         }
     }
@@ -46,5 +56,6 @@ impl EnvelopGenerator {
     pub fn trigger(&mut self) {
         self.counter = self.period;
         self.current_volume = self.starting_volume;
+        self.envelope_can_run = true;
     }
 }
