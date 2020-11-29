@@ -59,7 +59,6 @@ impl PulseChannel {
     }
 
     pub fn write_pattern_duty(&mut self, data: u8) {
-        // TODO: find if we need to reset the sequencer or not (NES do not need)
         self.sequencer_data = DUTY_CYCLE_SEQUENCES[data as usize & 3];
         self.duty = data & 3;
     }

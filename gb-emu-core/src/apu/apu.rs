@@ -90,7 +90,7 @@ impl Apu {
         match addr {
             0xFF10 => self.pulse1.channel_mut().write_sweep_register(data),
             0xFF11 => {
-                self.pulse1.channel_mut().write_pattern_duty(data >> 5);
+                self.pulse1.channel_mut().write_pattern_duty(data >> 6);
                 self.pulse1.write_sound_length(data & 0x3F);
             }
             0xFF12 => self
@@ -115,7 +115,7 @@ impl Apu {
                 }
             }
             0xFF16 => {
-                self.pulse2.channel_mut().write_pattern_duty(data >> 5);
+                self.pulse2.channel_mut().write_pattern_duty(data >> 6);
                 self.pulse2.write_sound_length(data & 0x3F);
             }
             0xFF17 => self
