@@ -119,7 +119,7 @@ impl<C: ApuChannel> Dac<C> {
             let dac_in = self.channel.output() as f32 / 15.;
             let dac_out = dac_in - self.capacitor;
 
-            self.capacitor = dac_in - dac_out * 0.926;
+            self.capacitor = dac_in - dac_out * 0.996;
 
             dac_out
         }
