@@ -2,10 +2,10 @@ use super::envelope::EnvelopGenerator;
 use super::ApuChannel;
 
 const DUTY_CYCLE_SEQUENCES: [[u8; 8]; 4] = [
-    [1, 0, 0, 0, 0, 0, 0, 0],
-    [1, 1, 0, 0, 0, 0, 0, 0],
-    [1, 1, 1, 1, 0, 0, 0, 0],
-    [0, 0, 1, 1, 1, 1, 1, 1],
+    [0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 1, 1, 1],
+    [0, 1, 1, 1, 1, 1, 1, 0],
 ];
 
 pub struct PulseChannel {
@@ -133,12 +133,13 @@ impl PulseChannel {
     }
 
     fn sweep_calculation(&mut self) -> u16 {
-        let mut shifted_freq = self.sweep_frequency_shadow >> self.sweep_shift_n;
-        if self.sweep_negate {
-            shifted_freq = ((shifted_freq as i16) * -1) as u16;
-        }
+        let shifted_freq = self.sweep_frequency_shadow >> self.sweep_shift_n;
 
-        let new_freq = self.sweep_frequency_shadow.wrapping_add(shifted_freq);
+        let new_freq = if self.sweep_negate {
+            self.sweep_frequency_shadow.wrapping_sub(shifted_freq)
+        } else {
+            self.sweep_frequency_shadow.wrapping_add(shifted_freq)
+        };
 
         if new_freq > 2047 {
             self.channel_enabled = false;
