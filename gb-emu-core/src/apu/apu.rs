@@ -1,4 +1,5 @@
 use super::pulse_channel::PulseChannel;
+use super::wave_channel::WaveChannel;
 use super::{ApuChannel, Dac, LengthCountedChannel};
 use bitflags::bitflags;
 
@@ -37,6 +38,7 @@ bitflags! {
 pub struct Apu {
     pulse1: Dac<LengthCountedChannel<PulseChannel>>,
     pulse2: Dac<LengthCountedChannel<PulseChannel>>,
+    wave: Dac<LengthCountedChannel<WaveChannel>>,
 
     channels_control: ChannelsControl,
     channels_selection: ChannelsSelection,
@@ -56,6 +58,7 @@ impl Default for Apu {
             sample_counter: 0.,
             pulse1: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
             pulse2: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
+            wave: Dac::new(LengthCountedChannel::new(WaveChannel::default(), 256)),
             cycle: 0,
         }
     }
@@ -76,12 +79,25 @@ impl Apu {
             0xFF18 => 0xFF,
             0xFF19 => 0xBF | ((self.pulse2.read_length_enable() as u8) << 6),
 
+            0xFF1A => 0x7F | ((self.wave.channel().read_channel_enable() as u8) << 7),
+            0xFF1B => 0xFF,
+            0xFF1C => 0x9F | ((self.wave.channel().read_volume()) << 5),
+            0xFF1D => 0xFF,
+            0xFF1E => 0xBF | ((self.wave.read_length_enable() as u8) << 6),
+
             0xFF24 => self.channels_control.bits(),
             0xFF25 => self.channels_selection.bits(),
             0xFF26 => {
                 // for now no available way to shutdown the apu
-                0x80 | 0x7C | ((self.pulse2.enabled() as u8) << 1) | self.pulse1.enabled() as u8
+                0x80 | 0x78
+                    | ((self.wave.enabled() as u8) << 2)
+                    | ((self.pulse2.enabled() as u8) << 1)
+                    | self.pulse1.enabled() as u8
             }
+
+            0xFF27..=0xFF2F => 0xFF,
+
+            0xFF30..=0xFF3F => self.wave.channel().read_buffer((addr & 0xF) as u8),
             _ => 0xFF,
         }
     }
@@ -114,6 +130,8 @@ impl Apu {
                     self.pulse1.trigger();
                 }
             }
+
+            0xFF15 => {}
             0xFF16 => {
                 self.pulse2.channel_mut().write_pattern_duty(data >> 6);
                 self.pulse2.write_sound_length(data & 0x3F);
@@ -140,12 +158,47 @@ impl Apu {
                 }
             }
 
+            0xFF1A => {
+                self.wave
+                    .channel_mut()
+                    .write_channel_enable(data & 0x80 != 0);
+            }
+            0xFF1B => {
+                self.wave.write_sound_length(data);
+            }
+            0xFF1C => self.wave.channel_mut().write_volume((data >> 5) & 3),
+            0xFF1D => {
+                let freq = (self.wave.channel().frequency() & 0xFF00) | data as u16;
+                self.wave.channel_mut().write_frequency(freq);
+            }
+            0xFF1E => {
+                let freq = (self.wave.channel().frequency() & 0xFF) | (((data as u16) & 0x7) << 8);
+                self.wave.channel_mut().write_frequency(freq);
+
+                self.wave.write_length_enable((data >> 6) & 1 == 1);
+
+                if data & 0x80 != 0 {
+                    // restart
+                    self.wave.trigger();
+                }
+            }
+
             0xFF24 => self
                 .channels_control
                 .clone_from(&ChannelsControl::from_bits_truncate(data)),
             0xFF25 => self
                 .channels_selection
                 .clone_from(&ChannelsSelection::from_bits_truncate(data)),
+
+            0xFF27..=0xFF2F => {
+                // unused
+            }
+
+            0xFF30..=0xFF3F => {
+                self.wave
+                    .channel_mut()
+                    .write_buffer((addr & 0xF) as u8, data);
+            }
             _ => {}
         }
     }
@@ -173,17 +226,21 @@ impl Apu {
 
         self.pulse1.channel_mut().clock();
         self.pulse2.channel_mut().clock();
+        self.wave.channel_mut().clock();
+        self.wave.channel_mut().clock();
 
         if self.cycle % 2048 == 0 {
             match self.cycle / 2048 {
                 1 | 5 => {
                     self.pulse1.clock_length_counter();
                     self.pulse2.clock_length_counter();
+                    self.wave.clock_length_counter();
                 }
                 3 | 7 => {
                     self.pulse1.channel_mut().clock_sweeper();
                     self.pulse1.clock_length_counter();
                     self.pulse2.clock_length_counter();
+                    self.wave.clock_length_counter();
                 }
                 8 => {
                     self.pulse1.channel_mut().envelope_mut().clock();
@@ -203,6 +260,7 @@ impl Apu {
 
         let pulse1 = self.pulse1.dac_output() / 8.;
         let pulse2 = self.pulse2.dac_output() / 8.;
+        let wave = self.wave.dac_output() / 8.;
 
         if self
             .channels_selection
@@ -220,6 +278,13 @@ impl Apu {
 
         if self
             .channels_selection
+            .contains(ChannelsSelection::WAVE_LEFT)
+        {
+            left += wave;
+        }
+
+        if self
+            .channels_selection
             .contains(ChannelsSelection::PULSE1_RIGHT)
         {
             right += pulse1;
@@ -230,6 +295,13 @@ impl Apu {
             .contains(ChannelsSelection::PULSE2_RIGHT)
         {
             right += pulse2;
+        }
+
+        if self
+            .channels_selection
+            .contains(ChannelsSelection::WAVE_RIGHT)
+        {
+            right += wave;
         }
 
         let right_vol = self.channels_control.vol_right() as f32 + 1.;

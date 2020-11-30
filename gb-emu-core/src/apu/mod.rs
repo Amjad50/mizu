@@ -1,6 +1,7 @@
 mod apu;
 mod envelope;
 mod pulse_channel;
+mod wave_channel;
 
 pub use apu::Apu;
 
@@ -13,15 +14,15 @@ trait ApuChannel {
 }
 
 struct LengthCountedChannel<C: ApuChannel> {
-    max_length: u8,
-    length: u8,
-    current_counter: u8,
+    max_length: u16,
+    length: u16,
+    current_counter: u16,
     counter_decrease_enable: bool,
     channel: C,
 }
 
 impl<C: ApuChannel> LengthCountedChannel<C> {
-    pub fn new(channel: C, max_length: u8) -> Self {
+    pub fn new(channel: C, max_length: u16) -> Self {
         Self {
             max_length,
             length: 0,
@@ -39,7 +40,7 @@ impl<C: ApuChannel> LengthCountedChannel<C> {
     }
 
     pub fn write_sound_length(&mut self, data: u8) {
-        self.length = self.max_length - data;
+        self.length = self.max_length - data as u16;
         self.current_counter = self.length;
     }
 

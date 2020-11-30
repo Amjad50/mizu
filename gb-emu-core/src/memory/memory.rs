@@ -160,7 +160,7 @@ impl Bus {
             0xFF00 => self.joypad.read_joypad(),                          // joypad
             0xFF04..=0xFF07 => self.timer.read_register(addr),            // divider and timer
             0xFF0F => self.interrupts.read_interrupt_flags(),             // interrupts flags
-            0xFF10..=0xFF26 => self.apu.read_register(addr),              // apu
+            0xFF10..=0xFF3F => self.apu.read_register(addr),              // apu
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.read_register(addr), // ppu io registers
             0xFF46 => self.dma.read(),                                    // dma start
             // 0xFF4C..=0xFF7F => 0xFF,                           // io registers
@@ -185,7 +185,7 @@ impl Bus {
             0xFF00 => self.joypad.write_joypad(data),                             // joypad
             0xFF04..=0xFF07 => self.timer.write_register(addr, data), // divider and timer
             0xFF0F => self.interrupts.write_interrupt_flags(data),    // interrupts flags
-            0xFF10..=0xFF26 => self.apu.write_register(addr, data),   // apu
+            0xFF10..=0xFF3F => self.apu.write_register(addr, data),   // apu
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.write_register(addr, data), // ppu io registers
             0xFF46 => self.dma.start_dma(data),                                       // dma start
             // 0xFF4C..=0xFF7F => {} // io registers
