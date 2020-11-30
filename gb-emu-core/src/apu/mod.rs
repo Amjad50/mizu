@@ -1,5 +1,6 @@
 mod apu;
 mod envelope;
+mod noise_channel;
 mod pulse_channel;
 mod wave_channel;
 
@@ -42,6 +43,11 @@ impl<C: ApuChannel> LengthCountedChannel<C> {
     pub fn write_sound_length(&mut self, data: u8) {
         self.length = self.max_length - data as u16;
         self.current_counter = self.length;
+    }
+
+    /// Can only be read from the noise channel
+    pub fn read_sound_length(&mut self) -> u8 {
+        (self.max_length - self.length) as u8
     }
 
     pub fn write_length_enable(&mut self, data: bool) {

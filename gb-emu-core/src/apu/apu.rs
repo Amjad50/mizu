@@ -1,3 +1,4 @@
+use super::noise_channel::NoiseChannel;
 use super::pulse_channel::PulseChannel;
 use super::wave_channel::WaveChannel;
 use super::{ApuChannel, Dac, LengthCountedChannel};
@@ -39,6 +40,7 @@ pub struct Apu {
     pulse1: Dac<LengthCountedChannel<PulseChannel>>,
     pulse2: Dac<LengthCountedChannel<PulseChannel>>,
     wave: Dac<LengthCountedChannel<WaveChannel>>,
+    noise: Dac<LengthCountedChannel<NoiseChannel>>,
 
     channels_control: ChannelsControl,
     channels_selection: ChannelsSelection,
@@ -59,6 +61,7 @@ impl Default for Apu {
             pulse1: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
             pulse2: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
             wave: Dac::new(LengthCountedChannel::new(WaveChannel::default(), 256)),
+            noise: Dac::new(LengthCountedChannel::new(NoiseChannel::default(), 64)),
             cycle: 0,
         }
     }
@@ -85,11 +88,18 @@ impl Apu {
             0xFF1D => 0xFF,
             0xFF1E => 0xBF | ((self.wave.read_length_enable() as u8) << 6),
 
+            0xFF1F => 0xFF,
+            0xFF20 => 0xE0 | self.noise.read_sound_length(),
+            0xFF21 => self.noise.channel().envelope().read_envelope_register(),
+            0xFF22 => self.noise.channel().read_noise_register(),
+            0xFF23 => 0xBF | ((self.noise.read_length_enable() as u8) << 6),
+
             0xFF24 => self.channels_control.bits(),
             0xFF25 => self.channels_selection.bits(),
             0xFF26 => {
                 // for now no available way to shutdown the apu
-                0x80 | 0x78
+                0x80 | 0x70
+                    | ((self.noise.enabled() as u8) << 3)
                     | ((self.wave.enabled() as u8) << 2)
                     | ((self.pulse2.enabled() as u8) << 1)
                     | self.pulse1.enabled() as u8
@@ -183,6 +193,23 @@ impl Apu {
                 }
             }
 
+            0xFF1F => {}
+            0xFF20 => self.noise.write_sound_length(data & 0x3F),
+            0xFF21 => self
+                .noise
+                .channel_mut()
+                .envelope_mut()
+                .write_envelope_register(data),
+            0xFF22 => self.noise.channel_mut().write_noise_register(data),
+            0xFF23 => {
+                self.noise.write_length_enable((data >> 6) & 1 == 1);
+
+                if data & 0x80 != 0 {
+                    // restart
+                    self.noise.trigger();
+                }
+            }
+
             0xFF24 => self
                 .channels_control
                 .clone_from(&ChannelsControl::from_bits_truncate(data)),
@@ -228,6 +255,7 @@ impl Apu {
         self.pulse2.channel_mut().clock();
         self.wave.channel_mut().clock();
         self.wave.channel_mut().clock();
+        self.noise.channel_mut().clock();
 
         if self.cycle % 2048 == 0 {
             match self.cycle / 2048 {
@@ -235,16 +263,19 @@ impl Apu {
                     self.pulse1.clock_length_counter();
                     self.pulse2.clock_length_counter();
                     self.wave.clock_length_counter();
+                    self.noise.clock_length_counter();
                 }
                 3 | 7 => {
                     self.pulse1.channel_mut().clock_sweeper();
                     self.pulse1.clock_length_counter();
                     self.pulse2.clock_length_counter();
                     self.wave.clock_length_counter();
+                    self.noise.clock_length_counter();
                 }
                 8 => {
                     self.pulse1.channel_mut().envelope_mut().clock();
                     self.pulse2.channel_mut().envelope_mut().clock();
+                    self.noise.channel_mut().envelope_mut().clock();
                     self.cycle = 0;
                 }
                 _ => {}
@@ -261,6 +292,7 @@ impl Apu {
         let pulse1 = self.pulse1.dac_output() / 8.;
         let pulse2 = self.pulse2.dac_output() / 8.;
         let wave = self.wave.dac_output() / 8.;
+        let noise = self.noise.dac_output() / 8.;
 
         if self
             .channels_selection
@@ -285,6 +317,13 @@ impl Apu {
 
         if self
             .channels_selection
+            .contains(ChannelsSelection::NOISE_LEFT)
+        {
+            left += noise;
+        }
+
+        if self
+            .channels_selection
             .contains(ChannelsSelection::PULSE1_RIGHT)
         {
             right += pulse1;
@@ -302,6 +341,13 @@ impl Apu {
             .contains(ChannelsSelection::WAVE_RIGHT)
         {
             right += wave;
+        }
+
+        if self
+            .channels_selection
+            .contains(ChannelsSelection::NOISE_RIGHT)
+        {
+            right += noise;
         }
 
         let right_vol = self.channels_control.vol_right() as f32 + 1.;
