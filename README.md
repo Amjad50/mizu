@@ -10,8 +10,8 @@ GB-emu (maybe I'll change the name) is a Gameboy emulator built in Rust.
 - [x] functional Mbc1 mapper (still without saving battery cartridge)
 - [x] Timer
 - [ ] Serial (not sure if its important, since we don't have more than one GB, but maybe we can use the internet? An idea...)
-- [ ] Audio
-- [ ] Automatic testing please
+- [x] Audio
+- [x] Automatic testing, and with easy interface
 
 # Yet another gameboy emulator?
 Why not?. it is fun and educational, but even though I'm planning to make it as accurate as I can. If you want to see cool emulators, check my previous work [Plastic].
