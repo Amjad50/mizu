@@ -1,6 +1,7 @@
+mod audio;
+use audio::AudioPlayer;
+
 use gb_emu_core::{GameBoy, JoypadButton};
-use sdl2::audio::{AudioQueue, AudioSpecDesired};
-use sdl2::{AudioSubsystem, Sdl};
 use std::env::args;
 
 use sfml::{
@@ -14,24 +15,6 @@ const TV_HEIGHT: u32 = 144;
 
 const SCREEN_WIDTH: u32 = TV_WIDTH * 3;
 const SCREEN_HEIGHT: u32 = TV_HEIGHT * 3;
-
-fn open_sdl_audio() -> Option<(AudioQueue<f32>, Sdl, AudioSubsystem)> {
-    let desired_spec = AudioSpecDesired {
-        freq: Some(44100),
-        channels: Some(2),
-        samples: None,
-    };
-
-    let sdl_context = sdl2::init().unwrap();
-    let audio_context = sdl_context.audio().unwrap();
-
-    if let Ok(device) = audio_context.open_queue(None, &desired_spec) {
-        device.resume();
-        Some((device, sdl_context, audio_context))
-    } else {
-        None
-    }
-}
 
 fn get_view(
     window_width: u32,
@@ -72,7 +55,8 @@ fn main() {
 
     let mut gameboy = GameBoy::new(&args[1]).unwrap();
 
-    let (audio_queue, _sdl_context, _audio_context) = open_sdl_audio().unwrap();
+    let mut audio_player = AudioPlayer::new(44100);
+    audio_player.play();
 
     let mut window = RenderWindow::new(
         (SCREEN_WIDTH, SCREEN_HEIGHT),
@@ -135,10 +119,7 @@ fn main() {
 
         let buffer = gameboy.audio_buffer();
 
-        audio_queue.queue(&buffer);
-        if audio_queue.size() < 44100 {
-            continue;
-        }
+        audio_player.queue(&buffer);
 
         window.clear(Color::WHITE);
 

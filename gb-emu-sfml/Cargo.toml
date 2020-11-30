@@ -9,5 +9,6 @@ edition = "2018"
 [dependencies]
 gb-emu-core = { path = "../gb-emu-core" }
 sfml = "^0.15.1"
-sdl2 = "0.34.3"
+ringbuf = "0.2.2"
+cpal = "0.13.1"
 
