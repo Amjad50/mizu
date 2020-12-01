@@ -54,7 +54,7 @@ impl Mapper for Mbc1 {
         bank as usize * 0x4000 + addr as usize
     }
 
-    fn map_ram_read(&self, addr: u16) -> MappingResult {
+    fn map_ram_read(&mut self, addr: u16) -> MappingResult {
         if !self.ram_enable {
             return MappingResult::NotMapped;
         }

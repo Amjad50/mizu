@@ -446,6 +446,7 @@ name = "gb-emu-core"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "byteorder",
  "crc",
  "fixed-vec-deque",
 ]

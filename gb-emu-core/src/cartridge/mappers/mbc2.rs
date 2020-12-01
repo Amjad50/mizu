@@ -42,7 +42,7 @@ impl Mapper for Mbc2 {
         bank as usize * 0x4000 + addr as usize
     }
 
-    fn map_ram_read(&self, addr: u16) -> MappingResult {
+    fn map_ram_read(&mut self, addr: u16) -> MappingResult {
         if self.ram_enable {
             MappingResult::Value(0xF0 | self.ram[addr as usize & 0x1FF])
         } else {
@@ -75,8 +75,8 @@ impl Mapper for Mbc2 {
         512
     }
 
-    fn save_battery(&self) -> &[u8] {
-        &self.ram
+    fn save_battery(&self) -> Vec<u8> {
+        self.ram.into()
     }
 
     fn load_battery(&mut self, data: &[u8]) {

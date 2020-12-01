@@ -149,6 +149,7 @@ impl CartridgeType {
             MapperType::NoMapper => Box::new(mappers::NoMapper::default()),
             MapperType::Mbc1 => Box::new(mappers::Mbc1::default()),
             MapperType::Mbc2 => Box::new(mappers::Mbc2::default()),
+            MapperType::Mbc3 { timer } => Box::new(mappers::Mbc3::new(timer)),
             _ => return None,
         };
 
@@ -204,7 +205,7 @@ impl Cartridge {
             GameBoyType::NonColor
         };
 
-        let mut cartridge_type =
+        let cartridge_type =
             CartridgeType::from_byte(data[0x147]).ok_or(CartridgeError::InvalidCartridgeType)?;
 
         let num_rom_banks = data[0x148];
@@ -303,24 +304,18 @@ impl Cartridge {
 
     /// 0xA000-0xBFFF
     pub fn read_ram(&mut self, addr: u16) -> u8 {
-        if self.cartridge_type.ram {
-            match self.mapper.map_ram_read(addr) {
-                MappingResult::Addr(addr) => self.ram[addr],
-                MappingResult::Value(value) => value,
-                MappingResult::NotMapped => 0xFF,
-            }
-        } else {
-            0xFF
+        match self.mapper.map_ram_read(addr) {
+            MappingResult::Addr(addr) => self.ram[addr],
+            MappingResult::Value(value) => value,
+            MappingResult::NotMapped => 0xFF,
         }
     }
 
     /// 0xA000-0xBFFF
     pub fn write_ram(&mut self, addr: u16, data: u8) {
-        if self.cartridge_type.ram {
-            match self.mapper.map_ram_write(addr, data) {
-                MappingResult::Addr(addr) => self.ram[addr] = data,
-                MappingResult::NotMapped | MappingResult::Value(_) => {}
-            }
+        match self.mapper.map_ram_write(addr, data) {
+            MappingResult::Addr(addr) => self.ram[addr] = data,
+            MappingResult::NotMapped | MappingResult::Value(_) => {}
         }
     }
 }
@@ -364,7 +359,7 @@ impl Cartridge {
 
         let extra = self.mapper.save_battery();
 
-        let size = file.write(extra)?;
+        let size = file.write(&extra)?;
 
         if size != extra.len() {
             file.sync_all()?;

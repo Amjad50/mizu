@@ -1,9 +1,11 @@
 mod mbc1;
 mod mbc2;
+mod mbc3;
 mod no_mapper;
 
 pub(super) use mbc1::Mbc1;
 pub(super) use mbc2::Mbc2;
+pub(super) use mbc3::Mbc3;
 pub(super) use no_mapper::NoMapper;
 
 #[derive(Debug, Clone, Copy)]
@@ -31,11 +33,11 @@ pub trait Mapper {
 
     fn map_read_romx(&self, addr: u16) -> usize;
 
-    fn map_ram_read(&self, addr: u16) -> MappingResult;
+    fn map_ram_read(&mut self, addr: u16) -> MappingResult;
 
     fn map_ram_write(&mut self, addr: u16, data: u8) -> MappingResult;
 
-    fn write_bank_controller_register(&mut self, addr: u16, data: u8) {
+    fn write_bank_controller_register(&mut self, _addr: u16, _data: u8) {
         // ignored
     }
 
@@ -43,11 +45,11 @@ pub trait Mapper {
         0
     }
 
-    fn save_battery(&self) -> &[u8] {
-        &[]
+    fn save_battery(&self) -> Vec<u8> {
+        Vec::new()
     }
 
-    fn load_battery(&mut self, data: &[u8]) {
+    fn load_battery(&mut self, _data: &[u8]) {
         // ignored
     }
 }

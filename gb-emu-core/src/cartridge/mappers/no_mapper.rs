@@ -28,7 +28,7 @@ impl Mapper for NoMapper {
         addr as usize
     }
 
-    fn map_ram_read(&self, addr: u16) -> MappingResult {
+    fn map_ram_read(&mut self, addr: u16) -> MappingResult {
         if self.ram_size == 0 {
             MappingResult::NotMapped
         } else {
