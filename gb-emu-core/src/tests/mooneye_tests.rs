@@ -1,11 +1,16 @@
 macro_rules! mooneye_tests {
-    ($($test_name: ident, $file_path: expr;)*) => {
+    ($prefix:expr; $($test_name: ident $(,)?),*) => {
         $(
             /// Run the test and check registers values (take from mooneye)
             #[test]
             fn $test_name() {
+                let file_path = concat!(
+                    "../test_roms/mooneye-gb_hwtests/",
+                    $prefix, "/",
+                    stringify!($test_name), ".gb");
+
                 let mut gb = crate::tests::TestingGameBoy::new(
-                    concat!("../test_roms/mooneye-gb_hwtests/", $file_path)
+                    file_path
                 ).unwrap();
 
                 let regs = gb.clock_until_breakpoint();
@@ -30,37 +35,28 @@ macro_rules! mooneye_tests {
 
 #[allow(non_snake_case)]
 mod mbc1 {
-    macro_rules! mbc1_tests {
-        ($($name: ident),*) => {
-            mooneye_tests!(
-                $(
-                $name,
-                concat!("emulator-only/mbc1/", stringify!($name), ".gb");
-                )*
-            );
-        };
-    }
-
-    mbc1_tests!(
+    mooneye_tests!("emulator-only/mbc1";
         bits_bank1, bits_ramg, ram_64kb, rom_2Mb, rom_8Mb, bits_bank2,
         // multicart_rom_8Mb,
         rom_16Mb, rom_4Mb, bits_mode, ram_256kb, rom_1Mb, rom_512kb
     );
 }
 
-mod acceptance {
-    macro_rules! acceptance_tests {
-         ($($name: tt $(.$folder:tt)? $(,)?),*) => {
-             mooneye_tests!(
-                 $(
-                 $name,
-                 concat!("acceptance/", $(stringify!($folder), "/",)? stringify!($name), ".gb");
-                 )*
-             );
-         };
-     }
+#[allow(non_snake_case)]
+mod mbc2 {
+    mooneye_tests!("emulator-only/mbc2";
+        bits_romb,
+        bits_ramg,
+        bits_unused,
+        ram,
+        rom_1Mb,
+        rom_2Mb,
+        rom_512kb
+    );
+}
 
-    acceptance_tests!(
+mod acceptance {
+    mooneye_tests!("acceptance";
         add_sp_e_timing,
         // boot_div - dmg0,
         // boot_hwio - dmg0,
@@ -94,48 +90,48 @@ mod acceptance {
     );
 
     mod bits {
-        acceptance_tests!(mem_oam.bits, reg_f.bits);
+        mooneye_tests!("acceptance/bits"; mem_oam, reg_f);
     }
 
     mod instr {
-        acceptance_tests!(daa.instr);
+        mooneye_tests!("acceptance/instr"; daa);
     }
 
     mod interrupts {
-        //acceptance_tests!(ie_push.interrupts);
+        // mooneye_tests!("acceptance/interrupts"; ie_push);
     }
 
     mod oam_dma {
-        acceptance_tests!(basic.oam_dma, reg_read.oam_dma);
+        mooneye_tests!("acceptance/oam_dma";basic, reg_read);
     }
 
     mod ppu {
-        acceptance_tests!(
-            //intr_2_0_timing.ppu,
-            //intr_2_mode0_timing.ppu,
-            //intr_2_mode0_timing_sprites.ppu,
-            //intr_2_mode3_timing.ppu,
-            //intr_2_oam_ok_timing.ppu,
-            //stat_irq_blocking.ppu,
-            //stat_lyc_onoff.ppu
+        mooneye_tests!("acceptance/ppu";
+            //intr_2_0_timing,
+            //intr_2_mode0_timing,
+            //intr_2_mode0_timing_sprites,
+            //intr_2_mode3_timing,
+            //intr_2_oam_ok_timing,
+            //stat_irq_blocking,
+            //stat_lyc_onoff
         );
     }
 
     mod timer {
-        acceptance_tests!(
-            div_write.timer,
-            //rapid_toggle.timer,
-            //tim00_div_trigger.timer,
-            tim00.timer,
-            //tim01_div_trigger.timer,
-            tim01.timer,
-            //tim10_div_trigger.timer,
-            tim10.timer,
-            //tim11_div_trigger.timer,
-            tim11.timer,
-            //tima_reload.timer,
-            //tima_write_reloading.timer,
-            //tma_write_reloading.timer
+        mooneye_tests!("acceptance/timer";
+            div_write,
+            //rapid_toggle,
+            //tim00_div_trigger,
+            tim00,
+            //tim01_div_trigger,
+            tim01,
+            //tim10_div_trigger,
+            tim10,
+            //tim11_div_trigger,
+            tim11,
+            //tima_reload,
+            //tima_write_reloading,
+            //tma_write_reloading
         );
     }
 }

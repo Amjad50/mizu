@@ -1,2 +1,5 @@
 /target
 /roms
+
+*.sav
+*.gb.sav
