@@ -148,6 +148,7 @@ impl CartridgeType {
         let mapper: Box<dyn Mapper> = match self.mapper_type {
             MapperType::NoMapper => Box::new(mappers::NoMapper::default()),
             MapperType::Mbc1 => Box::new(mappers::Mbc1::default()),
+            MapperType::Mbc2 => Box::new(mappers::Mbc2::default()),
             _ => return None,
         };
 
@@ -230,19 +231,13 @@ impl Cartridge {
         };
 
         if cartridge_type.ram && ram_size == 0 {
-            cartridge_type.ram = false;
-        // return Err(CartridgeError::RamNotPresentError);
+            // cartridge_type.ram = false;
+            // return Err(CartridgeError::RamNotPresentError);
         } else if !cartridge_type.ram && ram_size != 0 {
             return Err(CartridgeError::NotNeededRamPresentError);
         }
 
         let mut ram = vec![0; ram_size];
-
-        if cartridge_type.battery {
-            if let Ok(saved_ram) = Self::load_sram_file(file_path.as_ref(), ram_size) {
-                ram = saved_ram;
-            }
-        }
 
         let mut checksum = 0u8;
         for &i in data[0x134..=0x14c].iter() {
@@ -266,6 +261,15 @@ impl Cartridge {
                 ))?;
 
         mapper.init((rom_size / 0x4000) as u16, ram_size);
+
+        if cartridge_type.battery {
+            if let Ok((saved_ram, extra)) =
+                Self::load_sram_file(file_path.as_ref(), ram_size, mapper.save_battery_size())
+            {
+                ram = saved_ram;
+                mapper.load_battery(&extra);
+            }
+        }
 
         Ok(Self {
             file_path: file_path.as_ref().to_path_buf().into_boxed_path(),
@@ -322,17 +326,25 @@ impl Cartridge {
 }
 
 impl Cartridge {
-    fn load_sram_file<P: AsRef<Path>>(path: P, sram_size: usize) -> Result<Vec<u8>, SramError> {
+    fn load_sram_file<P: AsRef<Path>>(
+        path: P,
+        sram_size: usize,
+        extra_size: usize,
+    ) -> Result<(Vec<u8>, Vec<u8>), SramError> {
         let path = path.as_ref().with_extension("gb.sav");
         println!("Loading SRAM file data from {:?}", path);
 
         let mut file = File::open(path)?;
         let mut result = vec![0; sram_size];
+        let mut extra = vec![0; extra_size];
 
         file.read_exact(&mut result)
             .map_err(|_| SramError::SramFileSizeDoesNotMatch)?;
 
-        Ok(result)
+        file.read_exact(&mut extra)
+            .map_err(|_| SramError::SramFileSizeDoesNotMatch)?;
+
+        Ok((result, extra))
     }
 
     fn save_sram_file(&self) -> Result<(), SramError> {
@@ -347,10 +359,21 @@ impl Cartridge {
             file.sync_all()?;
             // remove the file so it will not be loaded next time the game is run
             std::fs::remove_file(path).expect("Could not remove `gb.sav` file");
-            Err(SramError::FailedToSaveSramFile)
-        } else {
-            Ok(())
+            return Err(SramError::FailedToSaveSramFile);
         }
+
+        let extra = self.mapper.save_battery();
+
+        let size = file.write(extra)?;
+
+        if size != extra.len() {
+            file.sync_all()?;
+            // remove the file so it will not be loaded next time the game is run
+            std::fs::remove_file(path).expect("Could not remove `gb.sav` file");
+            return Err(SramError::FailedToSaveSramFile);
+        }
+
+        Ok(())
     }
 }
 
