@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 
+#[derive(Debug)]
 enum GameBoyType {
     NonColor,
     Color,
@@ -204,6 +205,8 @@ impl Cartridge {
         } else {
             GameBoyType::NonColor
         };
+
+        println!("gameboy type {:?}", gameboy_type);
 
         let cartridge_type =
             CartridgeType::from_byte(data[0x147]).ok_or(CartridgeError::InvalidCartridgeType)?;
