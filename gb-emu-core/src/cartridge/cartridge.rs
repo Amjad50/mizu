@@ -184,7 +184,18 @@ impl Cartridge {
         file.read_to_end(&mut data)?;
 
         if data.len() < 0x8000 || data.len() % 0x4000 != 0 {
-            return Err(CartridgeError::InvalidFileSize(data.len()));
+            eprintln!(
+                "[WARN]: the cartridge contain invalid rom size {:X}",
+                data.len()
+            );
+        }
+
+        // extend the data, as some roms don't follow the rules :(
+        if data.len() < 0x8000 {
+            data.extend_from_slice(&vec![0; 0x8000 - data.len()]);
+        }
+        if data.len() % 0x4000 != 0 {
+            data.extend_from_slice(&vec![0; 0x4000 - (data.len() % 0x4000)]);
         }
 
         if &data[0x104..=0x133] != NINTENDO_LOGO_DATA {

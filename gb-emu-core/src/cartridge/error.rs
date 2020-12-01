@@ -8,7 +8,6 @@ use std::io::{Error as ioError, ErrorKind as ioErrorKind};
 pub enum CartridgeError {
     FileError(ioError),
     ExtensionError,
-    InvalidFileSize(usize),
     InvalidNintendoLogo,
     InvalidGameTitle,
     InvalidCartridgeType,
@@ -30,9 +29,6 @@ impl CartridgeError {
             }
             CartridgeError::InvalidCartridgeType => {
                 "Rom file contain unsupported cartridge type".to_string()
-            }
-            CartridgeError::InvalidFileSize(size) => {
-                format!("The rom file size {} bytes, is invalid", size)
             }
             CartridgeError::InvalidNintendoLogo => {
                 "The rom file does not contain a valid nintendo logo data at 0x104".to_string()
