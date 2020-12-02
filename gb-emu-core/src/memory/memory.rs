@@ -158,6 +158,8 @@ impl Bus {
             0xFE00..=0xFE9F if !block_for_dma => self.ppu.read_oam(addr), // ppu oam
             0xFEA0..=0xFEFF => 0,                                         // unused
             0xFF00 => self.joypad.read_joypad(),                          // joypad
+            0xFF01 => 0,                                                  // serial
+            0xFF02 => 0x7E,                                               // serial
             0xFF04..=0xFF07 => self.timer.read_register(addr),            // divider and timer
             0xFF0F => self.interrupts.read_interrupt_flags(),             // interrupts flags
             0xFF10..=0xFF3F => self.apu.read_register(addr),              // apu

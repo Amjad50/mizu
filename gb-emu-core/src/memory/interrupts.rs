@@ -46,7 +46,7 @@ impl Default for Interrupts {
     fn default() -> Self {
         Self {
             enabled: InterruptsFlags::from_bits_truncate(0),
-            requested: InterruptsFlags::from_bits_truncate(0),
+            requested: InterruptsFlags::from_bits_truncate(1),
         }
     }
 }
@@ -58,7 +58,7 @@ impl Interrupts {
     }
 
     pub fn read_interrupt_enable(&self) -> u8 {
-        self.enabled.bits() | 0xE0
+        self.enabled.bits()
     }
 
     pub fn write_interrupt_flags(&mut self, data: u8) {

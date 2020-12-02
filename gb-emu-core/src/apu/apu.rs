@@ -53,7 +53,7 @@ pub struct Apu {
 
 impl Default for Apu {
     fn default() -> Self {
-        Self {
+        let mut apu = Self {
             channels_control: ChannelsControl::from_bits_truncate(0),
             channels_selection: ChannelsSelection::from_bits_truncate(0),
             buffer: Vec::new(),
@@ -63,7 +63,20 @@ impl Default for Apu {
             wave: Dac::new(LengthCountedChannel::new(WaveChannel::default(), 256)),
             noise: Dac::new(LengthCountedChannel::new(NoiseChannel::default(), 64)),
             cycle: 0,
-        }
+        };
+
+        // power up sequence
+        apu.pulse1.channel_mut().write_pattern_duty(2);
+        apu.pulse1
+            .channel_mut()
+            .envelope_mut()
+            .write_envelope_register(0xF3);
+        apu.noise.write_sound_length(0x3F);
+        apu.channels_control = ChannelsControl::from_bits_truncate(0x77);
+        apu.channels_selection = ChannelsSelection::from_bits_truncate(0xF3);
+        apu.pulse1.set_enable(true);
+
+        apu
     }
 }
 

@@ -25,6 +25,8 @@ pub struct PulseChannel {
     frequency_timer: u16,
 
     channel_enabled: bool,
+
+    first_trigger: bool,
 }
 
 impl Default for PulseChannel {
@@ -43,6 +45,7 @@ impl Default for PulseChannel {
             frequency: 0,
             frequency_timer: 0,
             channel_enabled: false,
+            first_trigger: false,
         }
     }
 }
@@ -84,6 +87,11 @@ impl PulseChannel {
     }
 
     pub fn clock(&mut self) {
+        // obsecure behaviour
+        if !self.first_trigger {
+            return;
+        }
+
         if self.frequency_timer == 0 {
             self.clock_sequencer();
 
@@ -159,6 +167,7 @@ impl ApuChannel for PulseChannel {
     }
 
     fn trigger(&mut self) {
+        self.first_trigger = true;
         self.frequency_timer = 0x7FF - self.frequency;
         self.envelope.trigger();
         self.sweep_trigger();

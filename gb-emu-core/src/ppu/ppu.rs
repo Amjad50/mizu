@@ -180,19 +180,6 @@ impl Default for Ppu {
 }
 
 impl Ppu {
-    pub fn reset(&mut self) {
-        // reset I/O registers
-        self.write_register(0xff40, 0x91);
-        self.write_register(0xff42, 0x00);
-        self.write_register(0xff43, 0x00);
-        self.write_register(0xff45, 0x00);
-        self.write_register(0xff47, 0xFC);
-        self.write_register(0xff48, 0xFF);
-        self.write_register(0xff49, 0xFF);
-        self.write_register(0xff4A, 0x00);
-        self.write_register(0xff4B, 0x00);
-    }
-
     pub fn read_vram(&self, addr: u16) -> u8 {
         self.vram[addr as usize & 0x1FFF]
     }
@@ -214,7 +201,7 @@ impl Ppu {
     pub fn read_register(&mut self, addr: u16) -> u8 {
         match addr {
             0xFF40 => self.lcd_control.bits(),
-            0xFF41 => self.lcd_status.bits(),
+            0xFF41 => 0x80 | self.lcd_status.bits(),
             0xFF42 => self.scroll_y,
             0xFF43 => self.scroll_x,
             0xFF44 => self.scanline,
@@ -343,6 +330,19 @@ impl Ppu {
 }
 
 impl Ppu {
+    fn reset(&mut self) {
+        // reset I/O registers
+        self.write_register(0xff40, 0x91);
+        self.write_register(0xff42, 0x00);
+        self.write_register(0xff43, 0x00);
+        self.write_register(0xff45, 0x00);
+        self.write_register(0xff47, 0xFC);
+        self.write_register(0xff48, 0xFF);
+        self.write_register(0xff49, 0xFF);
+        self.write_register(0xff4A, 0x00);
+        self.write_register(0xff4B, 0x00);
+    }
+
     /// return true, if this is the last draw in the current scanline, and
     /// mode 0 is being activated
     fn draw(&mut self) -> bool {

@@ -42,13 +42,23 @@ impl From<JoypadButton> for JoypadButtons {
     }
 }
 
-#[derive(Default)]
 pub struct Joypad {
     buttons: JoypadButtons,
     selecting_directions: bool,
     selecting_start: bool,
 
     old_p1: u8,
+}
+
+impl Default for Joypad {
+    fn default() -> Self {
+        Self {
+            buttons: Default::default(),
+            selecting_directions: true,
+            selecting_start: true,
+            old_p1: 0,
+        }
+    }
 }
 
 impl Joypad {

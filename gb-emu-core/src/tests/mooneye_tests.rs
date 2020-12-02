@@ -55,12 +55,13 @@ mod mbc2 {
     );
 }
 
+#[allow(non_snake_case)]
 mod acceptance {
     mooneye_tests!("acceptance";
         add_sp_e_timing,
         // boot_div - dmg0,
-        // boot_hwio - dmg0,
-        // boot_regs - dmg0,
+        boot_hwio_dmgABCmgb,
+        boot_regs_dmgABC,
         call_cc_timing2,
         call_cc_timing,
         call_timing2,

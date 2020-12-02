@@ -26,12 +26,22 @@ impl TimerControl {
     }
 }
 
-#[derive(Default)]
 pub struct Timer {
     divider: u16,
     timer_counter: u8,
     timer_modulo: u8,
     timer_control: TimerControl,
+}
+
+impl Default for Timer {
+    fn default() -> Self {
+        Self {
+            divider: 0xAC55,
+            timer_counter: 0,
+            timer_modulo: 0,
+            timer_control: TimerControl::from_bits_truncate(0),
+        }
+    }
 }
 
 impl Timer {
