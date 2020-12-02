@@ -82,10 +82,7 @@ fn main() {
     'main: loop {
         while let Some(event) = window.poll_event() {
             match event {
-                Event::Closed
-                | Event::KeyPressed {
-                    code: Key::Escape, ..
-                } => break 'main,
+                Event::Closed => break 'main,
                 Event::KeyPressed { code: key, .. } => match key {
                     Key::J => gameboy.press_joypad(JoypadButton::B),
                     Key::K => gameboy.press_joypad(JoypadButton::A),
