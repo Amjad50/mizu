@@ -19,7 +19,13 @@ impl AudioPlayer {
             buffer_size: cpal::BufferSize::Default,
         };
 
-        let buffer = RingBuffer::new(sample_rate as usize * 2);
+        // Limiting the number of samples in the buffer is better to minimize
+        // audio delay in emulation, this is because emulation speed
+        // does not 100% match audio playing speed (44100Hz).
+        // The buffer holds only audio for 1/4 second, which is good enough for delays,
+        // It can be reduced more, but it might cause noise(?) for slower machines
+        // or if any CPU intensive process started while the emulator is running
+        let buffer = RingBuffer::new(sample_rate as usize / 2);
         let (buffer_producer, mut buffer_consumer) = buffer.split();
 
         let output_data_fn = move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
