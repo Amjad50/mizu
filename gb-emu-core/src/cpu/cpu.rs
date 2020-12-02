@@ -57,6 +57,7 @@ pub struct Cpu {
 
     reg_pc: u16,
 
+    enable_interrupt_next: bool,
     ime: bool,
     halt_mode: HaltMode,
 }
@@ -75,6 +76,7 @@ impl Cpu {
             reg_sp: 0,
             reg_pc: 0,
 
+            enable_interrupt_next: false,
             ime: false,
             halt_mode: HaltMode::NotHalting,
         };
@@ -101,8 +103,18 @@ impl Cpu {
                     self.stack_push(self.reg_pc, bus);
                     self.reg_pc = int_vector as u16;
                     self.ime = false;
+
+                    // delay for interrupt
+                    self.dummy_fetch(bus);
+                    self.dummy_fetch(bus);
+                    self.dummy_fetch(bus);
                     return CpuState::RunningInterrupt(int_vector);
                 }
+            }
+
+            if self.enable_interrupt_next {
+                self.ime = true;
+                self.enable_interrupt_next = false;
             }
 
             let pc = self.reg_pc;
@@ -120,7 +132,7 @@ impl Cpu {
 
             self.exec_instruction(instruction, bus)
         } else {
-            bus.read(0);
+            self.dummy_fetch(bus);
             if bus.check_interrupts() {
                 if self.halt_mode == HaltMode::HaltRunInterrupt {
                     if let Some(int_vector) = bus.get_interrupts() {
@@ -573,14 +585,14 @@ impl Cpu {
                     self.dummy_fetch(bus);
                 }
                 if self.check_cond(cond) {
-                    self.dummy_fetch(bus);
                     self.reg_pc = self.stack_pop(bus);
+                    self.dummy_fetch(bus);
                 }
                 0
             }
             Opcode::Reti => {
-                self.dummy_fetch(bus);
                 self.reg_pc = self.stack_pop(bus);
+                self.dummy_fetch(bus);
                 self.ime = true;
                 0
             }
@@ -595,7 +607,7 @@ impl Cpu {
                 0
             }
             Opcode::Ei => {
-                self.ime = true;
+                self.enable_interrupt_next = true;
                 0
             }
             Opcode::Ccf => {
