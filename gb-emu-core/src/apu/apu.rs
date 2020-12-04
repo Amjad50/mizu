@@ -45,6 +45,8 @@ pub struct Apu {
     channels_control: ChannelsControl,
     channels_selection: ChannelsSelection,
 
+    power: bool,
+
     sample_counter: f64,
     buffer: Vec<f32>,
 
@@ -56,6 +58,7 @@ impl Default for Apu {
         let mut apu = Self {
             channels_control: ChannelsControl::from_bits_truncate(0),
             channels_selection: ChannelsSelection::from_bits_truncate(0),
+            power: true,
             buffer: Vec::new(),
             sample_counter: 0.,
             pulse1: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
@@ -75,6 +78,7 @@ impl Default for Apu {
         apu.channels_control = ChannelsControl::from_bits_truncate(0x77);
         apu.channels_selection = ChannelsSelection::from_bits_truncate(0xF3);
         apu.pulse1.set_enable(true);
+        apu.wave.write_dac_enable(false);
 
         apu
     }
@@ -95,14 +99,14 @@ impl Apu {
             0xFF18 => 0xFF,
             0xFF19 => 0xBF | ((self.pulse2.read_length_enable() as u8) << 6),
 
-            0xFF1A => 0x7F | ((self.wave.channel().read_channel_enable() as u8) << 7),
+            0xFF1A => 0x7F | ((self.wave.read_dac_enable() as u8) << 7),
             0xFF1B => 0xFF,
             0xFF1C => 0x9F | ((self.wave.channel().read_volume()) << 5),
             0xFF1D => 0xFF,
             0xFF1E => 0xBF | ((self.wave.read_length_enable() as u8) << 6),
 
             0xFF1F => 0xFF,
-            0xFF20 => 0xE0 | self.noise.read_sound_length(),
+            0xFF20 => 0xFF,
             0xFF21 => self.noise.channel().envelope().read_envelope_register(),
             0xFF22 => self.noise.channel().read_noise_register(),
             0xFF23 => 0xBF | ((self.noise.read_length_enable() as u8) << 6),
@@ -110,8 +114,7 @@ impl Apu {
             0xFF24 => self.channels_control.bits(),
             0xFF25 => self.channels_selection.bits(),
             0xFF26 => {
-                // for now no available way to shutdown the apu
-                0x80 | 0x70
+                0x70 | ((self.power as u8) << 7)
                     | ((self.noise.enabled() as u8) << 3)
                     | ((self.wave.enabled() as u8) << 2)
                     | ((self.pulse2.enabled() as u8) << 1)
@@ -121,22 +124,30 @@ impl Apu {
             0xFF27..=0xFF2F => 0xFF,
 
             0xFF30..=0xFF3F => self.wave.channel().read_buffer((addr & 0xF) as u8),
-            _ => 0xFF,
+            _ => unreachable!(),
         }
     }
 
     pub fn write_register(&mut self, addr: u16, data: u8) {
+        if !self.power && (0xFF10..=0xFF25).contains(&addr) {
+            return;
+        }
+        let is_length_clock_next = self.is_length_clock_next();
+
         match addr {
             0xFF10 => self.pulse1.channel_mut().write_sweep_register(data),
             0xFF11 => {
                 self.pulse1.channel_mut().write_pattern_duty(data >> 6);
                 self.pulse1.write_sound_length(data & 0x3F);
             }
-            0xFF12 => self
-                .pulse1
-                .channel_mut()
-                .envelope_mut()
-                .write_envelope_register(data),
+            0xFF12 => {
+                self.pulse1
+                    .channel_mut()
+                    .envelope_mut()
+                    .write_envelope_register(data);
+
+                self.pulse1.write_dac_enable(data & 0xF8 != 0);
+            }
             0xFF13 => {
                 let freq = (self.pulse1.channel().frequency() & 0xFF00) | data as u16;
                 self.pulse1.channel_mut().write_frequency(freq);
@@ -146,12 +157,11 @@ impl Apu {
                     (self.pulse1.channel().frequency() & 0xFF) | (((data as u16) & 0x7) << 8);
                 self.pulse1.channel_mut().write_frequency(freq);
 
-                self.pulse1.write_length_enable((data >> 6) & 1 == 1);
-
-                if data & 0x80 != 0 {
-                    // restart
-                    self.pulse1.trigger();
-                }
+                Self::write_channel_length_enable_and_trigger(
+                    &mut *self.pulse1,
+                    is_length_clock_next,
+                    data,
+                );
             }
 
             0xFF15 => {}
@@ -159,11 +169,14 @@ impl Apu {
                 self.pulse2.channel_mut().write_pattern_duty(data >> 6);
                 self.pulse2.write_sound_length(data & 0x3F);
             }
-            0xFF17 => self
-                .pulse2
-                .channel_mut()
-                .envelope_mut()
-                .write_envelope_register(data),
+            0xFF17 => {
+                self.pulse2
+                    .channel_mut()
+                    .envelope_mut()
+                    .write_envelope_register(data);
+
+                self.pulse2.write_dac_enable(data & 0xF8 != 0);
+            }
             0xFF18 => {
                 let freq = (self.pulse2.channel().frequency() & 0xFF00) | data as u16;
                 self.pulse2.channel_mut().write_frequency(freq);
@@ -173,18 +186,15 @@ impl Apu {
                     (self.pulse2.channel().frequency() & 0xFF) | (((data as u16) & 0x7) << 8);
                 self.pulse2.channel_mut().write_frequency(freq);
 
-                self.pulse2.write_length_enable((data >> 6) & 1 == 1);
-
-                if data & 0x80 != 0 {
-                    // restart
-                    self.pulse2.trigger();
-                }
+                Self::write_channel_length_enable_and_trigger(
+                    &mut *self.pulse2,
+                    is_length_clock_next,
+                    data,
+                );
             }
 
             0xFF1A => {
-                self.wave
-                    .channel_mut()
-                    .write_channel_enable(data & 0x80 != 0);
+                self.wave.write_dac_enable(data & 0x80 != 0);
             }
             0xFF1B => {
                 self.wave.write_sound_length(data);
@@ -198,29 +208,30 @@ impl Apu {
                 let freq = (self.wave.channel().frequency() & 0xFF) | (((data as u16) & 0x7) << 8);
                 self.wave.channel_mut().write_frequency(freq);
 
-                self.wave.write_length_enable((data >> 6) & 1 == 1);
-
-                if data & 0x80 != 0 {
-                    // restart
-                    self.wave.trigger();
-                }
+                Self::write_channel_length_enable_and_trigger(
+                    &mut *self.wave,
+                    is_length_clock_next,
+                    data,
+                );
             }
 
             0xFF1F => {}
             0xFF20 => self.noise.write_sound_length(data & 0x3F),
-            0xFF21 => self
-                .noise
-                .channel_mut()
-                .envelope_mut()
-                .write_envelope_register(data),
+            0xFF21 => {
+                self.noise
+                    .channel_mut()
+                    .envelope_mut()
+                    .write_envelope_register(data);
+
+                self.noise.write_dac_enable(data & 0xF8 != 0);
+            }
             0xFF22 => self.noise.channel_mut().write_noise_register(data),
             0xFF23 => {
-                self.noise.write_length_enable((data >> 6) & 1 == 1);
-
-                if data & 0x80 != 0 {
-                    // restart
-                    self.noise.trigger();
-                }
+                Self::write_channel_length_enable_and_trigger(
+                    &mut *self.noise,
+                    is_length_clock_next,
+                    data,
+                );
             }
 
             0xFF24 => self
@@ -229,6 +240,19 @@ impl Apu {
             0xFF25 => self
                 .channels_selection
                 .clone_from(&ChannelsSelection::from_bits_truncate(data)),
+
+            0xFF26 => {
+                let new_power = data & 0x80 != 0;
+                if self.power && !new_power {
+                    self.power_off();
+                } else if !self.power && new_power {
+                    self.power_on();
+                }
+
+                // update `self.power` after `power_off`, because we
+                // need to be able to write zeros to registers normally
+                self.power = new_power;
+            }
 
             0xFF27..=0xFF2F => {
                 // unused
@@ -239,7 +263,7 @@ impl Apu {
                     .channel_mut()
                     .write_buffer((addr & 0xF) as u8, data);
             }
-            _ => {}
+            _ => unreachable!(),
         }
     }
 
@@ -367,5 +391,51 @@ impl Apu {
         let left_vol = self.channels_control.vol_left() as f32 + 1.;
 
         (right * right_vol, left * left_vol)
+    }
+
+    fn power_off(&mut self) {
+        for i in 0xFF10..=0xFF25 {
+            self.write_register(i, 0);
+        }
+
+        self.pulse1.set_enable(false);
+        self.pulse2.set_enable(false);
+        self.wave.set_enable(false);
+        self.noise.set_enable(false);
+    }
+
+    fn power_on(&mut self) {
+        self.pulse1.channel_mut().reset_sequencer();
+        self.pulse2.channel_mut().reset_sequencer();
+        self.wave.channel_mut().reset_buffer_index();
+    }
+
+    /// determines if the next frame sequencer clock is going to include
+    /// clocking the length counter
+    fn is_length_clock_next(&self) -> bool {
+        (self.cycle as f32 / 2048 as f32).ceil() as u16 % 2 != 0
+    }
+
+    /// write the top 2 bits of NRx4 registers and runs the obsecure
+    /// behaviour of clocking the length counter
+    fn write_channel_length_enable_and_trigger<C: ApuChannel>(
+        channel: &mut LengthCountedChannel<C>,
+        is_length_clock_next: bool,
+        data: u8,
+    ) {
+        let old_length_enable = channel.read_length_enable();
+        let new_length_enable = (data >> 6) & 1 == 1;
+        channel.write_length_enable(new_length_enable);
+
+        // obsecure behaviour: if the length decrement is enabled now (was not),
+        // and the sequencer will not clock length, then clock it now
+        if !is_length_clock_next && !old_length_enable && new_length_enable {
+            channel.clock_length_counter();
+        }
+
+        if data & 0x80 != 0 {
+            // trigger length, which would trigger the channel inside
+            channel.trigger_length(!is_length_clock_next);
+        }
     }
 }

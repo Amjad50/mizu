@@ -123,6 +123,10 @@ impl PulseChannel {
             self.sweep_current_time -= 1;
         }
     }
+
+    pub fn reset_sequencer(&mut self) {
+        self.sequencer_position = 0;
+    }
 }
 
 impl PulseChannel {

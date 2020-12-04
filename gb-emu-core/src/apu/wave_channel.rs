@@ -4,12 +4,6 @@ const VOLUME_SHIFT_TABLE: [u8; 4] = [4, 0, 1, 2];
 
 #[derive(Default)]
 pub struct WaveChannel {
-    // FIXME: find better name/way to represent this.
-    //
-    // this is different from `channel_enable` below which is used by the
-    // length counter, this is handled from the Wave channel itself
-    wave_enable: bool,
-
     volume: u8,
     volume_shift: u8,
     frequency: u16,
@@ -23,14 +17,6 @@ pub struct WaveChannel {
 }
 
 impl WaveChannel {
-    pub fn write_channel_enable(&mut self, enable: bool) {
-        self.wave_enable = enable;
-    }
-
-    pub fn read_channel_enable(&self) -> bool {
-        self.wave_enable
-    }
-
     pub fn write_volume(&mut self, vol: u8) {
         self.volume = vol;
         self.volume_shift = VOLUME_SHIFT_TABLE[vol as usize & 3];
@@ -65,6 +51,10 @@ impl WaveChannel {
         } else {
             self.frequency_timer -= 1;
         }
+    }
+
+    pub fn reset_buffer_index(&mut self) {
+        self.buffer_position = 0;
     }
 }
 

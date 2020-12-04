@@ -15,6 +15,10 @@ trait ApuChannel {
 }
 
 struct LengthCountedChannel<C: ApuChannel> {
+    // FIXME: re-order the organization of apu channels,
+    //  `dac_enable`, should not be here like this
+    dac_enable: bool,
+
     max_length: u16,
     length: u16,
     current_counter: u16,
@@ -25,6 +29,7 @@ struct LengthCountedChannel<C: ApuChannel> {
 impl<C: ApuChannel> LengthCountedChannel<C> {
     pub fn new(channel: C, max_length: u16) -> Self {
         Self {
+            dac_enable: true,
             max_length,
             length: 0,
             current_counter: 0,
@@ -45,18 +50,24 @@ impl<C: ApuChannel> LengthCountedChannel<C> {
         self.current_counter = self.length;
     }
 
-    /// Can only be read from the noise channel
-    pub fn read_sound_length(&mut self) -> u8 {
-        (self.max_length - self.length) as u8
-    }
-
     pub fn write_length_enable(&mut self, data: bool) {
         self.counter_decrease_enable = data;
-        self.current_counter = self.length;
     }
 
     pub fn read_length_enable(&self) -> bool {
         self.counter_decrease_enable
+    }
+
+    pub fn write_dac_enable(&mut self, value: bool) {
+        self.dac_enable = value;
+
+        if !self.dac_enable {
+            self.set_enable(false);
+        }
+    }
+
+    pub fn read_dac_enable(&self) -> bool {
+        self.dac_enable
     }
 
     pub fn clock_length_counter(&mut self) {
@@ -67,10 +78,21 @@ impl<C: ApuChannel> LengthCountedChannel<C> {
                 self.current_counter -= 1;
                 if self.current_counter == 0 {
                     self.set_enable(false);
-                    self.counter_decrease_enable = false;
                 }
             }
         }
+    }
+
+    // The code needs imporovements :(
+    //
+    /// A wrapper around `trigger` to account for the special case where the current
+    /// counter is clocked after reloading to the max length
+    pub fn trigger_length(&mut self, is_not_length_clock_next: bool) {
+        if self.current_counter == 0 {
+            self.current_counter =
+                self.max_length - (is_not_length_clock_next && self.counter_decrease_enable) as u16;
+        }
+        self.trigger();
     }
 }
 
@@ -88,9 +110,8 @@ impl<C: ApuChannel> ApuChannel for LengthCountedChannel<C> {
     }
 
     fn trigger(&mut self) {
-        self.set_enable(true);
-        if self.current_counter == 0 {
-            self.current_counter = self.max_length;
+        if self.dac_enable {
+            self.set_enable(true);
         }
 
         self.channel.trigger();
@@ -122,7 +143,6 @@ impl<C: ApuChannel> Dac<C> {
         if self.channel.muted() {
             0.
         } else {
-            // divide by 8 because we will multiply by master volume
             let dac_in = self.channel.output() as f32 / 15.;
             let dac_out = dac_in - self.capacitor;
 
