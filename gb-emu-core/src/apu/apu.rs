@@ -130,8 +130,9 @@ impl Apu {
 
     pub fn write_register(&mut self, addr: u16, data: u8) {
         // `addr % 5 != 2` will be true if its not a length counter register,
-        // as these are not affected by power off
-        if !self.power && (0xFF10..=0xFF25).contains(&addr) && addr % 5 != 2 {
+        // as these are not affected by power off, but `addr % 5 != 2` also
+        // includes `0xFF25` and we don't want to be able to write to it
+        if !self.power && addr <= 0xFF25 && (addr % 5 != 2 || addr == 0xFF25) {
             return;
         }
 
@@ -140,7 +141,10 @@ impl Apu {
         match addr {
             0xFF10 => self.pulse1.channel_mut().write_sweep_register(data),
             0xFF11 => {
-                self.pulse1.channel_mut().write_pattern_duty(data >> 6);
+                if self.power {
+                    self.pulse1.channel_mut().write_pattern_duty(data >> 6);
+                }
+
                 self.pulse1.write_sound_length(data & 0x3F);
             }
             0xFF12 => {
@@ -169,7 +173,10 @@ impl Apu {
 
             0xFF15 => {}
             0xFF16 => {
-                self.pulse2.channel_mut().write_pattern_duty(data >> 6);
+                if self.power {
+                    self.pulse2.channel_mut().write_pattern_duty(data >> 6);
+                }
+
                 self.pulse2.write_sound_length(data & 0x3F);
             }
             0xFF17 => {
@@ -275,8 +282,6 @@ impl Apu {
     }
 
     pub fn clock(&mut self) {
-        self.cycle += 1;
-
         const SAMPLE_RATE: f64 = 44100.;
         const SAMPLE_EVERY_N_CLOCKS: f64 = (((16384 * 256) / 4) as f64) / SAMPLE_RATE;
 
@@ -290,6 +295,11 @@ impl Apu {
 
             self.sample_counter -= SAMPLE_EVERY_N_CLOCKS;
         }
+
+        if !self.power {
+            return;
+        }
+        self.cycle += 1;
 
         self.pulse1.channel_mut().clock();
         self.pulse2.channel_mut().clock();
@@ -408,6 +418,7 @@ impl Apu {
     }
 
     fn power_on(&mut self) {
+        self.cycle = 0;
         self.pulse1.channel_mut().reset_sequencer();
         self.pulse2.channel_mut().reset_sequencer();
         self.wave.channel_mut().reset_buffer_index();

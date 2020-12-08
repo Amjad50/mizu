@@ -39,6 +39,14 @@ gb_tests!(
     "blargg-gb-tests/dmg_sound/rom_singles/06-overflow on trigger.gb",
     4505629686439410456;
 
+    blargg_dmg_sound_07_len_sweep_period_sync,
+    "blargg-gb-tests/dmg_sound/rom_singles/07-len sweep period sync.gb",
+    6761015301495688099;
+
+    blargg_dmg_sound_08_len_ctr_during_power,
+    "blargg-gb-tests/dmg_sound/rom_singles/08-len ctr during power.gb",
+    4857436539796096549;
+
     blargg_dmg_sound_11_regs_after_power,
     "blargg-gb-tests/dmg_sound/rom_singles/11-regs after power.gb",
     3623298725397701374;
