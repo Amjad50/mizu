@@ -368,7 +368,7 @@ impl Cpu {
             Opcode::Nop => 0,
             Opcode::Ld => src,
             Opcode::LdBB => {
-                self.reg_b = self.reg_b; // why not?
+                // self.reg_b = self.reg_b;
                 println!("Break point at {:04X} was hit", instruction.pc);
 
                 cpu_state = CpuState::Breakpoint(self.registers());
