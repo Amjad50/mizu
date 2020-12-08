@@ -34,4 +34,8 @@ gb_tests!(
     blargg_dmg_sound_05_sweep_details,
     "blargg-gb-tests/dmg_sound/rom_singles/05-sweep details.gb",
     11473986600589516575;
+
+    blargg_dmg_sound_06_overflow_on_trigger,
+    "blargg-gb-tests/dmg_sound/rom_singles/06-overflow on trigger.gb",
+    4505629686439410456;
 );
