@@ -13,6 +13,10 @@ gb_tests!(
     "blargg-gb-tests/halt_bug.gb",
     8499482420170558727;
 
+    blargg_mem_timing_2,
+    "blargg-gb-tests/mem_timing-2/mem_timing.gb",
+    7358815858417114038;
+
     // dmg_sound individual temporary for now, until all passes, we can use
     // the full one
     blargg_dmg_sound_01_registers,
