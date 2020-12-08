@@ -16,6 +16,9 @@ pub struct PulseChannel {
     sweep_negate: bool,
     sweep_shift_n: u8,
 
+    /// has sweep calculation happened at least once since last trigger
+    sweep_calculation_happened: bool,
+
     sequencer_data: [u8; 8],
     sequencer_position: usize,
     duty: u8,
@@ -38,6 +41,7 @@ impl Default for PulseChannel {
             sweep_current_time: 0,
             sweep_negate: false,
             sweep_shift_n: 0,
+            sweep_calculation_happened: false,
             duty: 0,
             sequencer_data: DUTY_CYCLE_SEQUENCES[0],
             sequencer_position: 0,
@@ -52,9 +56,20 @@ impl Default for PulseChannel {
 
 impl PulseChannel {
     pub fn write_sweep_register(&mut self, data: u8) {
+        let old_negate = self.sweep_negate;
+
         self.sweep_period = (data >> 4) & 7;
         self.sweep_negate = (data >> 3) & 1 == 1;
         self.sweep_shift_n = data & 7;
+
+        // obscure behaviour: Clearing the sweep negate mode bit in NR10 after
+        // at least one sweep calculation has been made using the negate mode
+        // since the last trigger causes the channel to be immediately disabled
+        if old_negate && !self.sweep_negate && self.sweep_calculation_happened {
+            self.channel_enabled = false;
+        }
+
+        self.sweep_calculation_happened = false;
     }
 
     pub fn read_sweep_register(&self) -> u8 {
@@ -103,12 +118,10 @@ impl PulseChannel {
     }
 
     pub fn clock_sweeper(&mut self) {
-        if self.sweep_current_time == 0 {
-            self.sweep_current_time = self.sweep_period;
+        self.sweep_current_time = self.sweep_current_time.saturating_sub(1);
 
-            if self.sweep_current_time == 0 {
-                self.sweep_current_time = 8;
-            }
+        if self.sweep_current_time == 0 {
+            self.reload_sweep_counter();
 
             if self.sweep_internal_enable && self.sweep_period != 0 {
                 let new_freq = self.sweep_calculation();
@@ -119,8 +132,6 @@ impl PulseChannel {
                     self.sweep_calculation();
                 }
             }
-        } else {
-            self.sweep_current_time -= 1;
         }
     }
 
@@ -134,10 +145,19 @@ impl PulseChannel {
         self.sequencer_position = (self.sequencer_position + 1) % 8;
     }
 
+    fn reload_sweep_counter(&mut self) {
+        self.sweep_current_time = self.sweep_period;
+
+        if self.sweep_current_time == 0 {
+            self.sweep_current_time = 8;
+        }
+    }
+
     fn sweep_trigger(&mut self) {
         self.sweep_frequency_shadow = self.frequency;
-        self.sweep_current_time = self.sweep_period;
+        self.reload_sweep_counter();
         self.sweep_internal_enable = self.sweep_period != 0 || self.sweep_shift_n != 0;
+        self.sweep_calculation_happened = false;
 
         if self.sweep_shift_n != 0 {
             self.sweep_calculation();
@@ -145,6 +165,8 @@ impl PulseChannel {
     }
 
     fn sweep_calculation(&mut self) -> u16 {
+        self.sweep_calculation_happened = true;
+
         let shifted_freq = self.sweep_frequency_shadow >> self.sweep_shift_n;
 
         let new_freq = if self.sweep_negate {

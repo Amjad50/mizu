@@ -26,4 +26,12 @@ gb_tests!(
     blargg_dmg_sound_03_trigger,
     "blargg-gb-tests/dmg_sound/rom_singles/03-trigger.gb",
     362609057241937141;
+
+    blargg_dmg_sound_04_sweep,
+    "blargg-gb-tests/dmg_sound/rom_singles/04-sweep.gb",
+    5831201209640628155;
+
+    blargg_dmg_sound_05_sweep_details,
+    "blargg-gb-tests/dmg_sound/rom_singles/05-sweep details.gb",
+    11473986600589516575;
 );
