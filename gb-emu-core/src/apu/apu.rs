@@ -129,9 +129,12 @@ impl Apu {
     }
 
     pub fn write_register(&mut self, addr: u16, data: u8) {
-        if !self.power && (0xFF10..=0xFF25).contains(&addr) {
+        // `addr % 5 != 2` will be true if its not a length counter register,
+        // as these are not affected by power off
+        if !self.power && (0xFF10..=0xFF25).contains(&addr) && addr % 5 != 2 {
             return;
         }
+
         let is_length_clock_next = self.is_length_clock_next();
 
         match addr {

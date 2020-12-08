@@ -38,4 +38,9 @@ gb_tests!(
     blargg_dmg_sound_06_overflow_on_trigger,
     "blargg-gb-tests/dmg_sound/rom_singles/06-overflow on trigger.gb",
     4505629686439410456;
+
+    blargg_dmg_sound_11_regs_after_power,
+    "blargg-gb-tests/dmg_sound/rom_singles/11-regs after power.gb",
+    3623298725397701374;
+
 );
