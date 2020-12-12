@@ -14,6 +14,8 @@ pub struct NoiseChannel {
     envelope: EnvelopGenerator,
 
     channel_enabled: bool,
+
+    dac_enable: bool,
 }
 
 impl NoiseChannel {
@@ -96,5 +98,13 @@ impl ApuChannel for NoiseChannel {
 
     fn enabled(&self) -> bool {
         self.channel_enabled
+    }
+
+    fn set_dac_enable(&mut self, enabled: bool) {
+        self.dac_enable = enabled;
+    }
+
+    fn dac_enabled(&self) -> bool {
+        self.dac_enable
     }
 }

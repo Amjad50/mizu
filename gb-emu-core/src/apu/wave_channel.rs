@@ -14,6 +14,8 @@ pub struct WaveChannel {
     frequency_timer: u16,
 
     channel_enable: bool,
+
+    dac_enable: bool,
 }
 
 impl WaveChannel {
@@ -88,5 +90,13 @@ impl ApuChannel for WaveChannel {
 
     fn trigger(&mut self) {
         self.buffer_position = 0;
+    }
+
+    fn set_dac_enable(&mut self, enabled: bool) {
+        self.dac_enable = enabled;
+    }
+
+    fn dac_enabled(&self) -> bool {
+        self.dac_enable
     }
 }

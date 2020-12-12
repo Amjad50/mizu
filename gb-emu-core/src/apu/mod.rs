@@ -11,14 +11,15 @@ trait ApuChannel {
     fn muted(&self) -> bool;
     fn set_enable(&mut self, enabled: bool);
     fn enabled(&self) -> bool;
+    fn set_dac_enable(&mut self, enabled: bool);
+    fn dac_enabled(&self) -> bool;
     fn trigger(&mut self);
 }
 
 struct LengthCountedChannel<C: ApuChannel> {
     // FIXME: re-order the organization of apu channels,
     //  `dac_enable`, should not be here like this
-    dac_enable: bool,
-
+    //dac_enable: bool,
     max_length: u16,
     length: u16,
     current_counter: u16,
@@ -29,7 +30,7 @@ struct LengthCountedChannel<C: ApuChannel> {
 impl<C: ApuChannel> LengthCountedChannel<C> {
     pub fn new(channel: C, max_length: u16) -> Self {
         Self {
-            dac_enable: true,
+            // dac_enable: true,
             max_length,
             length: 0,
             current_counter: 0,
@@ -56,18 +57,6 @@ impl<C: ApuChannel> LengthCountedChannel<C> {
 
     pub fn read_length_enable(&self) -> bool {
         self.counter_decrease_enable
-    }
-
-    pub fn write_dac_enable(&mut self, value: bool) {
-        self.dac_enable = value;
-
-        if !self.dac_enable {
-            self.set_enable(false);
-        }
-    }
-
-    pub fn read_dac_enable(&self) -> bool {
-        self.dac_enable
     }
 
     pub fn clock_length_counter(&mut self) {
@@ -110,7 +99,7 @@ impl<C: ApuChannel> ApuChannel for LengthCountedChannel<C> {
     }
 
     fn trigger(&mut self) {
-        if self.dac_enable {
+        if self.dac_enabled() {
             self.set_enable(true);
         }
 
@@ -123,6 +112,18 @@ impl<C: ApuChannel> ApuChannel for LengthCountedChannel<C> {
 
     fn enabled(&self) -> bool {
         self.channel.enabled()
+    }
+
+    fn set_dac_enable(&mut self, enabled: bool) {
+        self.channel.set_dac_enable(enabled);
+
+        if !enabled {
+            self.set_enable(false);
+        }
+    }
+
+    fn dac_enabled(&self) -> bool {
+        self.channel.dac_enabled()
     }
 }
 

@@ -30,6 +30,8 @@ pub struct PulseChannel {
     channel_enabled: bool,
 
     first_trigger: bool,
+
+    dac_enable: bool,
 }
 
 impl Default for PulseChannel {
@@ -50,6 +52,7 @@ impl Default for PulseChannel {
             frequency_timer: 0,
             channel_enabled: false,
             first_trigger: false,
+            dac_enable: false,
         }
     }
 }
@@ -205,5 +208,13 @@ impl ApuChannel for PulseChannel {
 
     fn enabled(&self) -> bool {
         self.channel_enabled
+    }
+
+    fn set_dac_enable(&mut self, enabled: bool) {
+        self.dac_enable = enabled;
+    }
+
+    fn dac_enabled(&self) -> bool {
+        self.dac_enable
     }
 }

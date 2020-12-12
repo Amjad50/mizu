@@ -78,7 +78,7 @@ impl Default for Apu {
         apu.channels_control = ChannelsControl::from_bits_truncate(0x77);
         apu.channels_selection = ChannelsSelection::from_bits_truncate(0xF3);
         apu.pulse1.set_enable(true);
-        apu.wave.write_dac_enable(false);
+        apu.wave.set_dac_enable(false);
 
         apu
     }
@@ -99,7 +99,7 @@ impl Apu {
             0xFF18 => 0xFF,
             0xFF19 => 0xBF | ((self.pulse2.read_length_enable() as u8) << 6),
 
-            0xFF1A => 0x7F | ((self.wave.read_dac_enable() as u8) << 7),
+            0xFF1A => 0x7F | ((self.wave.dac_enabled() as u8) << 7),
             0xFF1B => 0xFF,
             0xFF1C => 0x9F | ((self.wave.channel().read_volume()) << 5),
             0xFF1D => 0xFF,
@@ -153,7 +153,7 @@ impl Apu {
                     .envelope_mut()
                     .write_envelope_register(data);
 
-                self.pulse1.write_dac_enable(data & 0xF8 != 0);
+                self.pulse1.set_dac_enable(data & 0xF8 != 0);
             }
             0xFF13 => {
                 let freq = (self.pulse1.channel().frequency() & 0xFF00) | data as u16;
@@ -185,7 +185,7 @@ impl Apu {
                     .envelope_mut()
                     .write_envelope_register(data);
 
-                self.pulse2.write_dac_enable(data & 0xF8 != 0);
+                self.pulse2.set_dac_enable(data & 0xF8 != 0);
             }
             0xFF18 => {
                 let freq = (self.pulse2.channel().frequency() & 0xFF00) | data as u16;
@@ -204,7 +204,7 @@ impl Apu {
             }
 
             0xFF1A => {
-                self.wave.write_dac_enable(data & 0x80 != 0);
+                self.wave.set_dac_enable(data & 0x80 != 0);
             }
             0xFF1B => {
                 self.wave.write_sound_length(data);
@@ -233,7 +233,7 @@ impl Apu {
                     .envelope_mut()
                     .write_envelope_register(data);
 
-                self.noise.write_dac_enable(data & 0xF8 != 0);
+                self.noise.set_dac_enable(data & 0xF8 != 0);
             }
             0xFF22 => self.noise.channel_mut().write_noise_register(data),
             0xFF23 => {
