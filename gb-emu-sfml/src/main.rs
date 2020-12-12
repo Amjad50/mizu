@@ -13,9 +13,6 @@ use sfml::{
 const TV_WIDTH: u32 = 160;
 const TV_HEIGHT: u32 = 144;
 
-const SCREEN_WIDTH: u32 = TV_WIDTH * 3;
-const SCREEN_HEIGHT: u32 = TV_HEIGHT * 3;
-
 fn get_view(
     window_width: u32,
     window_height: u32,
@@ -59,12 +56,15 @@ fn main() {
     audio_player.play();
 
     let mut window = RenderWindow::new(
-        (SCREEN_WIDTH, SCREEN_HEIGHT),
-        "GB test",
+        (TV_WIDTH * 5, TV_HEIGHT * 5),
+        "",
         Style::CLOSE | Style::RESIZE,
         &Default::default(),
     );
-    window.set_vertical_sync_enabled(true);
+
+    let mut fps = 60;
+
+    window.set_framerate_limit(fps);
 
     // to scale the view into the window
     // this view is in the size of the GB TV screen
@@ -78,8 +78,16 @@ fn main() {
     ));
 
     let mut texture = Texture::new(TV_WIDTH, TV_HEIGHT).expect("texture");
+    let mut t = std::time::Instant::now();
 
     'main: loop {
+        window.set_title(&format!(
+            "GB-emu - FPS: {}",
+            (1. / t.elapsed().as_secs_f64()).round()
+        ));
+
+        t = std::time::Instant::now();
+
         while let Some(event) = window.poll_event() {
             match event {
                 Event::Closed => break 'main,
@@ -92,6 +100,16 @@ fn main() {
                     Key::S => gameboy.press_joypad(JoypadButton::Down),
                     Key::A => gameboy.press_joypad(JoypadButton::Left),
                     Key::D => gameboy.press_joypad(JoypadButton::Right),
+
+                    // change FPS
+                    Key::Equal => {
+                        fps += 5;
+                        window.set_framerate_limit(fps);
+                    }
+                    Key::Dash => {
+                        fps -= 5;
+                        window.set_framerate_limit(fps);
+                    }
                     _ => {}
                 },
                 Event::KeyReleased { code: key, .. } => match key {
@@ -118,7 +136,7 @@ fn main() {
 
         audio_player.queue(&buffer);
 
-        window.clear(Color::WHITE);
+        window.clear(Color::BLACK);
 
         let pixels = convert_to_rgba(gameboy.screen_buffer());
 
