@@ -2,6 +2,8 @@ use super::cartridge::{Cartridge, CartridgeError};
 use super::cpu::Cpu;
 use super::memory::Bus;
 use super::JoypadButton;
+use std::fs::File;
+use std::io::Read;
 
 use std::path::Path;
 
@@ -11,11 +13,24 @@ pub struct GameBoy {
 }
 
 impl GameBoy {
-    pub fn new<P: AsRef<Path>>(file_path: P) -> Result<Self, CartridgeError> {
+    pub fn new<P: AsRef<Path>>(
+        file_path: P,
+        boot_rom_file: Option<P>,
+    ) -> Result<Self, CartridgeError> {
         let cartridge = Cartridge::from_file(file_path)?;
 
+        let bus = if let Some(boot_rom_file) = boot_rom_file {
+            let mut boot_rom_file = File::open(boot_rom_file)?;
+            let mut data = [0; 0x100];
+            boot_rom_file.read_exact(&mut data)?;
+
+            Bus::with_boot_rom(cartridge, data)
+        } else {
+            Bus::new(cartridge)
+        };
+
         Ok(Self {
-            bus: Bus::new(cartridge),
+            bus,
             cpu: Cpu::new(),
         })
     }

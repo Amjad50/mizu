@@ -46,11 +46,11 @@ fn main() {
     let args = args().collect::<Vec<String>>();
 
     if args.len() < 2 {
-        eprintln!("USAGE: {} <rom-file>", args[0]);
+        eprintln!("USAGE: {} <rom-file> <boot-rom-file>", args[0]);
         return;
     }
 
-    let mut gameboy = GameBoy::new(&args[1]).unwrap();
+    let mut gameboy = GameBoy::new(&args[1], args.get(2)).unwrap();
 
     let mut audio_player = AudioPlayer::new(44100);
     audio_player.play();

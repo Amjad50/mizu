@@ -6,6 +6,20 @@ use crate::joypad::{Joypad, JoypadButton};
 use crate::ppu::Ppu;
 use crate::timer::Timer;
 
+struct BootRom {
+    enabled: bool,
+    data: [u8; 0x100],
+}
+
+impl Default for BootRom {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            data: [0; 0x100],
+        }
+    }
+}
+
 #[derive(Default)]
 struct DMA {
     address: u16,
@@ -87,6 +101,7 @@ pub struct Bus {
     dma: DMA,
     apu: Apu,
     hram: [u8; 127],
+    boot_rom: BootRom,
 
     cpu_cycles: u32,
 }
@@ -103,9 +118,17 @@ impl Bus {
             dma: DMA::default(),
             apu: Apu::default(),
             hram: [0; 127],
+            boot_rom: BootRom::default(),
 
             cpu_cycles: 0,
         }
+    }
+
+    pub fn with_boot_rom(cartridge: Cartridge, boot_rom_data: [u8; 0x100]) -> Self {
+        let mut s = Self::new(cartridge);
+        s.boot_rom.data = boot_rom_data;
+        s.boot_rom.enabled = true;
+        s
     }
 
     pub fn screen_buffer(&self) -> Vec<u8> {
@@ -150,12 +173,13 @@ impl Bus {
         // NOTE: DMA blocking is not accurate for now, DMA does not only block
         // OAM memory, but the mechanics are not clear yet, so I'll leave it like this
         match addr {
-            0x0000..=0x3FFF => self.cartridge.read_rom0(addr), // rom0
-            0x4000..=0x7FFF => self.cartridge.read_romx(addr), // romx
-            0x8000..=0x9FFF => self.ppu.read_vram(addr),       // ppu vram
-            0xA000..=0xBFFF => self.cartridge.read_ram(addr),  // sram
-            0xC000..=0xCFFF => self.ram.read_ram0(addr),       // wram0
-            0xD000..=0xDFFF => self.ram.read_ramx(addr),       // wramx
+            0x0000..=0x00FF if self.boot_rom.enabled => self.boot_rom.data[addr as usize], // boot rom
+            0x0000..=0x3FFF => self.cartridge.read_rom0(addr),                             // rom0
+            0x4000..=0x7FFF => self.cartridge.read_romx(addr),                             // romx
+            0x8000..=0x9FFF => self.ppu.read_vram(addr), // ppu vram
+            0xA000..=0xBFFF => self.cartridge.read_ram(addr), // sram
+            0xC000..=0xCFFF => self.ram.read_ram0(addr), // wram0
+            0xD000..=0xDFFF => self.ram.read_ramx(addr), // wramx
             0xE000..=0xFDFF => self.read_not_ticked(0xC000 | (addr & 0x1FFF), block_for_dma), // echo
             0xFE00..=0xFE9F if !block_for_dma => self.ppu.read_oam(addr), // ppu oam
             0xFEA0..=0xFEFF => 0,                                         // unused
@@ -167,9 +191,9 @@ impl Bus {
             0xFF10..=0xFF3F => self.apu.read_register(addr),              // apu
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.read_register(addr), // ppu io registers
             0xFF46 => self.dma.read(),                                    // dma start
-            // 0xFF4C..=0xFF7F => 0xFF,                           // io registers
-            0xFF80..=0xFFFE => self.hram[addr as usize & 0x7F], // hram
-            0xFFFF => self.interrupts.read_interrupt_enable(),  //interrupts enable
+            0xFF50 => 0xFF,                                               // boot rom stop
+            0xFF80..=0xFFFE => self.hram[addr as usize & 0x7F],           // hram
+            0xFFFF => self.interrupts.read_interrupt_enable(),            //interrupts enable
             _ => 0xFF,
         }
     }
@@ -192,9 +216,9 @@ impl Bus {
             0xFF10..=0xFF3F => self.apu.write_register(addr, data),   // apu
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.write_register(addr, data), // ppu io registers
             0xFF46 => self.dma.start_dma(data),                                       // dma start
-            // 0xFF4C..=0xFF7F => {} // io registers
+            0xFF50 => self.boot_rom.enabled = false, // boot rom stop
             0xFF80..=0xFFFE => self.hram[addr as usize & 0x7F] = data, // hram
-            0xFFFF => self.interrupts.write_interrupt_enable(data),    // interrupts enable
+            0xFFFF => self.interrupts.write_interrupt_enable(data), // interrupts enable
             _ => {}
         }
     }
