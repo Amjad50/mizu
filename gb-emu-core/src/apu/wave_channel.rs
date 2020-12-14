@@ -8,7 +8,7 @@ pub struct WaveChannel {
     volume_shift: u8,
     frequency: u16,
 
-    buffer: [u8; 32],
+    buffer: [u8; 16],
     buffer_position: u8,
 
     frequency_timer: u16,
@@ -37,11 +37,11 @@ impl WaveChannel {
     }
 
     pub fn write_buffer(&mut self, offset: u8, data: u8) {
-        self.buffer[offset as usize & 0x1F] = data;
+        self.buffer[offset as usize & 0xF] = data;
     }
 
     pub fn read_buffer(&self, offset: u8) -> u8 {
-        self.buffer[offset as usize & 0x1F]
+        self.buffer[offset as usize & 0xF]
     }
 
     pub fn clock(&mut self) {
@@ -49,7 +49,7 @@ impl WaveChannel {
             self.clock_position();
 
             // reload timer
-            self.frequency_timer = 0x7FF - self.frequency;
+            self.frequency_timer = (0x7FF - self.frequency) / 2;
         } else {
             self.frequency_timer -= 1;
         }
@@ -62,7 +62,7 @@ impl WaveChannel {
 
 impl WaveChannel {
     fn clock_position(&mut self) {
-        self.buffer_position = (self.buffer_position + 1) % 32;
+        self.buffer_position = (self.buffer_position + 1) & 0x1F;
     }
 }
 

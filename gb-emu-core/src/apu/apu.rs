@@ -304,7 +304,6 @@ impl Apu {
         self.pulse1.channel_mut().clock();
         self.pulse2.channel_mut().clock();
         self.wave.channel_mut().clock();
-        self.wave.channel_mut().clock();
         self.noise.channel_mut().clock();
 
         if self.cycle % 2048 == 0 {
