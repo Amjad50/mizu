@@ -19,20 +19,20 @@ impl GameBoy {
     ) -> Result<Self, CartridgeError> {
         let cartridge = Cartridge::from_file(file_path)?;
 
-        let bus = if let Some(boot_rom_file) = boot_rom_file {
+        let (bus, cpu) = if let Some(boot_rom_file) = boot_rom_file {
             let mut boot_rom_file = File::open(boot_rom_file)?;
             let mut data = [0; 0x100];
             boot_rom_file.read_exact(&mut data)?;
 
-            Bus::with_boot_rom(cartridge, data)
+            (Bus::new_with_boot_rom(cartridge, data), Cpu::new())
         } else {
-            Bus::new(cartridge)
+            (
+                Bus::new_without_boot_rom(cartridge),
+                Cpu::new_without_boot_rom(),
+            )
         };
 
-        Ok(Self {
-            bus,
-            cpu: Cpu::new(),
-        })
+        Ok(Self { bus, cpu })
     }
 
     /// Note entirly accurate, but its better than looping over a fixed

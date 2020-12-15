@@ -107,7 +107,7 @@ pub struct Bus {
 }
 
 impl Bus {
-    pub fn new(cartridge: Cartridge) -> Self {
+    pub fn new_without_boot_rom(cartridge: Cartridge) -> Self {
         Self {
             cartridge,
             ppu: Ppu::default(),
@@ -124,8 +124,8 @@ impl Bus {
         }
     }
 
-    pub fn with_boot_rom(cartridge: Cartridge, boot_rom_data: [u8; 0x100]) -> Self {
-        let mut s = Self::new(cartridge);
+    pub fn new_with_boot_rom(cartridge: Cartridge, boot_rom_data: [u8; 0x100]) -> Self {
+        let mut s = Self::new_without_boot_rom(cartridge);
         s.boot_rom.data = boot_rom_data;
         s.boot_rom.enabled = true;
         s

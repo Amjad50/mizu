@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use super::cartridge::{Cartridge, CartridgeError};
-use super::cpu::{Cpu, CpuBusProvider, CpuRegisters, CpuState};
+use super::cpu::{Cpu, CpuRegisters, CpuState};
 use super::memory::Bus;
 
 use std::path::Path;
@@ -74,8 +74,8 @@ impl TestingGameBoy {
         let cartridge = Cartridge::from_file(file_path)?;
 
         Ok(Self {
-            bus: Bus::new(cartridge),
-            cpu: Cpu::new(),
+            bus: Bus::new_without_boot_rom(cartridge),
+            cpu: Cpu::new_without_boot_rom(),
         })
     }
 

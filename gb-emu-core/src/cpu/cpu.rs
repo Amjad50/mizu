@@ -64,7 +64,7 @@ pub struct Cpu {
 
 impl Cpu {
     pub fn new() -> Self {
-        let mut cpu = Self {
+        Self {
             reg_a: 0,
             reg_b: 0,
             reg_c: 0,
@@ -79,21 +79,23 @@ impl Cpu {
             enable_interrupt_next: false,
             ime: false,
             halt_mode: HaltMode::NotHalting,
-        };
-
-        cpu.reset();
-
-        cpu
+        }
     }
 
-    pub fn reset(&mut self) {
+    /// create a new cpu, with states that match the ones the CPU would have
+    /// if the boot-rom would run (default values for registers)
+    pub fn new_without_boot_rom() -> Self {
+        let mut cpu = Self::new();
+
         // initial values of the registers (DMG)
-        self.reg_af_write(0x01B0);
-        self.reg_bc_write(0x0013);
-        self.reg_de_write(0x00D8);
-        self.reg_hl_write(0x014D);
-        self.reg_sp = 0xFFFE;
-        self.reg_pc = 0x0100;
+        cpu.reg_af_write(0x01B0);
+        cpu.reg_bc_write(0x0013);
+        cpu.reg_de_write(0x00D8);
+        cpu.reg_hl_write(0x014D);
+        cpu.reg_sp = 0xFFFE;
+        cpu.reg_pc = 0x0100;
+
+        cpu
     }
 
     pub fn next_instruction<P: CpuBusProvider>(&mut self, bus: &mut P) -> CpuState {
