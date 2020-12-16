@@ -150,8 +150,8 @@ pub struct Ppu {
 
 impl Default for Ppu {
     fn default() -> Self {
-        let mut ppu = Self {
-            lcd_control: LcdControl::from_bits_truncate(0),
+        Self {
+            lcd_control: LcdControl::from_bits_truncate(0x80),
             lcd_status: LcdStatus::from_bits_truncate(0),
             scroll_y: 0,
             scroll_x: 0,
@@ -172,14 +172,37 @@ impl Default for Ppu {
             lcd: Lcd::default(),
             cycle: 0,
             scanline: 0,
-        };
-        ppu.reset();
-
-        ppu
+        }
     }
 }
 
 impl Ppu {
+    /// create a ppu instance that match the one the ppu would have when the
+    /// boot_rom finishes execution
+    pub fn new_skip_boot_rom() -> Self {
+        let mut s = Self::default();
+        // set I/O registers to the value which would have if boot_rom ran
+        s.write_register(0xff40, 0x91);
+        s.write_register(0xff42, 0x00);
+        s.write_register(0xff43, 0x00);
+        s.write_register(0xff45, 0x00);
+        s.write_register(0xff47, 0xFC);
+        s.write_register(0xff48, 0xFF);
+        s.write_register(0xff49, 0xFF);
+        s.write_register(0xff4A, 0x00);
+        s.write_register(0xff4B, 0x00);
+        s
+    }
+
+    /// This would be called by the bus when the boot_rom is disabled to reset
+    /// the scan positions to the beginning of the screen
+    ///
+    /// this is used to pass the tests
+    pub fn reset_scan_position(&mut self) {
+        self.scanline = 0;
+        self.cycle = 0;
+    }
+
     pub fn read_vram(&self, addr: u16) -> u8 {
         self.vram[addr as usize & 0x1FFF]
     }
@@ -330,19 +353,6 @@ impl Ppu {
 }
 
 impl Ppu {
-    fn reset(&mut self) {
-        // reset I/O registers
-        self.write_register(0xff40, 0x91);
-        self.write_register(0xff42, 0x00);
-        self.write_register(0xff43, 0x00);
-        self.write_register(0xff45, 0x00);
-        self.write_register(0xff47, 0xFC);
-        self.write_register(0xff48, 0xFF);
-        self.write_register(0xff49, 0xFF);
-        self.write_register(0xff4A, 0x00);
-        self.write_register(0xff4B, 0x00);
-    }
-
     /// return true, if this is the last draw in the current scanline, and
     /// mode 0 is being activated
     fn draw(&mut self) -> bool {

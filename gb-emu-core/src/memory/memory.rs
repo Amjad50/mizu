@@ -110,7 +110,7 @@ impl Bus {
     pub fn new_without_boot_rom(cartridge: Cartridge) -> Self {
         Self {
             cartridge,
-            ppu: Ppu::default(),
+            ppu: Ppu::new_skip_boot_rom(),
             ram: Ram::default(),
             interrupts: Interrupts::default(),
             timer: Timer::new_skip_boot_rom(),
@@ -127,6 +127,7 @@ impl Bus {
     pub fn new_with_boot_rom(cartridge: Cartridge, boot_rom_data: [u8; 0x100]) -> Self {
         let mut s = Self::new_without_boot_rom(cartridge);
         s.timer = Timer::default();
+        s.ppu = Ppu::default();
         s.boot_rom.data = boot_rom_data;
         s.boot_rom.enabled = true;
         s
@@ -217,9 +218,12 @@ impl Bus {
             0xFF10..=0xFF3F => self.apu.write_register(addr, data),   // apu
             0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.write_register(addr, data), // ppu io registers
             0xFF46 => self.dma.start_dma(data),                                       // dma start
-            0xFF50 => self.boot_rom.enabled = false, // boot rom stop
+            0xFF50 => {
+                self.ppu.reset_scan_position();
+                self.boot_rom.enabled = false; // boot rom stop
+            }
             0xFF80..=0xFFFE => self.hram[addr as usize & 0x7F] = data, // hram
-            0xFFFF => self.interrupts.write_interrupt_enable(data), // interrupts enable
+            0xFFFF => self.interrupts.write_interrupt_enable(data),    // interrupts enable
             _ => {}
         }
     }
