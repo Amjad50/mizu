@@ -36,7 +36,7 @@ pub struct Timer {
 impl Default for Timer {
     fn default() -> Self {
         Self {
-            divider: 0xAC55,
+            divider: 0xB64A, // divider value if boot_rom is present
             timer_counter: 0,
             timer_modulo: 0,
             timer_control: TimerControl::from_bits_truncate(0),
@@ -45,6 +45,12 @@ impl Default for Timer {
 }
 
 impl Timer {
+    pub fn new_skip_boot_rom() -> Self {
+        let mut s = Self::default();
+        s.divider = 0xABCE; // divider value after the boot_rom finish executing
+        s
+    }
+
     pub fn read_register(&self, addr: u16) -> u8 {
         match addr {
             0xFF04 => (self.divider >> 8) as u8,

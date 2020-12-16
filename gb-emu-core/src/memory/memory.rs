@@ -113,7 +113,7 @@ impl Bus {
             ppu: Ppu::default(),
             ram: Ram::default(),
             interrupts: Interrupts::default(),
-            timer: Timer::default(),
+            timer: Timer::new_skip_boot_rom(),
             joypad: Joypad::default(),
             dma: DMA::default(),
             apu: Apu::default(),
@@ -126,6 +126,7 @@ impl Bus {
 
     pub fn new_with_boot_rom(cartridge: Cartridge, boot_rom_data: [u8; 0x100]) -> Self {
         let mut s = Self::new_without_boot_rom(cartridge);
+        s.timer = Timer::default();
         s.boot_rom.data = boot_rom_data;
         s.boot_rom.enabled = true;
         s

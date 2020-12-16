@@ -59,7 +59,7 @@ mod mbc2 {
 mod acceptance {
     mooneye_tests!("acceptance";
         add_sp_e_timing,
-        // boot_div - dmg0,
+        boot_div_dmgABCmgb,
         boot_hwio_dmgABCmgb,
         boot_regs_dmgABC,
         call_cc_timing2,
