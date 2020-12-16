@@ -270,7 +270,8 @@ impl Ppu {
         self.lcd.screen_buffer()
     }
 
-    pub fn clock<I: InterruptManager>(&mut self, interrupt_manager: &mut I) {
+    // clocks the PPU 4 times in a row
+    pub fn clock_4_times<I: InterruptManager>(&mut self, interrupt_manager: &mut I) {
         if !self.lcd_control.display_enable() {
             return;
         }
@@ -327,12 +328,15 @@ impl Ppu {
             1 => {}
             2 if self.cycle == 0 => self.load_selected_sprites_oam(),
             3 => {
-                if self.draw() {
-                    // change mode to 0 from 3
-                    self.lcd_status.current_mode_set(0);
-                    self.enter_hblank();
-                    if self.lcd_status.mode_0_hblank_interrupt() {
-                        interrupt_manager.request_interrupt(InterruptType::LcdStat);
+                for _ in 0..4 {
+                    if self.draw() {
+                        // change mode to 0 from 3
+                        self.lcd_status.current_mode_set(0);
+                        self.enter_hblank();
+                        if self.lcd_status.mode_0_hblank_interrupt() {
+                            interrupt_manager.request_interrupt(InterruptType::LcdStat);
+                        }
+                        break;
                     }
                 }
             }
@@ -340,7 +344,7 @@ impl Ppu {
         }
 
         // increment cycle
-        self.cycle += 1;
+        self.cycle += 4;
         if self.cycle == 456 {
             self.cycle = 0;
             self.scanline += 1;

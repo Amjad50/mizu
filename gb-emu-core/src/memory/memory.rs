@@ -158,9 +158,7 @@ impl Bus {
     fn on_cpu_machine_cycle(&mut self) {
         self.cpu_cycles += 1;
         // clock the ppu four times
-        for _ in 0..4 {
-            self.ppu.clock(&mut self.interrupts);
-        }
+        self.ppu.clock_4_times(&mut self.interrupts);
         self.apu.clock();
         self.timer.clock_divider(&mut self.interrupts);
         self.joypad.update_interrupts(&mut self.interrupts);
