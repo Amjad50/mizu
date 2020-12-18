@@ -262,9 +262,11 @@ impl Ppu {
                     self.lcd.clear();
                 }
             }
-            0xFF41 => self
-                .lcd_status
-                .clone_from(&LcdStatus::from_bits_truncate(data & 0x78)),
+            0xFF41 => {
+                self.lcd_status.clone_from(&LcdStatus::from_bits_truncate(
+                    (self.lcd_status.bits() & !0x78) | (data & 0x78),
+                ));
+            }
             0xFF42 => self.scroll_y = data,
             0xFF43 => self.scroll_x = data,
             0xFF44 => {
