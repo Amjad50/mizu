@@ -55,10 +55,10 @@ pub struct Apu {
 
 impl Default for Apu {
     fn default() -> Self {
-        let mut apu = Self {
+        Self {
             channels_control: ChannelsControl::from_bits_truncate(0),
             channels_selection: ChannelsSelection::from_bits_truncate(0),
-            power: true,
+            power: false,
             buffer: Vec::new(),
             sample_counter: 0.,
             pulse1: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
@@ -66,9 +66,15 @@ impl Default for Apu {
             wave: Dac::new(LengthCountedChannel::new(WaveChannel::default(), 256)),
             noise: Dac::new(LengthCountedChannel::new(NoiseChannel::default(), 64)),
             cycle: 0,
-        };
+        }
+    }
+}
 
-        // power up sequence
+impl Apu {
+    pub fn new_skip_boot_rom() -> Self {
+        let mut apu = Self::default();
+
+        // after boot_rom state
         apu.pulse1.channel_mut().write_pattern_duty(2);
         apu.pulse1
             .channel_mut()
@@ -79,12 +85,11 @@ impl Default for Apu {
         apu.channels_selection = ChannelsSelection::from_bits_truncate(0xF3);
         apu.pulse1.set_enable(true);
         apu.wave.set_dac_enable(false);
+        apu.power = true;
 
         apu
     }
-}
 
-impl Apu {
     pub fn read_register(&mut self, addr: u16) -> u8 {
         match addr {
             0xFF10 => 0x80 | self.pulse1.channel_mut().read_sweep_register(),

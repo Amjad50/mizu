@@ -151,13 +151,14 @@ pub struct Ppu {
 impl Default for Ppu {
     fn default() -> Self {
         Self {
-            lcd_control: LcdControl::from_bits_truncate(0x80),
-            lcd_status: LcdStatus::from_bits_truncate(0),
+            lcd_control: LcdControl::from_bits_truncate(0),
+            // COINCIDENCE_FLAG flag set because LYC and LY are 0 at the beginning
+            lcd_status: LcdStatus::from_bits_truncate(4),
             scroll_y: 0,
             scroll_x: 0,
             lyc: 0,
-            bg_palette: 0,
-            sprite_palette: [0; 2],
+            bg_palette: 0xFC,
+            sprite_palette: [0xFF; 2],
             windows_y: 0,
             windows_x: 0,
             vram: [0; 0x2000],
@@ -170,7 +171,7 @@ impl Default for Ppu {
             window_y_counter: 0,
             fifo: Fifo::default(),
             lcd: Lcd::default(),
-            cycle: 0,
+            cycle: 4,
             scanline: 0,
         }
     }
@@ -192,15 +193,6 @@ impl Ppu {
         s.write_register(0xff4A, 0x00);
         s.write_register(0xff4B, 0x00);
         s
-    }
-
-    /// This would be called by the bus when the boot_rom is disabled to reset
-    /// the scan positions to the beginning of the screen
-    ///
-    /// this is used to pass the tests
-    pub fn reset_scan_position(&mut self) {
-        self.scanline = 0;
-        self.cycle = 0;
     }
 
     pub fn read_vram(&self, addr: u16) -> u8 {
