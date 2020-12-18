@@ -123,6 +123,9 @@ pub struct Ppu {
     scroll_y: u8,
     scroll_x: u8,
 
+    /// representation of `scanline`, these are separated because in scanline 153
+    /// `ly` vaue will be 0 and `lyc` is affected by this
+    ly: u8,
     lyc: u8,
     bg_palette: u8,
     sprite_palette: [u8; 2],
@@ -156,6 +159,7 @@ impl Default for Ppu {
             lcd_status: LcdStatus::from_bits_truncate(4),
             scroll_y: 0,
             scroll_x: 0,
+            ly: 0,
             lyc: 0,
             bg_palette: 0xFC,
             sprite_palette: [0xFF; 2],
@@ -192,6 +196,12 @@ impl Ppu {
         s.write_register(0xff49, 0xFF);
         s.write_register(0xff4A, 0x00);
         s.write_register(0xff4B, 0x00);
+
+        s.scanline = 153;
+        s.cycle = 400;
+        s.ly = 0;
+        s.lcd_status.current_mode_set(1);
+
         s
     }
 
@@ -219,7 +229,7 @@ impl Ppu {
             0xFF41 => 0x80 | self.lcd_status.bits(),
             0xFF42 => self.scroll_y,
             0xFF43 => self.scroll_x,
-            0xFF44 => self.scanline,
+            0xFF44 => self.ly,
             0xFF45 => self.lyc,
             0xFF47 => self.bg_palette,
             0xFF48 => self.sprite_palette[0],
@@ -305,8 +315,24 @@ impl Ppu {
             _ => {}
         }
 
-        if self.cycle == 0 {
-            let flag = self.scanline == self.lyc;
+        if self.cycle == 4 {
+            let flag = self.ly == self.lyc;
+
+            if self.scanline == 153 {
+                self.ly = 0;
+            }
+
+            self.lcd_status.coincidence_flag_set(flag);
+
+            if flag && self.lcd_status.lyc_ly_interrupt() {
+                interrupt_manager.request_interrupt(InterruptType::LcdStat);
+            }
+        }
+
+        if self.scanline == 153 && self.cycle == 12 {
+            self.ly = 0;
+
+            let flag = self.ly == self.lyc;
 
             self.lcd_status.coincidence_flag_set(flag);
 
@@ -344,6 +370,7 @@ impl Ppu {
                 self.scanline = 0;
                 self.lcd.next_line();
             }
+            self.ly = self.scanline;
         }
     }
 }
