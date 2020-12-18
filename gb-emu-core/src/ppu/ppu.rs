@@ -127,6 +127,7 @@ pub struct Ppu {
     /// `ly` vaue will be 0 and `lyc` is affected by this
     ly: u8,
     lyc: u8,
+    lyc_int_happend: bool,
     bg_palette: u8,
     sprite_palette: [u8; 2],
     windows_y: u8,
@@ -161,6 +162,7 @@ impl Default for Ppu {
             scroll_x: 0,
             ly: 0,
             lyc: 0,
+            lyc_int_happend: false,
             bg_palette: 0xFC,
             sprite_palette: [0xFF; 2],
             windows_y: 0,
@@ -243,10 +245,20 @@ impl Ppu {
     pub fn write_register(&mut self, addr: u16, data: u8) {
         match addr {
             0xFF40 => {
+                let old_disply_enable = self.lcd_control.display_enable();
+
                 self.lcd_control
                     .clone_from(&LcdControl::from_bits_truncate(data));
 
-                if !self.lcd_control.display_enable() {
+                if !self.lcd_control.display_enable() && old_disply_enable {
+                    if self.scanline < 144 {
+                        println!(
+                            "[WARN] Tried to turn off display outside VBLANK, hardware may get corrupted"
+                        );
+                    }
+
+                    self.ly = 0;
+                    self.lcd_status.current_mode_set(0);
                     self.lcd.clear();
                 }
             }
@@ -320,32 +332,6 @@ impl Ppu {
             _ => {}
         }
 
-        if self.cycle == 4 {
-            let flag = self.ly == self.lyc;
-
-            if self.scanline == 153 {
-                self.ly = 0;
-            }
-
-            self.lcd_status.coincidence_flag_set(flag);
-
-            if flag && self.lcd_status.lyc_ly_interrupt() {
-                interrupt_manager.request_interrupt(InterruptType::LcdStat);
-            }
-        }
-
-        if self.scanline == 153 && self.cycle == 12 {
-            self.ly = 0;
-
-            let flag = self.ly == self.lyc;
-
-            self.lcd_status.coincidence_flag_set(flag);
-
-            if flag && self.lcd_status.lyc_ly_interrupt() {
-                interrupt_manager.request_interrupt(InterruptType::LcdStat);
-            }
-        }
-
         match self.lcd_status.current_mode() {
             0 => {}
             1 => {}
@@ -364,6 +350,22 @@ impl Ppu {
                 }
             }
             _ => {}
+        }
+
+        let new_coincidence = self.ly == self.lyc;
+        self.lcd_status.coincidence_flag_set(new_coincidence);
+
+        if !new_coincidence {
+            self.lyc_int_happend = false;
+        }
+
+        if new_coincidence && !self.lyc_int_happend && self.lcd_status.lyc_ly_interrupt() {
+            interrupt_manager.request_interrupt(InterruptType::LcdStat);
+            self.lyc_int_happend = true;
+        }
+
+        if self.scanline == 153 && self.cycle == 4 {
+            self.ly = 0;
         }
 
         // increment cycle

@@ -1,5 +1,5 @@
 macro_rules! mooneye_tests {
-    ($prefix:expr; $($test_name: ident $(,)?),*) => {
+    ($prefix:expr; $($test_name: ident $(- $suffix_name:ident)? $(,)?),*) => {
         $(
             /// Run the test and check registers values (take from mooneye)
             #[test]
@@ -7,7 +7,7 @@ macro_rules! mooneye_tests {
                 let file_path = concat!(
                     "../test_roms/mooneye-gb_hwtests/",
                     $prefix, "/",
-                    stringify!($test_name), ".gb");
+                    stringify!($test_name), $('-', stringify!($suffix_name),)? ".gb");
 
                 let mut gb = crate::tests::TestingGameBoy::new(
                     file_path
@@ -108,13 +108,18 @@ mod acceptance {
 
     mod ppu {
         mooneye_tests!("acceptance/ppu";
+            //hblank_ly_scx_timing-GS,
+            //intr_1_2_timing-GS,
             //intr_2_0_timing,
             //intr_2_mode0_timing,
             //intr_2_mode0_timing_sprites,
             //intr_2_mode3_timing,
             //intr_2_oam_ok_timing,
+            //lcdon_timing-GS,
+            //lcdon_write_timing-GS,
             //stat_irq_blocking,
-            //stat_lyc_onoff
+            stat_lyc_onoff,
+            vblank_stat_intr-GS,
         );
     }
 
