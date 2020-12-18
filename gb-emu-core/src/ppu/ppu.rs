@@ -127,7 +127,7 @@ pub struct Ppu {
     /// `ly` vaue will be 0 and `lyc` is affected by this
     ly: u8,
     lyc: u8,
-    lyc_int_happend: bool,
+    stat_interrupt_line: bool,
     bg_palette: u8,
     sprite_palette: [u8; 2],
     windows_y: u8,
@@ -162,7 +162,7 @@ impl Default for Ppu {
             scroll_x: 0,
             ly: 0,
             lyc: 0,
-            lyc_int_happend: false,
+            stat_interrupt_line: false,
             bg_palette: 0xFC,
             sprite_palette: [0xFF; 2],
             windows_y: 0,
@@ -288,6 +288,8 @@ impl Ppu {
 
     // clocks the PPU 4 times in a row
     pub fn clock_4_times<I: InterruptManager>(&mut self, interrupt_manager: &mut I) {
+        let mut new_stat_int_happened = false;
+
         if !self.lcd_control.display_enable() {
             return;
         }
@@ -297,18 +299,10 @@ impl Ppu {
             (0, 0) => {
                 // change to mode 2 from mode 1
                 self.lcd_status.current_mode_set(2);
-
-                if self.lcd_status.mode_2_oam_interrupt() {
-                    interrupt_manager.request_interrupt(InterruptType::LcdStat);
-                }
             }
             (1..=143, 0) => {
                 // change to mode 2 from mode 0
                 self.lcd_status.current_mode_set(2);
-
-                if self.lcd_status.mode_2_oam_interrupt() {
-                    interrupt_manager.request_interrupt(InterruptType::LcdStat);
-                }
             }
             (0..=143, 80) => {
                 // change to mode 3 from mode 2
@@ -320,33 +314,33 @@ impl Ppu {
                 self.lcd_status.current_mode_set(1);
                 self.enter_vblank();
 
-                // FIXME: check if two interrupts are being fired
                 interrupt_manager.request_interrupt(InterruptType::Vblank);
-                if self.lcd_status.mode_1_vblank_interrupt() {
-                    interrupt_manager.request_interrupt(InterruptType::LcdStat);
-                }
-
-                // also mode 2 interrupt if enabled
-                if self.lcd_status.mode_2_oam_interrupt() {
-                    interrupt_manager.request_interrupt(InterruptType::LcdStat);
-                }
             }
             _ => {}
         }
 
         match self.lcd_status.current_mode() {
-            0 => {}
-            1 => {}
+            0 => {
+                new_stat_int_happened =
+                    new_stat_int_happened || self.lcd_status.mode_0_hblank_interrupt();
+            }
+            1 => {
+                // also mode 2 interrupt if enabled
+                new_stat_int_happened = new_stat_int_happened
+                    || self.lcd_status.mode_1_vblank_interrupt()
+                    || self.lcd_status.mode_2_oam_interrupt();
+            }
             2 if self.cycle == 0 => self.load_selected_sprites_oam(),
+            2 => {
+                new_stat_int_happened =
+                    new_stat_int_happened || self.lcd_status.mode_2_oam_interrupt();
+            }
             3 => {
                 for _ in 0..4 {
                     if self.draw() {
                         // change mode to 0 from 3
                         self.lcd_status.current_mode_set(0);
                         self.enter_hblank();
-                        if self.lcd_status.mode_0_hblank_interrupt() {
-                            interrupt_manager.request_interrupt(InterruptType::LcdStat);
-                        }
                         break;
                     }
                 }
@@ -357,14 +351,14 @@ impl Ppu {
         let new_coincidence = self.ly == self.lyc;
         self.lcd_status.coincidence_flag_set(new_coincidence);
 
-        if !new_coincidence {
-            self.lyc_int_happend = false;
+        new_stat_int_happened =
+            new_stat_int_happened || (new_coincidence && self.lcd_status.lyc_ly_interrupt());
+
+        if new_stat_int_happened && !self.stat_interrupt_line {
+            interrupt_manager.request_interrupt(InterruptType::LcdStat);
         }
 
-        if new_coincidence && !self.lyc_int_happend && self.lcd_status.lyc_ly_interrupt() {
-            interrupt_manager.request_interrupt(InterruptType::LcdStat);
-            self.lyc_int_happend = true;
-        }
+        self.stat_interrupt_line = new_stat_int_happened;
 
         if self.scanline == 153 && self.cycle == 4 {
             self.ly = 0;

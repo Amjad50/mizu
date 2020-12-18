@@ -117,7 +117,7 @@ mod acceptance {
             //intr_2_oam_ok_timing,
             //lcdon_timing-GS,
             //lcdon_write_timing-GS,
-            //stat_irq_blocking,
+            stat_irq_blocking,
             stat_lyc_onoff,
             vblank_stat_intr-GS,
         );
