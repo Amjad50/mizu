@@ -268,7 +268,7 @@ impl Ppu {
         }
     }
 
-    pub fn screen_buffer(&self) -> Vec<u8> {
+    pub fn screen_buffer(&self) -> &[u8] {
         self.lcd.screen_buffer()
     }
 
@@ -309,6 +309,11 @@ impl Ppu {
                 // FIXME: check if two interrupts are being fired
                 interrupt_manager.request_interrupt(InterruptType::Vblank);
                 if self.lcd_status.mode_1_vblank_interrupt() {
+                    interrupt_manager.request_interrupt(InterruptType::LcdStat);
+                }
+
+                // also mode 2 interrupt if enabled
+                if self.lcd_status.mode_2_oam_interrupt() {
                     interrupt_manager.request_interrupt(InterruptType::LcdStat);
                 }
             }

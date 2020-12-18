@@ -62,6 +62,8 @@ fn main() {
         &Default::default(),
     );
 
+    let mut pixels_buffer = [0xFF; TV_HEIGHT as usize * TV_WIDTH as usize * 4];
+
     let mut fps = 60;
 
     window.set_framerate_limit(fps);
@@ -138,9 +140,9 @@ fn main() {
 
         window.clear(Color::BLACK);
 
-        let pixels = convert_to_rgba(gameboy.screen_buffer());
+        convert_to_rgba(&gameboy.screen_buffer(), &mut pixels_buffer);
 
-        let image = Image::create_from_pixels(TV_WIDTH, TV_HEIGHT, &pixels).expect("image");
+        let image = Image::create_from_pixels(TV_WIDTH, TV_HEIGHT, &pixels_buffer).expect("image");
 
         texture.update_from_image(&image, 0, 0);
 
@@ -150,17 +152,11 @@ fn main() {
     }
 }
 
-fn convert_to_rgba(data: Vec<u8>) -> Vec<u8> {
-    let mut result = vec![0; data.len() * 4];
-
-    for (i, &color) in data.iter().enumerate() {
-        let i = i * 4;
-        let reduced = (color as f32 * 0.8) as u8;
-        result[i] = reduced;
-        result[i + 1] = color;
-        result[i + 2] = reduced;
-        result[i + 3] = 0xff;
+fn convert_to_rgba(data: &[u8], output: &mut [u8]) {
+    for (pixel_chunk, &pixel_color) in output.chunks_mut(4).zip(data.iter()) {
+        let reduced = (pixel_color as f32 * 0.8) as u8;
+        pixel_chunk[0] = reduced;
+        pixel_chunk[1] = pixel_color;
+        pixel_chunk[2] = reduced;
     }
-
-    result
 }

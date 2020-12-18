@@ -134,7 +134,7 @@ impl Bus {
         s
     }
 
-    pub fn screen_buffer(&self) -> Vec<u8> {
+    pub fn screen_buffer(&self) -> &[u8] {
         self.ppu.screen_buffer()
     }
 

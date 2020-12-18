@@ -29,10 +29,10 @@ macro_rules! gb_tests {
                 gb.$looping_statement();
 
                 let screen_buffer = gb.screen_buffer();
-                crate::tests::print_screen_buffer(&screen_buffer);
+                crate::tests::print_screen_buffer(screen_buffer);
 
                 assert_eq!(
-                    crc::crc64::checksum_ecma(&screen_buffer),
+                    crc::crc64::checksum_ecma(screen_buffer),
                     $crc_checksome
                 );
             }
@@ -79,7 +79,7 @@ impl TestingGameBoy {
         })
     }
 
-    pub fn screen_buffer(&self) -> Vec<u8> {
+    pub fn screen_buffer(&self) -> &[u8] {
         self.bus.screen_buffer()
     }
 

@@ -16,7 +16,7 @@ macro_rules! mooneye_tests {
                 let regs = gb.clock_until_breakpoint();
 
                 let screen_buffer = gb.screen_buffer();
-                crate::tests::print_screen_buffer(&screen_buffer);
+                crate::tests::print_screen_buffer(screen_buffer);
 
                 // These checks are taken from mooneye emulator
                 if regs.a != 0 {
