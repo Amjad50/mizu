@@ -519,7 +519,10 @@ impl Ppu {
                 .iter()
                 .take(self.selected_oam_size as usize)
             {
-                if sprite.screen_x() == self.lcd.x() {
+                // the x index of the sprite is of the left of the display
+                let left_out_of_bounds = self.lcd.x() == 0 && sprite.x() < 8;
+
+                if self.lcd.x() == sprite.screen_x() || left_out_of_bounds {
                     let mut y = self.scanline.wrapping_sub(sprite.screen_y());
                     if sprite.y_flipped() {
                         y = (self.lcd_control.sprite_size() - 1) - y;
@@ -529,6 +532,15 @@ impl Ppu {
 
                     if sprite.x_flipped() {
                         colors.reverse();
+                    }
+
+                    if left_out_of_bounds {
+                        let to_shift = 8u8.saturating_sub(sprite.x()) as usize;
+
+                        colors.rotate_left(to_shift);
+                        for i in &mut colors[8 - to_shift..] {
+                            *i = 0;
+                        }
                     }
 
                     self.fifo

@@ -11,7 +11,7 @@ bitflags! {
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Debug)]
 pub struct Sprite {
     y: u8,
     x: u8,
@@ -40,6 +40,16 @@ impl Sprite {
                 .clone_from(&SpriteFlags::from_bits_truncate(data)),
             _ => unreachable!(),
         }
+    }
+
+    /// This is here just for completion as [`x`] is also present
+    #[allow(dead_code)]
+    pub fn y(&self) -> u8 {
+        self.y
+    }
+
+    pub fn x(&self) -> u8 {
+        self.x
     }
 
     pub fn screen_y(&self) -> u8 {
