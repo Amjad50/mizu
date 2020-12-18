@@ -46,9 +46,10 @@ impl Default for Timer {
 
 impl Timer {
     pub fn new_skip_boot_rom() -> Self {
-        let mut s = Self::default();
-        s.divider = 0xABCC; // divider value after the boot_rom finish executing
-        s
+        Self {
+            divider: 0xABCC, // divider value after the boot_rom finish executing
+            ..Self::default()
+        }
     }
 
     pub fn read_register(&self, addr: u16) -> u8 {

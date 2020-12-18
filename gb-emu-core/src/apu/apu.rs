@@ -431,7 +431,7 @@ impl Apu {
     /// determines if the next frame sequencer clock is going to include
     /// clocking the length counter
     fn is_length_clock_next(&self) -> bool {
-        (self.cycle as f32 / 2048 as f32).ceil() as u16 % 2 != 0
+        (self.cycle as f32 / 2048_f32).ceil() as u16 % 2 != 0
     }
 
     /// write the top 2 bits of NRx4 registers and runs the obsecure

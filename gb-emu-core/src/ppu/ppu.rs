@@ -187,15 +187,15 @@ impl Ppu {
     pub fn new_skip_boot_rom() -> Self {
         let mut s = Self::default();
         // set I/O registers to the value which would have if boot_rom ran
-        s.write_register(0xff40, 0x91);
-        s.write_register(0xff42, 0x00);
-        s.write_register(0xff43, 0x00);
-        s.write_register(0xff45, 0x00);
-        s.write_register(0xff47, 0xFC);
-        s.write_register(0xff48, 0xFF);
-        s.write_register(0xff49, 0xFF);
-        s.write_register(0xff4A, 0x00);
-        s.write_register(0xff4B, 0x00);
+        s.write_register(0xFF40, 0x91);
+        s.write_register(0xFF42, 0x00);
+        s.write_register(0xFF43, 0x00);
+        s.write_register(0xFF45, 0x00);
+        s.write_register(0xFF47, 0xFC);
+        s.write_register(0xFF48, 0xFF);
+        s.write_register(0xFF49, 0xFF);
+        s.write_register(0xFF4A, 0x00);
+        s.write_register(0xFF4B, 0x00);
 
         s.scanline = 153;
         s.cycle = 400;
@@ -445,19 +445,9 @@ impl Ppu {
             pattern_table.wrapping_add(tile_index)
         } else {
             pattern_table + (tile as u16) * 16
-        } as usize;
+        };
 
-        let low = self.vram[index + (y as usize) * 2];
-        let high = self.vram[index + (y as usize) * 2 + 1];
-
-        let mut result = [0; 8];
-
-        for i in 0..8 {
-            let bin_i = 7 - i;
-            result[i] = ((high >> bin_i) & 1) << 1 | ((low >> bin_i) & 1);
-        }
-
-        result
+        self.get_tile_pattern_from_index(index, y)
     }
 
     fn get_sprite_pattern(&self, mut tile: u8, y: u8) -> [u8; 8] {
@@ -465,16 +455,22 @@ impl Ppu {
             tile &= 0xFE;
         }
 
-        let index = 0x0000 + (tile as usize) * 16;
+        let index = tile as u16 * 16;
+
+        self.get_tile_pattern_from_index(index, y)
+    }
+
+    fn get_tile_pattern_from_index(&self, index: u16, y: u8) -> [u8; 8] {
+        let index = index as usize;
 
         let low = self.vram[index + (y as usize) * 2];
         let high = self.vram[index + (y as usize) * 2 + 1];
 
         let mut result = [0; 8];
 
-        for i in 0..8 {
+        for (i, result_item) in result.iter_mut().enumerate() {
             let bin_i = 7 - i;
-            result[i] = ((high >> bin_i) & 1) << 1 | ((low >> bin_i) & 1);
+            *result_item = ((high >> bin_i) & 1) << 1 | ((low >> bin_i) & 1);
         }
 
         result

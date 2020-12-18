@@ -54,9 +54,7 @@ impl Fifo {
 
         for (pixel, &sprite_color) in self.pixels.iter_mut().take(8).zip(colors.iter()) {
             if pixel.palette == PaletteType::Background {
-                if (!background_priority && sprite_color != 0)
-                    || (pixel.color == 0 && sprite_color != 0)
-                {
+                if (!background_priority || pixel.color == 0) && sprite_color != 0 {
                     pixel.color = sprite_color;
                     pixel.palette = PaletteType::Sprite(palette);
                 }

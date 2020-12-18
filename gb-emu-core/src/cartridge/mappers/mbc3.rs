@@ -189,13 +189,13 @@ pub struct Mbc3 {
 
 impl Mbc3 {
     pub fn new(timer: bool) -> Self {
-        let mut s = Self::default();
+        Self {
+            rtc_present: timer,
+            rom_bank_4000: 1,
+            ram_block_enable: true,
 
-        s.rtc_present = timer;
-        s.rom_bank_4000 = 1;
-        s.ram_block_enable = true;
-
-        s
+            ..Self::default()
+        }
     }
 }
 
@@ -289,7 +289,7 @@ impl Mapper for Mbc3 {
             0x4000..=0x5FFF => {
                 let data = data & 0xF;
                 // FIXME: what happens if the value written is outside 0x0..=0xC?
-                assert!(data <= 3 || (data >= 8 && data <= 0xC));
+                assert!(data <= 3 || (0x8..=0xC).contains(&data));
 
                 self.is_reading_ram = data <= 3;
 
