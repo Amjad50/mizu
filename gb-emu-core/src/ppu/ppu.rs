@@ -258,6 +258,8 @@ impl Ppu {
                     }
 
                     self.ly = 0;
+                    self.cycle = 4;
+                    self.scanline = 0;
                     self.lcd_status.current_mode_set(0);
                     self.lcd.clear();
                 }
