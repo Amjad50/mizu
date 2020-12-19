@@ -20,17 +20,27 @@ impl Default for BootRom {
     }
 }
 
+#[derive(Clone, Copy)]
+enum BusType {
+    // VRAM
+    Video,
+    // Cartridge ROM and SRAM, and WRAM
+    External,
+}
+
 #[derive(Default)]
 struct DMA {
+    conflicting_bus: Option<BusType>,
+    current_value: u8,
     address: u16,
     in_transfer: bool,
     starting_delay: u8,
-    blocking: bool,
 }
 
 impl DMA {
     fn start_dma(&mut self, high_byte: u8) {
         self.address = (high_byte as u16) << 8;
+
         // 8 T-cycles here for delay instead of 4, this is to ensure correct
         // DMA timing
         self.starting_delay = 2;
@@ -47,15 +57,23 @@ impl DMA {
 
             // block after 1 M-cycle delay
             if self.starting_delay == 0 {
-                self.blocking = true;
+                let high_byte = (self.address >> 8) as u8;
+
+                self.conflicting_bus = Some(if (0x80..=0x9F).contains(&high_byte) {
+                    BusType::Video
+                } else {
+                    BusType::External
+                });
             }
         } else {
+            self.current_value = value;
+
             ppu.write_oam(0xFE00 | (self.address & 0xFF), value);
 
             self.address += 1;
             if self.address & 0xFF == 0xA0 {
                 self.in_transfer = false;
-                self.blocking = false;
+                self.conflicting_bus = None;
             }
         }
     }
@@ -165,61 +183,71 @@ impl Bus {
         self.joypad.update_interrupts(&mut self.interrupts);
 
         if self.dma.in_transfer {
-            let value = self.read_not_ticked(self.dma.address, false);
+            let value = self.read_not_ticked(self.dma.address, None);
             self.dma.transfer_clock(&mut self.ppu, value);
         }
     }
 
-    fn read_not_ticked(&mut self, addr: u16, block_for_dma: bool) -> u8 {
-        // NOTE: DMA blocking is not accurate for now, DMA does not only block
-        // OAM memory, but the mechanics are not clear yet, so I'll leave it like this
-        match addr {
-            0x0000..=0x00FF if self.boot_rom.enabled => self.boot_rom.data[addr as usize], // boot rom
-            0x0000..=0x3FFF => self.cartridge.read_rom0(addr),                             // rom0
-            0x4000..=0x7FFF => self.cartridge.read_romx(addr),                             // romx
-            0x8000..=0x9FFF => self.ppu.read_vram(addr), // ppu vram
-            0xA000..=0xBFFF => self.cartridge.read_ram(addr), // sram
-            0xC000..=0xCFFF => self.ram.read_ram0(addr), // wram0
-            0xD000..=0xDFFF => self.ram.read_ramx(addr), // wramx
-            0xE000..=0xFDFF => self.read_not_ticked(0xC000 | (addr & 0x1FFF), block_for_dma), // echo
-            0xFE00..=0xFE9F if !block_for_dma => self.ppu.read_oam(addr), // ppu oam
-            0xFEA0..=0xFEFF => 0,                                         // unused
-            0xFF00 => self.joypad.read_joypad(),                          // joypad
-            0xFF01 => 0,                                                  // serial
-            0xFF02 => 0x7E,                                               // serial
-            0xFF04..=0xFF07 => self.timer.read_register(addr),            // divider and timer
-            0xFF0F => self.interrupts.read_interrupt_flags(),             // interrupts flags
-            0xFF10..=0xFF3F => self.apu.read_register(addr),              // apu
-            0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.read_register(addr), // ppu io registers
-            0xFF46 => self.dma.read(),                                    // dma start
-            0xFF50 => 0xFF,                                               // boot rom stop
-            0xFF80..=0xFFFE => self.hram[addr as usize & 0x7F],           // hram
-            0xFFFF => self.interrupts.read_interrupt_enable(),            //interrupts enable
+    fn read_not_ticked(&mut self, addr: u16, block_for_dma: Option<BusType>) -> u8 {
+        let dma_value = if block_for_dma.is_some() {
+            self.dma.current_value
+        } else {
+            0xFF
+        };
+
+        match (addr, block_for_dma) {
+            (0x0000..=0x00FF, _) if self.boot_rom.enabled => self.boot_rom.data[addr as usize], // boot rom
+            (0x0000..=0x7FFF, Some(BusType::External)) => dma_value, // external bus DMA conflict
+            (0x0000..=0x3FFF, _) => self.cartridge.read_rom0(addr),  // rom0
+            (0x4000..=0x7FFF, _) => self.cartridge.read_romx(addr),  // romx
+            (0x8000..=0x9FFF, Some(BusType::Video)) => dma_value,    // video bus DMA conflict
+            (0x8000..=0x9FFF, _) => self.ppu.read_vram(addr),        // ppu vram
+            (0xA000..=0xDFFF, Some(BusType::External)) => dma_value, // external bus DMA conflict
+            (0xA000..=0xBFFF, _) => self.cartridge.read_ram(addr),   // sram
+            (0xC000..=0xCFFF, _) => self.ram.read_ram0(addr),        // wram0
+            (0xD000..=0xDFFF, _) => self.ram.read_ramx(addr),        // wramx
+            (0xE000..=0xFDFF, _) => self.read_not_ticked(0xC000 | (addr & 0x1FFF), block_for_dma), // echo
+            (0xFE00..=0xFE9F, None) => self.ppu.read_oam(addr), // ppu oam
+            (0xFEA0..=0xFEFF, _) => 0,                          // unused
+            (0xFF00, _) => self.joypad.read_joypad(),           // joypad
+            (0xFF01, _) => 0,                                   // serial
+            (0xFF02, _) => 0x7E,                                // serial
+            (0xFF04..=0xFF07, _) => self.timer.read_register(addr), // divider and timer
+            (0xFF0F, _) => self.interrupts.read_interrupt_flags(), // interrupts flags
+            (0xFF10..=0xFF3F, _) => self.apu.read_register(addr), // apu
+            (0xFF40..=0xFF45, _) | (0xFF47..=0xFF4B, _) => self.ppu.read_register(addr), // ppu io registers
+            (0xFF46, _) => self.dma.read(), // dma start
+            (0xFF50, _) => 0xFF,            // boot rom stop
+            (0xFF80..=0xFFFE, _) => self.hram[addr as usize & 0x7F], // hram
+            (0xFFFF, _) => self.interrupts.read_interrupt_enable(), //interrupts enable
             _ => 0xFF,
         }
     }
 
-    fn write_not_ticked(&mut self, addr: u16, data: u8, block_for_dma: bool) {
-        // NOTE: DMA blocking is not accurate for now, DMA does not only block
-        // OAM memory, but the mechanics are not clear yet, so I'll leave it like this
-        match addr {
-            0x0000..=0x7FFF => self.cartridge.write_to_bank_controller(addr, data), // rom0
-            0x8000..=0x9FFF => self.ppu.write_vram(addr, data),                     // ppu vram
-            0xA000..=0xBFFF => self.cartridge.write_ram(addr, data),                // sram
-            0xC000..=0xCFFF => self.ram.write_ram0(addr, data),                     // wram0
-            0xD000..=0xDFFF => self.ram.write_ramx(addr, data),                     // wramx
-            0xE000..=0xFDFF => self.write(0xC000 | (addr & 0x1FFF), data),          // echo
-            0xFE00..=0xFE9F if !block_for_dma => self.ppu.write_oam(addr, data),    // ppu oam
-            0xFEA0..=0xFEFF => {}                                                   // unused
-            0xFF00 => self.joypad.write_joypad(data),                               // joypad
-            0xFF04..=0xFF07 => self.timer.write_register(addr, data), // divider and timer
-            0xFF0F => self.interrupts.write_interrupt_flags(data),    // interrupts flags
-            0xFF10..=0xFF3F => self.apu.write_register(addr, data),   // apu
-            0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.write_register(addr, data), // ppu io registers
-            0xFF46 => self.dma.start_dma(data),                                       // dma start
-            0xFF50 => self.boot_rom.enabled = false, // boot rom stop
-            0xFF80..=0xFFFE => self.hram[addr as usize & 0x7F] = data, // hram
-            0xFFFF => self.interrupts.write_interrupt_enable(data), // interrupts enable
+    fn write_not_ticked(&mut self, addr: u16, data: u8, block_for_dma: Option<BusType>) {
+        match (addr, block_for_dma) {
+            (0x0000..=0x7FFF, Some(BusType::External)) => {} // ignore writes
+            (0x0000..=0x7FFF, _) => self.cartridge.write_to_bank_controller(addr, data), // rom0
+            (0x8000..=0x9FFF, Some(BusType::Video)) => {}    // ignore writes
+            (0x8000..=0x9FFF, _) => self.ppu.write_vram(addr, data), // ppu vram
+            (0xA000..=0xDFFF, Some(BusType::External)) => {} // ignore writes
+            (0xA000..=0xBFFF, _) => self.cartridge.write_ram(addr, data), // sram
+            (0xC000..=0xCFFF, _) => self.ram.write_ram0(addr, data), // wram0
+            (0xD000..=0xDFFF, _) => self.ram.write_ramx(addr, data), // wramx
+            (0xE000..=0xFDFF, _) => {
+                self.write_not_ticked(0xC000 | (addr & 0x1FFF), data, block_for_dma)
+            } // echo
+            (0xFE00..=0xFE9F, None) => self.ppu.write_oam(addr, data), // ppu oam
+            (0xFEA0..=0xFEFF, _) => {}                       // unused
+            (0xFF00, _) => self.joypad.write_joypad(data),   // joypad
+            (0xFF04..=0xFF07, _) => self.timer.write_register(addr, data), // divider and timer
+            (0xFF0F, _) => self.interrupts.write_interrupt_flags(data), // interrupts flags
+            (0xFF10..=0xFF3F, _) => self.apu.write_register(addr, data), // apu
+            (0xFF40..=0xFF45, _) | (0xFF47..=0xFF4B, _) => self.ppu.write_register(addr, data), // ppu io registers
+            (0xFF46, _) => self.dma.start_dma(data), // dma start
+            (0xFF50, _) => self.boot_rom.enabled = false, // boot rom stop
+            (0xFF80..=0xFFFE, _) => self.hram[addr as usize & 0x7F] = data, // hram
+            (0xFFFF, _) => self.interrupts.write_interrupt_enable(data), // interrupts enable
             _ => {}
         }
     }
@@ -228,14 +256,14 @@ impl Bus {
 impl CpuBusProvider for Bus {
     /// each time the cpu reads, clock the components on the bus
     fn read(&mut self, addr: u16) -> u8 {
-        let result = self.read_not_ticked(addr, self.dma.blocking);
+        let result = self.read_not_ticked(addr, self.dma.conflicting_bus);
         self.on_cpu_machine_cycle();
         result
     }
 
     /// each time the cpu writes, clock the components on the bus
     fn write(&mut self, addr: u16, data: u8) {
-        self.write_not_ticked(addr, data, self.dma.blocking);
+        self.write_not_ticked(addr, data, self.dma.conflicting_bus);
         self.on_cpu_machine_cycle();
     }
 
