@@ -44,6 +44,7 @@ macro_rules! gb_tests {
 mod acid2_test;
 mod blargg_tests;
 mod mooneye_tests;
+mod scribbltests;
 
 fn print_screen_buffer(buffer: &[u8]) {
     const TV_WIDTH: u32 = 160;
