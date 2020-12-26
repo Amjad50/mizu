@@ -29,5 +29,5 @@ jobs:
     - name: Build
       run: cargo build --verbose
     - name: Run tests
-      run: cargo tarpaulin -t 300 --workspace -e gb-emu-sfml -v -o Xml
+      run: sh ./.github/install_and_run_tests.sh
     - uses: codecov/codecov-action@v1.0.11
