@@ -32,6 +32,7 @@ pub struct Timer {
     timer_modulo: u8,
     timer_control: TimerControl,
     interrupt_next: bool,
+    during_interrupt: bool,
 }
 
 impl Default for Timer {
@@ -42,6 +43,7 @@ impl Default for Timer {
             timer_modulo: 0,
             timer_control: TimerControl::from_bits_truncate(0),
             interrupt_next: false,
+            during_interrupt: false,
         }
     }
 }
@@ -75,8 +77,28 @@ impl Timer {
                     self.increment_timer();
                 }
             }
-            0xFF05 => self.timer_counter = data,
-            0xFF06 => self.timer_modulo = data,
+            0xFF05 => {
+                // ignore timer reload and interrupt if there is an interrupt_next
+                self.interrupt_next = false;
+
+                // in the case this is the timer counter(TIMA) is reloaded
+                // (and interrupt is triggered), then reload from the (TMA)
+                // and ignore `data`
+                self.timer_counter = if self.during_interrupt {
+                    self.timer_modulo
+                } else {
+                    data
+                };
+            }
+            0xFF06 => {
+                self.timer_modulo = data;
+
+                // if TMA is written during the same cycle it is reloaded into
+                // the timer counter (TIMA), then reload TIMA as well
+                if self.during_interrupt {
+                    self.timer_counter = self.timer_modulo;
+                }
+            }
             0xFF07 => {
                 let old_enable = self.timer_control.timer_enabled();
                 let old_divider_bit = old_enable && self.divider_bit();
@@ -96,9 +118,13 @@ impl Timer {
     }
 
     pub fn clock_divider<I: InterruptManager>(&mut self, interrupt: &mut I) {
+        self.during_interrupt = false;
+
         if self.interrupt_next {
             interrupt.request_interrupt(InterruptType::Timer);
             self.interrupt_next = false;
+            self.timer_counter = self.timer_modulo;
+            self.during_interrupt = true;
         }
 
         let old_divider_bit = self.divider_bit();

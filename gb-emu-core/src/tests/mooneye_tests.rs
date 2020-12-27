@@ -140,9 +140,9 @@ mod acceptance {
             tim10,
             tim11_div_trigger,
             tim11,
-            //tima_reload,
-            //tima_write_reloading,
-            //tma_write_reloading
+            tima_reload,
+            tima_write_reloading,
+            tma_write_reloading
         );
     }
 }
