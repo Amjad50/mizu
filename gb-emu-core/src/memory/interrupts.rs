@@ -17,6 +17,8 @@ pub trait InterruptManager {
 
 bitflags! {
     struct InterruptsFlags: u8 {
+        /// This is only used when reading `interrupt_enable` only
+        const UNUSED   = 0b111 << 5;
         const VBLANK   = 1 << 0;
         const LCD_STAT = 1 << 1;
         const TIMER    = 1 << 2;
@@ -67,18 +69,18 @@ impl Interrupts {
     }
 
     pub fn read_interrupt_flags(&self) -> u8 {
-        self.requested.bits() | 0xE0
+        0xE0 | self.requested.bits()
     }
 
     pub fn is_interrupts_available(&self) -> bool {
-        self.requested.bits() & self.enabled.bits() != 0
+        self.requested.bits() & self.enabled.bits() & 0x1F != 0
     }
 
     pub fn get_highest_interrupt_addr_and_ack(&mut self) -> Option<u8> {
-        if self.requested.is_empty() {
+        if self.requested.bits() & 0x1F == 0 {
             None
         } else {
-            let mut bits = self.requested.bits() & self.enabled.bits();
+            let mut bits = self.requested.bits() & self.enabled.bits() & 0x1F;
             let mut counter = 0;
             while bits != 0 {
                 if bits & 1 == 1 {

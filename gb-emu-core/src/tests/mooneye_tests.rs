@@ -66,11 +66,13 @@ mod acceptance {
         call_cc_timing,
         call_timing2,
         call_timing,
+        di_timing-GS,
         div_timing,
         ei_sequence,
         ei_timing,
         halt_ime0_ei,
         halt_ime0_nointr_timing,
+        halt_ime1_timing2-GS,
         halt_ime1_timing,
         if_ie_registers,
         intr_timing,
@@ -91,7 +93,7 @@ mod acceptance {
     );
 
     mod bits {
-        mooneye_tests!("acceptance/bits"; mem_oam, reg_f);
+        mooneye_tests!("acceptance/bits"; mem_oam, reg_f, unused_hwio-GS);
     }
 
     mod instr {
@@ -103,7 +105,10 @@ mod acceptance {
     }
 
     mod oam_dma {
-        mooneye_tests!("acceptance/oam_dma";basic, reg_read);
+        mooneye_tests!("acceptance/oam_dma";
+            basic, reg_read,
+            //sources-GS
+        );
     }
 
     mod ppu {
