@@ -311,7 +311,7 @@ impl Ppu {
                 self.fine_scroll_x_discard = self.scroll_x & 0x7;
                 self.lcd_status.current_mode_set(3);
             }
-            (144, 0) => {
+            (144, 4) => {
                 // change to mode 1 from mode 0
                 self.lcd_status.current_mode_set(1);
                 self.enter_vblank();
@@ -332,6 +332,7 @@ impl Ppu {
                     || self.lcd_status.mode_1_vblank_interrupt()
                     || self.lcd_status.mode_2_oam_interrupt();
             }
+            // FIXME: mode2 timings
             2 if self.cycle == 0 => self.load_selected_sprites_oam(),
             2 => {
                 new_stat_int_happened =
