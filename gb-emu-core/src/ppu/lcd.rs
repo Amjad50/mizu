@@ -37,7 +37,8 @@ impl Lcd {
 
     pub fn clear(&mut self) {
         for i in &mut self.buf {
-            *i = 0;
+            // fill with white
+            *i = 0xFF;
         }
     }
 }
