@@ -31,6 +31,7 @@ pub struct Timer {
     timer_counter: u8,
     timer_modulo: u8,
     timer_control: TimerControl,
+    interrupt_next: bool,
 }
 
 impl Default for Timer {
@@ -40,6 +41,7 @@ impl Default for Timer {
             timer_counter: 0,
             timer_modulo: 0,
             timer_control: TimerControl::from_bits_truncate(0),
+            interrupt_next: false,
         }
     }
 }
@@ -64,41 +66,64 @@ impl Timer {
 
     pub fn write_register(&mut self, addr: u16, data: u8) {
         match addr {
-            0xFF04 => self.divider = 0, // reset
+            0xFF04 => {
+                let old_divider_bit = self.divider_bit();
+                self.divider = 0; // reset
+                let new_divider_bit = self.divider_bit();
+
+                if old_divider_bit && !new_divider_bit {
+                    self.increment_timer();
+                }
+            }
             0xFF05 => self.timer_counter = data,
             0xFF06 => self.timer_modulo = data,
-            0xFF07 => self
-                .timer_control
-                .clone_from(&TimerControl::from_bits_truncate(data)),
+            0xFF07 => {
+                let old_enable = self.timer_control.timer_enabled();
+                let old_divider_bit = old_enable && self.divider_bit();
+
+                self.timer_control
+                    .clone_from(&TimerControl::from_bits_truncate(data));
+
+                let new_enable = self.timer_control.timer_enabled();
+                let new_divider_bit = new_enable && self.divider_bit();
+
+                if old_divider_bit && !new_divider_bit {
+                    self.increment_timer();
+                }
+            }
             _ => unreachable!(),
         }
     }
 
     pub fn clock_divider<I: InterruptManager>(&mut self, interrupt: &mut I) {
-        let bit = self.timer_control.freq_divider_selection_bit();
-        let saved_divider_bit = (self.divider >> bit) & 1;
+        if self.interrupt_next {
+            interrupt.request_interrupt(InterruptType::Timer);
+            self.interrupt_next = false;
+        }
+
+        let old_divider_bit = self.divider_bit();
 
         // because each CPU M-cycle is 4 T-cycles
         self.divider = self.divider.wrapping_add(4);
 
-        let new_divider_bit = (self.divider >> bit) & 1;
+        let new_divider_bit = self.divider_bit();
 
-        if self.timer_control.timer_enabled() && saved_divider_bit == 1 && new_divider_bit == 0 {
-            self.increment_timer(interrupt)
+        if self.timer_control.timer_enabled() && old_divider_bit && !new_divider_bit {
+            self.increment_timer();
         }
     }
 }
 
 impl Timer {
-    fn increment_timer<I: InterruptManager>(&mut self, interrupt: &mut I) {
+    fn increment_timer(&mut self) {
         let (new_counter, overflow) = self.timer_counter.overflowing_add(1);
 
-        if overflow {
-            self.timer_counter = self.timer_modulo;
-            // generate interrupt
-            interrupt.request_interrupt(InterruptType::Timer);
-        } else {
-            self.timer_counter = new_counter;
-        }
+        self.timer_counter = new_counter;
+        self.interrupt_next = overflow;
+    }
+
+    fn divider_bit(&self) -> bool {
+        let bit = self.timer_control.freq_divider_selection_bit();
+        (self.divider >> bit) & 1 == 1
     }
 }
