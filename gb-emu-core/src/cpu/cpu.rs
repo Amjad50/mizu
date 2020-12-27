@@ -99,57 +99,60 @@ impl Cpu {
     }
 
     pub fn next_instruction<P: CpuBusProvider>(&mut self, bus: &mut P) -> CpuState {
-        if self.halt_mode == HaltMode::NotHalting || self.halt_mode == HaltMode::HaltBug {
-            if self.ime && bus.check_interrupts() {
-                if let Some(int_vector) = bus.get_interrupts() {
-                    self.stack_push(self.reg_pc, bus);
-                    self.reg_pc = int_vector as u16;
-                    self.ime = false;
-
-                    // delay for interrupt
-                    self.dummy_fetch(bus);
-                    self.dummy_fetch(bus);
-                    self.dummy_fetch(bus);
-                    return CpuState::RunningInterrupt(int_vector);
-                }
-            }
-
-            if self.enable_interrupt_next {
-                self.ime = true;
-                self.enable_interrupt_next = false;
-            }
-
-            let pc = self.reg_pc;
-            let mut instruction = Instruction::from_byte(self.fetch_next_pc(bus), pc);
-
-            if self.halt_mode == HaltMode::HaltBug {
-                self.halt_mode = HaltMode::NotHalting;
-                // do not add pc from the last fetch ^
-                self.reg_pc = pc;
-            }
-
-            if instruction.opcode == Opcode::Prefix {
-                instruction = Instruction::from_prefix(self.fetch_next_pc(bus), pc);
-            }
-
-            self.exec_instruction(instruction, bus)
-        } else {
+        if self.halt_mode == HaltMode::HaltRunInterrupt
+            || self.halt_mode == HaltMode::HaltNoRunInterrupt
+        {
             self.dummy_fetch(bus);
+
             if bus.check_interrupts() {
+                self.halt_mode = HaltMode::NotHalting;
+
                 if self.halt_mode == HaltMode::HaltRunInterrupt {
                     if let Some(int_vector) = bus.get_interrupts() {
                         self.stack_push(self.reg_pc, bus);
                         self.reg_pc = int_vector as u16;
                         self.ime = false;
                     }
+                    return CpuState::Normal;
                 }
-                self.halt_mode = HaltMode::NotHalting;
-
-                CpuState::Normal
             } else {
-                CpuState::Halting
+                return CpuState::Halting;
             }
         }
+
+        if self.ime && bus.check_interrupts() {
+            if let Some(int_vector) = bus.get_interrupts() {
+                self.stack_push(self.reg_pc, bus);
+                self.reg_pc = int_vector as u16;
+                self.ime = false;
+
+                // delay for interrupt
+                self.dummy_fetch(bus);
+                self.dummy_fetch(bus);
+                self.dummy_fetch(bus);
+                return CpuState::RunningInterrupt(int_vector);
+            }
+        }
+
+        if self.enable_interrupt_next {
+            self.ime = true;
+            self.enable_interrupt_next = false;
+        }
+
+        let pc = self.reg_pc;
+        let mut instruction = Instruction::from_byte(self.fetch_next_pc(bus), pc);
+
+        if self.halt_mode == HaltMode::HaltBug {
+            self.halt_mode = HaltMode::NotHalting;
+            // do not add pc from the last fetch ^
+            self.reg_pc = pc;
+        }
+
+        if instruction.opcode == Opcode::Prefix {
+            instruction = Instruction::from_prefix(self.fetch_next_pc(bus), pc);
+        }
+
+        self.exec_instruction(instruction, bus)
     }
 }
 

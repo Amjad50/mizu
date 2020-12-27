@@ -70,7 +70,7 @@ mod acceptance {
         ei_sequence,
         ei_timing,
         halt_ime0_ei,
-        //halt_ime0_nointr_timing,
+        halt_ime0_nointr_timing,
         halt_ime1_timing,
         if_ie_registers,
         intr_timing,
