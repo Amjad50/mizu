@@ -150,6 +150,9 @@ pub struct Ppu {
 
     cycle: u16,
     scanline: u8,
+
+    /// track if the next frame is LCD still turning on
+    lcd_turned_on: bool,
 }
 
 impl Default for Ppu {
@@ -179,6 +182,7 @@ impl Default for Ppu {
             lcd: Lcd::default(),
             cycle: 4,
             scanline: 0,
+            lcd_turned_on: false,
         }
     }
 }
@@ -262,6 +266,9 @@ impl Ppu {
                     self.scanline = 0;
                     self.lcd_status.current_mode_set(0);
                     self.lcd.clear();
+
+                    // to function as soon as lcd is turned on
+                    self.lcd_turned_on = true;
                 }
             }
             0xFF41 => {
@@ -298,11 +305,16 @@ impl Ppu {
 
         // change modes depending on cycle
         match (self.scanline, self.cycle) {
-            (0, 0) => {
-                // change to mode 2 from mode 1
-                self.lcd_status.current_mode_set(2);
+            (0, 4) => {
+                // if the lcd is not just turning on, then switch to mode 2,
+                // when the lcd is turning on it will start here, but will keep
+                // mode 0
+                if !self.lcd_turned_on {
+                    // change to mode 2 from mode 1
+                    self.lcd_status.current_mode_set(2);
+                }
             }
-            (1..=143, 0) => {
+            (1..=143, 4) => {
                 // change to mode 2 from mode 0
                 self.lcd_status.current_mode_set(2);
             }
@@ -326,15 +338,19 @@ impl Ppu {
                 new_stat_int_happened =
                     new_stat_int_happened || self.lcd_status.mode_0_hblank_interrupt();
             }
-            1 => {
-                // also mode 2 interrupt if enabled
+            // TODO: check if apply to 144 or to 144-153
+            1 if self.cycle == 4 && self.scanline == 144 => {
+                // special: also mode 2 interrupt if enabled
                 new_stat_int_happened = new_stat_int_happened
                     || self.lcd_status.mode_1_vblank_interrupt()
                     || self.lcd_status.mode_2_oam_interrupt();
             }
-            // FIXME: mode2 timings
-            2 if self.cycle == 0 => self.load_selected_sprites_oam(),
-            2 => {
+            1 => {
+                new_stat_int_happened =
+                    new_stat_int_happened || self.lcd_status.mode_1_vblank_interrupt();
+            }
+            2 if self.cycle == 4 => {
+                self.load_selected_sprites_oam();
                 new_stat_int_happened =
                     new_stat_int_happened || self.lcd_status.mode_2_oam_interrupt();
             }
@@ -378,6 +394,8 @@ impl Ppu {
             }
             self.ly = self.scanline;
         }
+
+        self.lcd_turned_on = false;
     }
 }
 
