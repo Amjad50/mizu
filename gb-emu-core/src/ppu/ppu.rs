@@ -351,8 +351,13 @@ impl Ppu {
             }
             2 if self.cycle == 4 => {
                 self.load_selected_sprites_oam();
-                new_stat_int_happened =
-                    new_stat_int_happened || self.lcd_status.mode_2_oam_interrupt();
+
+                // execluded from the spcial case where mode2 interrupt happen
+                // at cycle 0, here it happens at cycle 4
+                if self.scanline == 0 {
+                    new_stat_int_happened =
+                        new_stat_int_happened || self.lcd_status.mode_2_oam_interrupt();
+                }
             }
             3 => {
                 for _ in 0..4 {
@@ -365,6 +370,11 @@ impl Ppu {
                 }
             }
             _ => {}
+        }
+
+        // special case where mode2 interrupt happen at cycle 0 instead of 4
+        if (1..=143).contains(&self.scanline) && self.cycle == 0 {
+            new_stat_int_happened = new_stat_int_happened || self.lcd_status.mode_2_oam_interrupt();
         }
 
         let new_coincidence = self.ly == self.lyc;

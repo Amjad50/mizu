@@ -118,7 +118,7 @@ mod acceptance {
             //intr_2_0_timing,
             //intr_2_mode0_timing,
             //intr_2_mode0_timing_sprites,
-            //intr_2_mode3_timing,
+            intr_2_mode3_timing,
             //intr_2_oam_ok_timing,
             //lcdon_timing-GS,
             //lcdon_write_timing-GS,
