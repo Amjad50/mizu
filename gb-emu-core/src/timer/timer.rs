@@ -29,7 +29,7 @@ impl TimerControl {
 pub struct Timer {
     divider: u16,
     timer_counter: u8,
-    timer_modulo: u8,
+    timer_reload: u8,
     timer_control: TimerControl,
     interrupt_next: bool,
     during_interrupt: bool,
@@ -40,7 +40,7 @@ impl Default for Timer {
         Self {
             divider: 0x0008, // divider value if boot_rom is present
             timer_counter: 0,
-            timer_modulo: 0,
+            timer_reload: 0,
             timer_control: TimerControl::from_bits_truncate(0),
             interrupt_next: false,
             during_interrupt: false,
@@ -60,7 +60,7 @@ impl Timer {
         match addr {
             0xFF04 => (self.divider >> 8) as u8,
             0xFF05 => self.timer_counter,
-            0xFF06 => self.timer_modulo,
+            0xFF06 => self.timer_reload,
             0xFF07 => self.timer_control.bits() | 0xF8,
             _ => unreachable!(),
         }
@@ -85,18 +85,18 @@ impl Timer {
                 // (and interrupt is triggered), then reload from the (TMA)
                 // and ignore `data`
                 self.timer_counter = if self.during_interrupt {
-                    self.timer_modulo
+                    self.timer_reload
                 } else {
                     data
                 };
             }
             0xFF06 => {
-                self.timer_modulo = data;
+                self.timer_reload = data;
 
                 // if TMA is written during the same cycle it is reloaded into
                 // the timer counter (TIMA), then reload TIMA as well
                 if self.during_interrupt {
-                    self.timer_counter = self.timer_modulo;
+                    self.timer_counter = self.timer_reload;
                 }
             }
             0xFF07 => {
@@ -123,7 +123,7 @@ impl Timer {
         if self.interrupt_next {
             interrupt.request_interrupt(InterruptType::Timer);
             self.interrupt_next = false;
-            self.timer_counter = self.timer_modulo;
+            self.timer_counter = self.timer_reload;
             self.during_interrupt = true;
         }
 
