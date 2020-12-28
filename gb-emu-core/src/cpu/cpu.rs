@@ -106,15 +106,6 @@ impl Cpu {
 
             if bus.check_interrupts() {
                 self.halt_mode = HaltMode::NotHalting;
-
-                if self.halt_mode == HaltMode::HaltRunInterrupt {
-                    if let Some(int_vector) = bus.get_interrupts() {
-                        self.stack_push(self.reg_pc, bus);
-                        self.reg_pc = int_vector as u16;
-                        self.ime = false;
-                    }
-                    return CpuState::Normal;
-                }
             } else {
                 return CpuState::Halting;
             }
