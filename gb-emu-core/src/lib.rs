@@ -5,6 +5,7 @@ mod cpu;
 mod joypad;
 mod memory;
 mod ppu;
+mod serial;
 mod timer;
 
 #[cfg(test)]

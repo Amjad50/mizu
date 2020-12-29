@@ -4,6 +4,7 @@ use crate::cartridge::Cartridge;
 use crate::cpu::CpuBusProvider;
 use crate::joypad::{Joypad, JoypadButton};
 use crate::ppu::Ppu;
+use crate::serial::Serial;
 use crate::timer::Timer;
 
 struct BootRom {
@@ -116,6 +117,7 @@ pub struct Bus {
     interrupts: Interrupts,
     timer: Timer,
     joypad: Joypad,
+    serial: Serial,
     dma: DMA,
     apu: Apu,
     hram: [u8; 127],
@@ -133,6 +135,7 @@ impl Bus {
             interrupts: Interrupts::default(),
             timer: Timer::new_skip_boot_rom(),
             joypad: Joypad::default(),
+            serial: Serial::default(),
             dma: DMA::default(),
             apu: Apu::new_skip_boot_rom(),
             hram: [0; 127],
@@ -181,6 +184,7 @@ impl Bus {
         self.apu.clock();
         self.timer.clock_divider(&mut self.interrupts);
         self.joypad.update_interrupts(&mut self.interrupts);
+        self.serial.clock(&mut self.interrupts);
 
         if self.dma.in_transfer {
             let value = self.read_not_ticked(self.dma.address, None);
@@ -210,8 +214,7 @@ impl Bus {
             (0xFE00..=0xFE9F, None) => self.ppu.read_oam(addr), // ppu oam
             (0xFEA0..=0xFEFF, _) => 0,                          // unused
             (0xFF00, _) => self.joypad.read_joypad(),           // joypad
-            (0xFF01, _) => 0,                                   // serial
-            (0xFF02, _) => 0x7E,                                // serial
+            (0xFF01..=0xFF02, _) => self.serial.read_register(addr), // serial
             (0xFF04..=0xFF07, _) => self.timer.read_register(addr), // divider and timer
             (0xFF0F, _) => self.interrupts.read_interrupt_flags(), // interrupts flags
             (0xFF10..=0xFF3F, _) => self.apu.read_register(addr), // apu
@@ -240,6 +243,7 @@ impl Bus {
             (0xFE00..=0xFE9F, None) => self.ppu.write_oam(addr, data), // ppu oam
             (0xFEA0..=0xFEFF, _) => {}                       // unused
             (0xFF00, _) => self.joypad.write_joypad(data),   // joypad
+            (0xFF01..=0xFF02, _) => self.serial.write_register(addr, data), // serial
             (0xFF04..=0xFF07, _) => self.timer.write_register(addr, data), // divider and timer
             (0xFF0F, _) => self.interrupts.write_interrupt_flags(data), // interrupts flags
             (0xFF10..=0xFF3F, _) => self.apu.write_register(addr, data), // apu
