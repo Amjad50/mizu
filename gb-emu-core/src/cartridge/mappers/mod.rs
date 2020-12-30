@@ -1,11 +1,13 @@
 mod mbc1;
 mod mbc2;
 mod mbc3;
+mod mbc5;
 mod no_mapper;
 
 pub(super) use mbc1::Mbc1;
 pub(super) use mbc2::Mbc2;
 pub(super) use mbc3::Mbc3;
+pub(super) use mbc5::Mbc5;
 pub(super) use no_mapper::NoMapper;
 
 #[derive(Debug, Clone, Copy)]

@@ -66,6 +66,20 @@ mod mbc2 {
 }
 
 #[allow(non_snake_case)]
+mod mbc5 {
+    mooneye_tests!("emulator-only/mbc5";
+        rom_16Mb,
+        rom_1Mb,
+        rom_2Mb,
+        rom_32Mb,
+        rom_4Mb,
+        rom_512kb,
+        rom_64Mb,
+        rom_8Mb
+    );
+}
+
+#[allow(non_snake_case)]
 mod acceptance {
     mooneye_tests!("acceptance";
         add_sp_e_timing,

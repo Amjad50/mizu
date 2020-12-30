@@ -170,6 +170,7 @@ impl CartridgeType {
             MapperType::Mbc1 { multicart } => Box::new(mappers::Mbc1::new(multicart)),
             MapperType::Mbc2 => Box::new(mappers::Mbc2::default()),
             MapperType::Mbc3 { timer } => Box::new(mappers::Mbc3::new(timer)),
+            MapperType::Mbc5 { rumble } => Box::new(mappers::Mbc5::new(rumble)),
             _ => return None,
         };
 
