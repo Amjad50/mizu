@@ -27,17 +27,17 @@ impl CartridgeType {
                 battery: false,
             }),
             1 => Some(Self {
-                mapper_type: MapperType::Mbc1,
+                mapper_type: MapperType::Mbc1 { multicart: false },
                 ram: false,
                 battery: false,
             }),
             2 => Some(Self {
-                mapper_type: MapperType::Mbc1,
+                mapper_type: MapperType::Mbc1 { multicart: false },
                 ram: true,
                 battery: false,
             }),
             3 => Some(Self {
-                mapper_type: MapperType::Mbc1,
+                mapper_type: MapperType::Mbc1 { multicart: false },
                 ram: true,
                 battery: true,
             }),
@@ -145,10 +145,29 @@ impl CartridgeType {
         }
     }
 
+    /// Checks if the cartridge is MBC1 multicart and update the `mapper` value
+    fn update_mbc1_multicart(&mut self, data: &[u8]) {
+        if let MapperType::Mbc1 { ref mut multicart } = self.mapper_type {
+            // Must be 8 MegaBits
+            if data.len() == 0x100000 {
+                for i in 0..=3 {
+                    let bank_start = i << 18;
+
+                    if &data[(bank_start + 0x104)..=(bank_start + 0x133)] != NINTENDO_LOGO_DATA {
+                        // Not multicart
+                        return;
+                    }
+                }
+                // If all checks pass
+                *multicart = true;
+            }
+        }
+    }
+
     fn get_mapper(&self) -> Option<Box<dyn Mapper>> {
         let mapper: Box<dyn Mapper> = match self.mapper_type {
             MapperType::NoMapper => Box::new(mappers::NoMapper::default()),
-            MapperType::Mbc1 => Box::new(mappers::Mbc1::default()),
+            MapperType::Mbc1 { multicart } => Box::new(mappers::Mbc1::new(multicart)),
             MapperType::Mbc2 => Box::new(mappers::Mbc2::default()),
             MapperType::Mbc3 { timer } => Box::new(mappers::Mbc3::new(timer)),
             _ => return None,
@@ -219,8 +238,11 @@ impl Cartridge {
 
         println!("gameboy type {:?}", gameboy_type);
 
-        let cartridge_type =
+        let mut cartridge_type =
             CartridgeType::from_byte(data[0x147]).ok_or(CartridgeError::InvalidCartridgeType)?;
+
+        // checks if its mbc1 multicart and update the mapper type
+        cartridge_type.update_mbc1_multicart(&data);
 
         let num_rom_banks = data[0x148];
         if num_rom_banks > 8 {

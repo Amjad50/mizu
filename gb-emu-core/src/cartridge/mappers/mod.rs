@@ -11,7 +11,7 @@ pub(super) use no_mapper::NoMapper;
 #[derive(Debug, Clone, Copy)]
 pub enum MapperType {
     NoMapper,
-    Mbc1,
+    Mbc1 { multicart: bool },
     Mbc2,
     Mbc3 { timer: bool },
     Mbc5 { rumble: bool },

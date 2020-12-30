@@ -36,9 +36,19 @@ macro_rules! mooneye_tests {
 #[allow(non_snake_case)]
 mod mbc1 {
     mooneye_tests!("emulator-only/mbc1";
-        bits_bank1, bits_ramg, ram_64kb, rom_2Mb, rom_8Mb, bits_bank2,
-        // multicart_rom_8Mb,
-        rom_16Mb, rom_4Mb, bits_mode, ram_256kb, rom_1Mb, rom_512kb
+        bits_bank1,
+        bits_ramg,
+        ram_64kb,
+        rom_2Mb,
+        rom_8Mb,
+        bits_bank2,
+        multicart_rom_8Mb,
+        rom_16Mb,
+        rom_4Mb,
+        bits_mode,
+        ram_256kb,
+        rom_1Mb,
+        rom_512kb
     );
 }
 

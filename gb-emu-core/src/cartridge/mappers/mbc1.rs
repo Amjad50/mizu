@@ -12,10 +12,12 @@ pub struct Mbc1 {
     ram_enable: bool,
 
     rom_bank1: u8,
+
+    multicart: bool,
 }
 
-impl Default for Mbc1 {
-    fn default() -> Self {
+impl Mbc1 {
+    pub fn new(multicart: bool) -> Self {
         Self {
             is_2k_ram: false,
             ram_banks: 0,
@@ -24,6 +26,18 @@ impl Default for Mbc1 {
             two_bit_bank2: 0,
             ram_enable: false,
             rom_bank1: 1,
+            multicart,
+        }
+    }
+}
+
+impl Mbc1 {
+    #[inline]
+    fn bank2_shift(&self) -> u8 {
+        if self.multicart {
+            4
+        } else {
+            5
         }
     }
 }
@@ -37,7 +51,7 @@ impl Mapper for Mbc1 {
 
     fn map_read_rom0(&self, addr: u16) -> usize {
         let bank = if self.mode {
-            (self.two_bit_bank2 << 5) % self.rom_banks as u8
+            (self.two_bit_bank2 << self.bank2_shift()) % self.rom_banks as u8
         } else {
             0
         } as usize;
@@ -48,7 +62,7 @@ impl Mapper for Mbc1 {
     fn map_read_romx(&self, addr: u16) -> usize {
         let addr = addr & 0x3FFF;
 
-        let bank = (self.rom_bank1 | (self.two_bit_bank2 << 5)) as usize;
+        let bank = (self.rom_bank1 | (self.two_bit_bank2 << self.bank2_shift())) as usize;
         let bank = bank % self.rom_banks as usize;
 
         bank as usize * 0x4000 + addr as usize
@@ -84,6 +98,13 @@ impl Mapper for Mbc1 {
                 if data == 0 {
                     data = 1;
                 }
+
+                // For some reason the & is done after, so when bank1
+                // is supplied with 0x10 (16) it will become 0 and not 1
+                if self.multicart {
+                    data &= 0xF;
+                }
+
                 self.rom_bank1 = data;
             }
             0x4000..=0x5FFF => {
