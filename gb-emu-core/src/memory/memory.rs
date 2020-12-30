@@ -39,7 +39,12 @@ struct DMA {
 }
 
 impl DMA {
-    fn start_dma(&mut self, high_byte: u8) {
+    fn start_dma(&mut self, mut high_byte: u8) {
+        // addresses changed from internal bus into external bus
+        if high_byte == 0xFE || high_byte == 0xFF {
+            high_byte &= 0xDF;
+        }
+
         self.address = (high_byte as u16) << 8;
 
         // 8 T-cycles here for delay instead of 4, this is to ensure correct

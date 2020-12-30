@@ -130,8 +130,9 @@ mod acceptance {
 
     mod oam_dma {
         mooneye_tests!("acceptance/oam_dma";
-            basic, reg_read,
-            //sources-GS
+            basic,
+            reg_read,
+            sources-GS
         );
     }
 
