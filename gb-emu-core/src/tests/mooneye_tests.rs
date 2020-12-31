@@ -141,7 +141,7 @@ mod acceptance {
             //hblank_ly_scx_timing-GS,
             intr_1_2_timing-GS,
             //intr_2_0_timing,
-            //intr_2_mode0_timing,
+            intr_2_mode0_timing,
             //intr_2_mode0_timing_sprites,
             intr_2_mode3_timing,
             //intr_2_oam_ok_timing,

@@ -117,6 +117,38 @@ impl LcdStatus {
     }
 }
 
+#[derive(Default)]
+struct Fetcher {
+    delay_counter: u8,
+    data: Option<[u8; 8]>,
+    x: u8,
+}
+
+impl Fetcher {
+    fn cycle(&mut self) -> bool {
+        self.delay_counter = self.delay_counter.saturating_sub(1);
+        if self.delay_counter == 0 {
+            self.reset();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn push(&mut self, data: [u8; 8]) {
+        self.x += 1;
+        self.data = Some(data);
+    }
+
+    fn pop(&mut self) -> Option<[u8; 8]> {
+        self.data.take()
+    }
+
+    fn reset(&mut self) {
+        self.delay_counter = 8;
+    }
+}
+
 pub struct Ppu {
     lcd_control: LcdControl,
     lcd_status: LcdStatus,
@@ -140,7 +172,7 @@ pub struct Ppu {
     selected_oam_size: u8,
 
     fine_scroll_x_discard: u8,
-    fetcher_x: u8,
+    fetcher: Fetcher,
     is_drawing_window: bool,
     window_y_counter: u8,
 
@@ -175,7 +207,7 @@ impl Default for Ppu {
             selected_oam: [Sprite::default(); 10],
             selected_oam_size: 0,
             fine_scroll_x_discard: 0,
-            fetcher_x: 0,
+            fetcher: Fetcher::default(),
             is_drawing_window: false,
             window_y_counter: 0,
             fifo: Fifo::default(),
@@ -314,13 +346,14 @@ impl Ppu {
                     self.lcd_status.current_mode_set(2);
                 }
             }
-            (1..=143, 4) => {
+            (1..=143, 0) => {
                 // change to mode 2 from mode 0
                 self.lcd_status.current_mode_set(2);
             }
             (0..=143, 80) => {
                 // change to mode 3 from mode 2
                 self.fine_scroll_x_discard = self.scroll_x & 0x7;
+                self.fetcher.reset();
                 self.lcd_status.current_mode_set(3);
             }
             (144, 4) => {
@@ -349,6 +382,10 @@ impl Ppu {
                 new_stat_int_happened =
                     new_stat_int_happened || self.lcd_status.mode_1_vblank_interrupt();
             }
+            2 if self.cycle == 0 => {
+                new_stat_int_happened =
+                    new_stat_int_happened || self.lcd_status.mode_2_oam_interrupt();
+            }
             2 if self.cycle == 4 => {
                 self.load_selected_sprites_oam();
 
@@ -370,11 +407,6 @@ impl Ppu {
                 }
             }
             _ => {}
-        }
-
-        // special case where mode2 interrupt happen at cycle 0 instead of 4
-        if (1..=143).contains(&self.scanline) && self.cycle == 0 {
-            new_stat_int_happened = new_stat_int_happened || self.lcd_status.mode_2_oam_interrupt();
         }
 
         let new_coincidence = self.ly == self.lyc;
@@ -415,12 +447,24 @@ impl Ppu {
     fn draw(&mut self) -> bool {
         self.try_enter_window();
 
+        if self.fetcher.cycle() {
+            let bg = self.fetch_bg();
+            self.fetcher.push(bg);
+        }
+
+        if self.fifo.len() <= 8 {
+            if let Some(data) = self.fetcher.pop() {
+                self.fifo.push_bg(data);
+            }
+        }
+
         if self.fifo.len() > 8 {
+            self.try_add_sprite();
+
             if self.fine_scroll_x_discard > 0 {
                 self.fine_scroll_x_discard -= 1;
                 self.fifo.pop();
             } else {
-                self.try_add_sprite();
                 let (color, palette) = self.fifo.pop();
 
                 self.lcd.push(self.get_color(color, palette), self.scanline);
@@ -429,8 +473,6 @@ impl Ppu {
                     return true;
                 }
             }
-        } else {
-            self.fill_bg_fifo();
         }
 
         false
@@ -451,12 +493,12 @@ impl Ppu {
         let tile_map;
 
         if self.is_drawing_window {
-            tile_x = self.fetcher_x;
+            tile_x = self.fetcher.x;
             tile_y = self.window_y_counter;
 
             tile_map = self.lcd_control.window_tilemap();
         } else {
-            tile_x = ((self.scroll_x / 8) + self.fetcher_x) & 0x1F;
+            tile_x = ((self.scroll_x / 8) + self.fetcher.x) & 0x1F;
             tile_y = self.scanline.wrapping_add(self.scroll_y);
 
             tile_map = self.lcd_control.bg_tilemap();
@@ -510,19 +552,13 @@ impl Ppu {
         result
     }
 
-    fn fill_bg_fifo(&mut self) {
-        let bg_colors;
-
+    fn fetch_bg(&mut self) -> [u8; 8] {
         if self.lcd_control.bg_window_priority() {
             let (tile, y) = self.get_bg_window_tile_and_y();
-            bg_colors = self.get_bg_pattern(tile, y % 8);
-        } else {
-            bg_colors = [0; 8];
-        }
 
-        if self.fifo.len() <= 8 {
-            self.fifo.push_bg(bg_colors);
-            self.fetcher_x += 1;
+            self.get_bg_pattern(tile, y % 8)
+        } else {
+            [0; 8]
         }
     }
 
@@ -596,7 +632,7 @@ impl Ppu {
             }
             // start window drawing
             self.fifo.clear();
-            self.fetcher_x = 0;
+            self.fetcher.x = 0;
             self.is_drawing_window = true;
         }
     }
@@ -606,7 +642,7 @@ impl Ppu {
         self.lcd.next_line();
         // clear for the next line
         self.fifo.clear();
-        self.fetcher_x = 0;
+        self.fetcher.x = 0;
         if self.is_drawing_window {
             self.window_y_counter += 1;
         }

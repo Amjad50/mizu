@@ -22,8 +22,7 @@ gb_tests!(
 
 );
 
-//#[test]
-//failing test
+#[test]
 #[allow(dead_code)]
 fn statcount_auto() {
     let mut gb =
