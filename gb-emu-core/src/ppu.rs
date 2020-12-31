@@ -1,8 +1,12 @@
-use super::fifo::{Fifo, PaletteType};
-use super::lcd::Lcd;
-use super::sprite::Sprite;
+mod fifo;
+mod lcd;
+mod sprite;
+
 use crate::memory::{InterruptManager, InterruptType};
 use bitflags::bitflags;
+use fifo::{Fifo, PaletteType};
+use lcd::Lcd;
+use sprite::Sprite;
 
 bitflags! {
     struct LcdControl: u8 {

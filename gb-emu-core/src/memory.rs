@@ -1,4 +1,7 @@
-use super::interrupts::{InterruptType, Interrupts};
+mod interrupts;
+
+pub use interrupts::{InterruptManager, InterruptType};
+
 use crate::apu::Apu;
 use crate::cartridge::Cartridge;
 use crate::cpu::CpuBusProvider;
@@ -6,6 +9,7 @@ use crate::joypad::{Joypad, JoypadButton};
 use crate::ppu::Ppu;
 use crate::serial::Serial;
 use crate::timer::Timer;
+use interrupts::Interrupts;
 
 struct BootRom {
     enabled: bool,

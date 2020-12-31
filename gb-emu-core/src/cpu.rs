@@ -1,8 +1,19 @@
-use super::instruction::{Condition, Instruction, Opcode, OperandType};
-use super::CpuBusProvider;
-use super::InterruptType;
+pub mod instruction;
+mod instructions_table;
 
 use bitflags::bitflags;
+
+use crate::memory::InterruptType;
+use instruction::{Condition, Instruction, Opcode, OperandType};
+
+pub trait CpuBusProvider {
+    fn read(&mut self, addr: u16) -> u8;
+    fn write(&mut self, addr: u16, data: u8);
+
+    fn take_next_interrupt(&mut self) -> Option<InterruptType>;
+    fn peek_next_interrupt(&mut self) -> Option<InterruptType>;
+    fn check_interrupts(&self) -> bool;
+}
 
 const INTERRUPTS_VECTOR: [u16; 5] = [0x40, 0x48, 0x50, 0x58, 0x60];
 

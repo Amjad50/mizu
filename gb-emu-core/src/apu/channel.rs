@@ -1,12 +1,4 @@
-mod apu;
-mod envelope;
-mod noise_channel;
-mod pulse_channel;
-mod wave_channel;
-
-pub use apu::Apu;
-
-trait ApuChannel {
+pub trait ApuChannel {
     fn output(&mut self) -> u8;
     fn muted(&self) -> bool;
     fn set_enable(&mut self, enabled: bool);
@@ -16,7 +8,7 @@ trait ApuChannel {
     fn trigger(&mut self);
 }
 
-struct LengthCountedChannel<C: ApuChannel> {
+pub struct LengthCountedChannel<C: ApuChannel> {
     // FIXME: re-order the organization of apu channels,
     //  `dac_enable`, should not be here like this
     //dac_enable: bool,
@@ -127,7 +119,7 @@ impl<C: ApuChannel> ApuChannel for LengthCountedChannel<C> {
     }
 }
 
-struct Dac<C: ApuChannel> {
+pub struct Dac<C: ApuChannel> {
     capacitor: f32,
     channel: C,
 }

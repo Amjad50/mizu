@@ -1,8 +1,14 @@
-use super::noise_channel::NoiseChannel;
-use super::pulse_channel::PulseChannel;
-use super::wave_channel::WaveChannel;
-use super::{ApuChannel, Dac, LengthCountedChannel};
+mod channel;
+mod envelope;
+mod noise_channel;
+mod pulse_channel;
+mod wave_channel;
+
 use bitflags::bitflags;
+use channel::{ApuChannel, Dac, LengthCountedChannel};
+use noise_channel::NoiseChannel;
+use pulse_channel::PulseChannel;
+use wave_channel::WaveChannel;
 
 bitflags! {
     struct ChannelsControl: u8 {

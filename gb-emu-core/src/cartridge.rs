@@ -1,6 +1,10 @@
-use super::error::{CartridgeError, SramError};
-use super::mappers;
-use super::mappers::{Mapper, MapperType, MappingResult};
+mod error;
+mod mappers;
+
+pub use error::CartridgeError;
+
+use error::SramError;
+use mappers::{Mapper, MapperType, MappingResult};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
