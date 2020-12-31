@@ -50,15 +50,13 @@ fn print_screen_buffer(buffer: &[u8]) {
     const TV_WIDTH: u32 = 160;
     const TV_HEIGHT: u32 = 144;
 
+    let brightness_ascii = &[' ', '.', ':', '#'];
+
     for i in 0..TV_HEIGHT as usize {
         for j in 0..TV_WIDTH as usize {
             print!(
                 "{}",
-                if buffer[i * TV_WIDTH as usize + j] == 0 {
-                    0
-                } else {
-                    1
-                }
+                brightness_ascii[(buffer[i * TV_WIDTH as usize + j] / 85) as usize]
             )
         }
         println!()

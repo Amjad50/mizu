@@ -11,7 +11,6 @@ gb_tests!(
     "scribbltests/lycscy/lycscy.gb",
     16456385004234895650;
 
-    // FIXME: this test require 4 color support, in testing we only have 2
     palettely,
     "scribbltests/palettely/palettely.gb",
     4766554184901124846;
