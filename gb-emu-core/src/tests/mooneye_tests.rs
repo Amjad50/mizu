@@ -125,7 +125,7 @@ mod acceptance {
     }
 
     mod interrupts {
-        // mooneye_tests!("acceptance/interrupts"; ie_push);
+        mooneye_tests!("acceptance/interrupts"; ie_push);
     }
 
     mod oam_dma {

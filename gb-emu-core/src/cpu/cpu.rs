@@ -1,7 +1,10 @@
 use super::instruction::{Condition, Instruction, Opcode, OperandType};
 use super::CpuBusProvider;
+use super::InterruptType;
 
 use bitflags::bitflags;
+
+const INTERRUPTS_VECTOR: [u16; 5] = [0x40, 0x48, 0x50, 0x58, 0x60];
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct CpuRegisters {
@@ -22,7 +25,7 @@ pub enum CpuState {
     Normal,
     InfiniteLoop,
     Halting,
-    RunningInterrupt(u8),
+    RunningInterrupt(InterruptType),
     Breakpoint(CpuRegisters),
 }
 
@@ -112,16 +115,34 @@ impl Cpu {
         }
 
         if self.ime && bus.check_interrupts() {
-            if let Some(int_vector) = bus.get_interrupts() {
-                self.stack_push(self.reg_pc, bus);
-                self.reg_pc = int_vector as u16;
+            if bus.peek_next_interrupt().is_some() {
+                let mut cpu_state = CpuState::Normal;
+
+                let pc = self.reg_pc;
+
+                // Push PC part 1
+                self.reg_sp = self.reg_sp.wrapping_sub(1);
+                bus.write(self.reg_sp, (pc >> 8) as u8);
+
+                if let Some(int_type) = bus.take_next_interrupt() {
+                    cpu_state = CpuState::RunningInterrupt(int_type);
+                    self.reg_pc = INTERRUPTS_VECTOR[int_type as usize];
+                } else {
+                    // Interrupt cancelled
+                    self.reg_pc = 0;
+                }
+
                 self.ime = false;
+
+                // Push PC part 2
+                self.reg_sp = self.reg_sp.wrapping_sub(1);
+                bus.write(self.reg_sp, pc as u8);
 
                 // delay for interrupt
                 self.dummy_fetch(bus);
                 self.dummy_fetch(bus);
                 self.dummy_fetch(bus);
-                return CpuState::RunningInterrupt(int_vector);
+                return cpu_state;
             }
         }
 

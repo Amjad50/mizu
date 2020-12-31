@@ -1,14 +1,28 @@
 use bitflags::bitflags;
-use std::convert::From;
+use std::convert::{From, TryFrom};
 
-const INTERRUPTS_VECTOR: [u8; 5] = [0x40, 0x48, 0x50, 0x58, 0x60];
-
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum InterruptType {
     Vblank,
     LcdStat,
     Timer,
     Serial,
     Joypad,
+}
+
+impl TryFrom<u8> for InterruptType {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Vblank),
+            1 => Ok(Self::LcdStat),
+            2 => Ok(Self::Timer),
+            3 => Ok(Self::Serial),
+            4 => Ok(Self::Joypad),
+            _ => Err(()),
+        }
+    }
 }
 
 pub trait InterruptManager {
@@ -76,7 +90,13 @@ impl Interrupts {
         self.requested.bits() & self.enabled.bits() & 0x1F != 0
     }
 
-    pub fn get_highest_interrupt_addr_and_ack(&mut self) -> Option<u8> {
+    pub fn acknowledge_interrupt(&mut self, interrupt: InterruptType) {
+        assert!(self.requested.contains(interrupt.into()));
+
+        self.requested.remove(interrupt.into());
+    }
+
+    pub fn get_highest_interrupt(&mut self) -> Option<InterruptType> {
         if self.requested.bits() & 0x1F == 0 {
             None
         } else {
@@ -84,10 +104,7 @@ impl Interrupts {
             let mut counter = 0;
             while bits != 0 {
                 if bits & 1 == 1 {
-                    self.requested
-                        .remove(InterruptsFlags::from_bits_truncate(1 << counter));
-
-                    return Some(INTERRUPTS_VECTOR[counter]);
+                    return Some(InterruptType::try_from(counter).unwrap());
                 }
                 counter += 1;
                 bits >>= 1;

@@ -1,4 +1,4 @@
-use super::interrupts::Interrupts;
+use super::interrupts::{InterruptType, Interrupts};
 use crate::apu::Apu;
 use crate::cartridge::Cartridge;
 use crate::cpu::CpuBusProvider;
@@ -276,8 +276,17 @@ impl CpuBusProvider for Bus {
         self.on_cpu_machine_cycle();
     }
 
-    fn get_interrupts(&mut self) -> Option<u8> {
-        self.interrupts.get_highest_interrupt_addr_and_ack()
+    // gets the interrupt type and remove it
+    fn take_next_interrupt(&mut self) -> Option<InterruptType> {
+        let int = self.interrupts.get_highest_interrupt();
+        if let Some(int) = int {
+            self.interrupts.acknowledge_interrupt(int);
+        }
+        int
+    }
+
+    fn peek_next_interrupt(&mut self) -> Option<InterruptType> {
+        self.interrupts.get_highest_interrupt()
     }
 
     fn check_interrupts(&self) -> bool {
