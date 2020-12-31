@@ -126,35 +126,33 @@ impl Cpu {
         }
 
         if self.ime && bus.check_interrupts() {
-            if bus.peek_next_interrupt().is_some() {
-                let mut cpu_state = CpuState::Normal;
+            let mut cpu_state = CpuState::Normal;
 
-                let pc = self.reg_pc;
+            let pc = self.reg_pc;
 
-                // Push PC part 1
-                self.reg_sp = self.reg_sp.wrapping_sub(1);
-                bus.write(self.reg_sp, (pc >> 8) as u8);
+            // Push PC part 1
+            self.reg_sp = self.reg_sp.wrapping_sub(1);
+            bus.write(self.reg_sp, (pc >> 8) as u8);
 
-                if let Some(int_type) = bus.take_next_interrupt() {
-                    cpu_state = CpuState::RunningInterrupt(int_type);
-                    self.reg_pc = INTERRUPTS_VECTOR[int_type as usize];
-                } else {
-                    // Interrupt cancelled
-                    self.reg_pc = 0;
-                }
-
-                self.ime = false;
-
-                // Push PC part 2
-                self.reg_sp = self.reg_sp.wrapping_sub(1);
-                bus.write(self.reg_sp, pc as u8);
-
-                // delay for interrupt
-                self.dummy_fetch(bus);
-                self.dummy_fetch(bus);
-                self.dummy_fetch(bus);
-                return cpu_state;
+            if let Some(int_type) = bus.take_next_interrupt() {
+                cpu_state = CpuState::RunningInterrupt(int_type);
+                self.reg_pc = INTERRUPTS_VECTOR[int_type as usize];
+            } else {
+                // Interrupt cancelled
+                self.reg_pc = 0;
             }
+
+            self.ime = false;
+
+            // Push PC part 2
+            self.reg_sp = self.reg_sp.wrapping_sub(1);
+            bus.write(self.reg_sp, pc as u8);
+
+            // delay for interrupt
+            self.dummy_fetch(bus);
+            self.dummy_fetch(bus);
+            self.dummy_fetch(bus);
+            return cpu_state;
         }
 
         if self.enable_interrupt_next {
