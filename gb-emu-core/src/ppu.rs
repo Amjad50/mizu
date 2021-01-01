@@ -1,12 +1,14 @@
+mod bg_attribs;
 mod colors;
 mod fifo;
 mod lcd;
 mod sprite;
 
 use crate::memory::{InterruptManager, InterruptType};
+use bg_attribs::BgAttribute;
 use bitflags::bitflags;
 use colors::{Color, ColorPalette, ColorPalettesCollection};
-use fifo::{Fifo, PaletteType};
+use fifo::Fifo;
 use lcd::Lcd;
 use sprite::Sprite;
 
@@ -126,7 +128,7 @@ impl LcdStatus {
 #[derive(Default)]
 struct Fetcher {
     delay_counter: u8,
-    data: Option<[u8; 8]>,
+    data: Option<([u8; 8], BgAttribute)>,
     x: u8,
 }
 
@@ -141,12 +143,12 @@ impl Fetcher {
         }
     }
 
-    fn push(&mut self, data: [u8; 8]) {
+    fn push(&mut self, data: [u8; 8], attribs: BgAttribute) {
         self.x += 1;
-        self.data = Some(data);
+        self.data = Some((data, attribs));
     }
 
-    fn pop(&mut self) -> Option<[u8; 8]> {
+    fn pop(&mut self) -> Option<([u8; 8], BgAttribute)> {
         self.data.take()
     }
 
@@ -489,13 +491,17 @@ impl Ppu {
         self.try_enter_window();
 
         if self.fetcher.cycle() {
-            let bg = self.fetch_bg();
-            self.fetcher.push(bg);
+            let (bg, attribs) = self.fetch_bg();
+            self.fetcher.push(bg, attribs);
         }
 
         if self.fifo.len() <= 8 {
-            if let Some(data) = self.fetcher.pop() {
-                self.fifo.push_bg(data);
+            if let Some((pixels, attribs)) = self.fetcher.pop() {
+                self.fifo.push_bg(
+                    pixels,
+                    self.bg_palettes.get_palette(attribs.palette()),
+                    attribs.priority(),
+                );
             }
         }
 
@@ -519,16 +525,11 @@ impl Ppu {
         false
     }
 
-    fn get_color(&self, color: u8, palette_type: PaletteType) -> u8 {
-        let palette = match palette_type {
-            PaletteType::Sprite(index) => self.sprite_palette[index as usize],
-            PaletteType::Background => self.bg_palette,
-        };
-
-        (palette >> (2 * color)) & 0b11
+    fn get_color(&self, color_index: u8, palette: ColorPalette) -> Color {
+        palette.get_color(color_index)
     }
 
-    fn get_bg_window_tile_and_y(&mut self) -> (u8, u8) {
+    fn get_bg_window_tile_and_y(&mut self) -> (u8, BgAttribute, u8) {
         let tile_x;
         let tile_y;
         let tile_map;
@@ -545,16 +546,18 @@ impl Ppu {
             tile_map = self.lcd_control.bg_tilemap();
         }
 
-        (self.get_tile(tile_map, tile_x, tile_y / 8), tile_y)
+        let tile_index = self.get_tile_index(tile_x, tile_y / 8);
+        let tile = self.vram[(tile_map + tile_index) as usize];
+        let tile_attribs = BgAttribute::new(self.vram[0x2000 + (tile_map + tile_index) as usize]);
+
+        (tile, tile_attribs, tile_y)
     }
 
-    fn get_tile(&self, tile_map: u16, tile_x: u8, tile_y: u8) -> u8 {
-        let index = tile_y as usize * 32 + tile_x as usize;
-
-        self.vram[tile_map as usize + index]
+    fn get_tile_index(&self, tile_x: u8, tile_y: u8) -> u16 {
+        tile_y as u16 * 32 + tile_x as u16
     }
 
-    fn get_bg_pattern(&self, tile: u8, y: u8) -> [u8; 8] {
+    fn get_bg_pattern(&self, tile: u8, y: u8, bank: u8) -> [u8; 8] {
         let pattern_table = self.lcd_control.bg_window_pattern_table_base();
 
         let index = if self.lcd_control.bg_window_pattern_table_block_1() {
@@ -564,24 +567,24 @@ impl Ppu {
             pattern_table + (tile as u16) * 16
         };
 
-        self.get_tile_pattern_from_index(index, y)
+        self.get_tile_pattern_from_index(index, y, bank)
     }
 
-    fn get_sprite_pattern(&self, mut tile: u8, y: u8) -> [u8; 8] {
+    fn get_sprite_pattern(&self, mut tile: u8, y: u8, bank: u8) -> [u8; 8] {
         if self.lcd_control.sprite_size() == 16 {
             tile &= 0xFE;
         }
 
         let index = tile as u16 * 16;
 
-        self.get_tile_pattern_from_index(index, y)
+        self.get_tile_pattern_from_index(index, y, bank)
     }
 
-    fn get_tile_pattern_from_index(&self, index: u16, y: u8) -> [u8; 8] {
+    fn get_tile_pattern_from_index(&self, index: u16, y: u8, bank: u8) -> [u8; 8] {
         let index = index as usize;
 
-        let low = self.vram[index + (y as usize) * 2];
-        let high = self.vram[index + (y as usize) * 2 + 1];
+        let low = self.vram[(bank as usize * 0x2000) + index + ((y as usize) * 2)];
+        let high = self.vram[(bank as usize * 0x2000) + index + ((y as usize) * 2 + 1)];
 
         let mut result = [0; 8];
 
@@ -593,14 +596,22 @@ impl Ppu {
         result
     }
 
-    fn fetch_bg(&mut self) -> [u8; 8] {
-        if self.lcd_control.bg_window_priority() {
-            let (tile, y) = self.get_bg_window_tile_and_y();
+    fn fetch_bg(&mut self) -> ([u8; 8], BgAttribute) {
+        let (tile, attribs, y) = self.get_bg_window_tile_and_y();
 
-            self.get_bg_pattern(tile, y % 8)
+        let y = if attribs.is_vertical_flip() {
+            7 - (y % 8)
         } else {
-            [0; 8]
+            y % 8
+        };
+
+        let mut pattern = self.get_bg_pattern(tile, y, attribs.bank());
+
+        if attribs.is_horizontal_flip() {
+            pattern.reverse();
         }
+
+        (pattern, attribs)
     }
 
     fn load_selected_sprites_oam(&mut self) {
@@ -635,7 +646,7 @@ impl Ppu {
                         y = (self.lcd_control.sprite_size() - 1) - y;
                     }
 
-                    let mut colors = self.get_sprite_pattern(sprite.tile(), y);
+                    let mut colors = self.get_sprite_pattern(sprite.tile(), y, sprite.bank());
 
                     if sprite.x_flipped() {
                         colors.reverse();
@@ -650,8 +661,12 @@ impl Ppu {
                         }
                     }
 
-                    self.fifo
-                        .mix_sprite(colors, sprite.palette_selector(), sprite.bg_priority())
+                    self.fifo.mix_sprite(
+                        colors,
+                        self.sprite_palettes.get_palette(sprite.cgb_palette()),
+                        sprite.bg_priority(),
+                        !self.lcd_control.bg_window_priority(),
+                    )
                 }
             }
         }

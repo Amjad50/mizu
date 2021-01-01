@@ -153,10 +153,10 @@ fn main() {
 }
 
 fn convert_to_rgba(data: &[u8], output: &mut [u8]) {
-    for (pixel_chunk, &pixel_color) in output.chunks_mut(4).zip(data.iter()) {
-        let reduced = (pixel_color as f32 * 0.8) as u8;
-        pixel_chunk[0] = reduced;
-        pixel_chunk[1] = pixel_color;
-        pixel_chunk[2] = reduced;
+    for (dest, src) in output.chunks_mut(4).zip(data.chunks(3)) {
+        dest[0] = (src[0] as f32 * 8.2) as u8;
+        dest[1] = (src[1] as f32 * 8.2) as u8;
+        dest[2] = (src[2] as f32 * 8.2) as u8;
+        dest[3] = 0xFF;
     }
 }

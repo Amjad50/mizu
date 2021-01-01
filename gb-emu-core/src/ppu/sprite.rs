@@ -3,11 +3,12 @@ use bitflags::bitflags;
 bitflags! {
     #[derive(Default)]
     struct SpriteFlags: u8 {
-        const PRIORITY = 1 << 7;
-        const Y_FLIP   = 1 << 6;
-        const X_FLIP   = 1 << 5;
-        const PALLETE  = 1 << 4;
-        const UNUSED   = 0xF;
+        const PRIORITY    = 1 << 7;
+        const Y_FLIP      = 1 << 6;
+        const X_FLIP      = 1 << 5;
+        const PALLETE     = 1 << 4;
+        const BANK        = 1 << 3;
+        const CGB_PALETTE = 0b111;
     }
 }
 
@@ -64,6 +65,7 @@ impl Sprite {
         self.tile
     }
 
+    // TODO: should be used in DMG mode
     pub fn palette_selector(&self) -> u8 {
         self.flags.intersects(SpriteFlags::PALLETE) as u8
     }
@@ -79,5 +81,13 @@ impl Sprite {
 
     pub fn x_flipped(&self) -> bool {
         self.flags.intersects(SpriteFlags::X_FLIP)
+    }
+
+    pub fn cgb_palette(&self) -> u8 {
+        self.flags.bits() & SpriteFlags::CGB_PALETTE.bits
+    }
+
+    pub fn bank(&self) -> u8 {
+        self.flags.contains(SpriteFlags::BANK) as u8
     }
 }
