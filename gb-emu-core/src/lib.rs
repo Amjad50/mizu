@@ -7,8 +7,9 @@ mod ppu;
 mod serial;
 mod timer;
 
-#[cfg(test)]
-mod tests;
+//#[cfg(test)]
+//TODO: re enable tests once the CGB implementation is finished
+//mod tests;
 
 use cartridge::{Cartridge, CartridgeError};
 use cpu::Cpu;
@@ -34,7 +35,7 @@ impl GameBoy {
 
         let (bus, cpu) = if let Some(boot_rom_file) = boot_rom_file {
             let mut boot_rom_file = File::open(boot_rom_file)?;
-            let mut data = [0; 0x100];
+            let mut data = [0; 0x900];
             boot_rom_file.read_exact(&mut data)?;
 
             (Bus::new_with_boot_rom(cartridge, data), Cpu::new())

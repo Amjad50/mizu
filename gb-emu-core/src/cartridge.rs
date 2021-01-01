@@ -198,7 +198,7 @@ impl Cartridge {
             .extension()
             .ok_or(CartridgeError::ExtensionError)?;
 
-        if extension != "gb" {
+        if extension != "gbc" && extension != "gb" {
             return Err(CartridgeError::ExtensionError);
         }
 
@@ -235,9 +235,11 @@ impl Cartridge {
         )
         .map_err(|_| CartridgeError::InvalidGameTitle)?;
 
-        let gameboy_type = if data[0x143] == 0x80 {
+        let gameboy_type = if data[0x143] & 0x80 != 0 {
             GameBoyType::Color
         } else {
+            //TODO: remove this when color is fully implemented and can run DMG roms
+            panic!("This is color only");
             GameBoyType::NonColor
         };
 
