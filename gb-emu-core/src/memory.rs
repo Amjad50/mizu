@@ -240,9 +240,24 @@ impl Bus {
             (0xFF0F, _) => self.interrupts.read_interrupt_flags(), // interrupts flags
             (0xFF10..=0xFF3F, _) => self.apu.read_register(addr), // apu
             (0xFF40..=0xFF45, _) | (0xFF47..=0xFF4B, _) => self.ppu.read_register(addr), // ppu io registers
-            (0xFF46, _) => self.dma.read(),           // dma start
-            (0xFF4F, _) => self.ppu.get_vram_bank(),  // vram bank
-            (0xFF50, _) => 0xFF,                      // boot rom stop
+            (0xFF46, _) => self.dma.read(), // dma start
+            (0xFF4D, _) => {
+                todo!("CGB speed switch");
+            }
+            (0xFF4F, _) => self.ppu.get_vram_bank(), // vram bank
+            (0xFF50, _) => 0xFF,                     // boot rom stop
+            (0xFF51..=0xFF55, _) => {
+                todo!("HDMA");
+            }
+            (0xFF56, _) => {
+                todo!("RP port");
+            }
+            (0xFF68..=0xFF69, _) | (0xFF6A..=0xFF6B, _) => {
+                self.ppu.read_color_register(addr) // ppu colors
+            }
+            (0xFF6C, _) => {
+                todo!("object priority mode 1 for OAM 0 for coord (DMG style)");
+            }
             (0xFF70, _) => self.wram.get_wram_bank(), // wram bank
             (0xFF80..=0xFFFE, _) => self.hram[addr as usize & 0x7F], // hram
             (0xFFFF, _) => self.interrupts.read_interrupt_enable(), //interrupts enable
@@ -272,8 +287,24 @@ impl Bus {
             (0xFF10..=0xFF3F, _) => self.apu.write_register(addr, data), // apu
             (0xFF40..=0xFF45, _) | (0xFF47..=0xFF4B, _) => self.ppu.write_register(addr, data), // ppu io registers
             (0xFF46, _) => self.dma.start_dma(data), // dma start
+            (0xFF4D, _) => {
+                todo!("CGB speed switch");
+            }
             (0xFF4F, _) => self.ppu.set_vram_bank(data), // vram bank
             (0xFF50, _) => self.boot_rom.enabled = false, // boot rom stop
+            (0xFF51..=0xFF55, _) => {
+                //looks like its needed, but not sure where since the bios looks normal
+                //todo!("HDMA");
+            }
+            (0xFF56, _) => {
+                todo!("RP port");
+            }
+            (0xFF68..=0xFF69, _) | (0xFF6A..=0xFF6B, _) => {
+                self.ppu.write_color_register(addr, data); // ppu colors
+            }
+            (0xFF6C, _) => {
+                todo!("object priority mode 1 for OAM 0 for coord (DMG style)");
+            }
             (0xFF70, _) => self.wram.set_wram_bank(data), // wram bank
             (0xFF80..=0xFFFE, _) => self.hram[addr as usize & 0x7F] = data, // hram
             (0xFFFF, _) => self.interrupts.write_interrupt_enable(data), // interrupts enable

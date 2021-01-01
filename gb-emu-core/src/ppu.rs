@@ -1,9 +1,11 @@
+mod colors;
 mod fifo;
 mod lcd;
 mod sprite;
 
 use crate::memory::{InterruptManager, InterruptType};
 use bitflags::bitflags;
+use colors::{Color, ColorPalette, ColorPalettesCollection};
 use fifo::{Fifo, PaletteType};
 use lcd::Lcd;
 use sprite::Sprite;
@@ -176,6 +178,9 @@ pub struct Ppu {
     selected_oam: [Sprite; 10],
     selected_oam_size: u8,
 
+    bg_palettes: ColorPalettesCollection,
+    sprite_palettes: ColorPalettesCollection,
+
     fine_scroll_x_discard: u8,
     fetcher: Fetcher,
     is_drawing_window: bool,
@@ -212,6 +217,8 @@ impl Default for Ppu {
             oam: [Sprite::default(); 40],
             selected_oam: [Sprite::default(); 10],
             selected_oam_size: 0,
+            bg_palettes: ColorPalettesCollection::default(),
+            sprite_palettes: ColorPalettesCollection::default(),
             fine_scroll_x_discard: 0,
             fetcher: Fetcher::default(),
             is_drawing_window: false,
@@ -335,6 +342,26 @@ impl Ppu {
 
     pub fn set_vram_bank(&mut self, data: u8) {
         self.vram_bank = data & 1;
+    }
+
+    pub fn read_color_register(&mut self, addr: u16) -> u8 {
+        match addr {
+            0xFF68 => self.bg_palettes.read_index(),
+            0xFF69 => self.bg_palettes.read_color_data(),
+            0xFF6A => self.sprite_palettes.read_index(),
+            0xFF6B => self.sprite_palettes.read_color_data(),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn write_color_register(&mut self, addr: u16, data: u8) {
+        match addr {
+            0xFF68 => self.bg_palettes.write_index(data),
+            0xFF69 => self.bg_palettes.write_color_data(data),
+            0xFF6A => self.sprite_palettes.write_index(data),
+            0xFF6B => self.sprite_palettes.write_color_data(data),
+            _ => unreachable!(),
+        }
     }
 
     pub fn screen_buffer(&self) -> &[u8] {
