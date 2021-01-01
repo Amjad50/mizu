@@ -241,6 +241,7 @@ impl Bus {
             (0xFF10..=0xFF3F, _) => self.apu.read_register(addr), // apu
             (0xFF40..=0xFF45, _) | (0xFF47..=0xFF4B, _) => self.ppu.read_register(addr), // ppu io registers
             (0xFF46, _) => self.dma.read(),           // dma start
+            (0xFF4F, _) => self.ppu.get_vram_bank(),  // vram bank
             (0xFF50, _) => 0xFF,                      // boot rom stop
             (0xFF70, _) => self.wram.get_wram_bank(), // wram bank
             (0xFF80..=0xFFFE, _) => self.hram[addr as usize & 0x7F], // hram
@@ -271,6 +272,7 @@ impl Bus {
             (0xFF10..=0xFF3F, _) => self.apu.write_register(addr, data), // apu
             (0xFF40..=0xFF45, _) | (0xFF47..=0xFF4B, _) => self.ppu.write_register(addr, data), // ppu io registers
             (0xFF46, _) => self.dma.start_dma(data), // dma start
+            (0xFF4F, _) => self.ppu.set_vram_bank(data), // vram bank
             (0xFF50, _) => self.boot_rom.enabled = false, // boot rom stop
             (0xFF70, _) => self.wram.set_wram_bank(data), // wram bank
             (0xFF80..=0xFFFE, _) => self.hram[addr as usize & 0x7F] = data, // hram

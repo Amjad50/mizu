@@ -169,7 +169,8 @@ pub struct Ppu {
     windows_y: u8,
     windows_x: u8,
 
-    vram: [u8; 0x2000],
+    vram: [u8; 0x4000],
+    vram_bank: u8,
     oam: [Sprite; 40],
     // the sprites that got selected
     selected_oam: [Sprite; 10],
@@ -206,7 +207,8 @@ impl Default for Ppu {
             sprite_palette: [0xFF; 2],
             windows_y: 0,
             windows_x: 0,
-            vram: [0; 0x2000],
+            vram: [0; 0x4000],
+            vram_bank: 0,
             oam: [Sprite::default(); 40],
             selected_oam: [Sprite::default(); 10],
             selected_oam_size: 0,
@@ -248,11 +250,11 @@ impl Ppu {
     }
 
     pub fn read_vram(&self, addr: u16) -> u8 {
-        self.vram[addr as usize & 0x1FFF]
+        self.vram[(self.vram_bank as usize * 0x2000) + (addr as usize & 0x1FFF)]
     }
 
     pub fn write_vram(&mut self, addr: u16, data: u8) {
-        self.vram[addr as usize & 0x1FFF] = data;
+        self.vram[(self.vram_bank as usize * 0x2000) + (addr as usize & 0x1FFF)] = data;
     }
 
     pub fn read_oam(&self, addr: u16) -> u8 {
@@ -325,6 +327,14 @@ impl Ppu {
             0xFF4B => self.windows_x = data,
             _ => unreachable!(),
         }
+    }
+
+    pub fn get_vram_bank(&self) -> u8 {
+        self.vram_bank
+    }
+
+    pub fn set_vram_bank(&mut self, data: u8) {
+        self.vram_bank = data & 1;
     }
 
     pub fn screen_buffer(&self) -> &[u8] {
