@@ -1,10 +1,13 @@
 use super::colors::ColorPalette;
 use fixed_vec_deque::FixedVecDeque;
 
+// Background store the `bg_priority` of the `bg_attribs` for the pixel data
+// Sprite store the index of the sprite, as in CGB priority is done by index
+//  and not by coordinate
 #[derive(Clone, Copy)]
 enum PixelType {
     Background(bool),
-    Sprite,
+    Sprite(u8),
 }
 
 #[derive(Clone, Copy)]
@@ -57,27 +60,33 @@ impl Fifo {
         &mut self,
         colors: [u8; 8],
         palette: ColorPalette,
+        index: u8,
         oam_bg_priority: bool,
         master_priority: bool,
     ) {
         assert!(self.len() >= 8);
 
         for (pixel, &sprite_color) in self.pixels.iter_mut().take(8).zip(colors.iter()) {
-            if let PixelType::Background(bg_priority) = pixel.pixel_type {
-                // TODO: fix this mess
-                if (master_priority
-                    || ((!bg_priority || pixel.color == 0)
-                        && (!oam_bg_priority || pixel.color == 0)))
-                    && sprite_color != 0
-                {
-                    pixel.color = sprite_color;
-                    pixel.palette = palette;
-                    pixel.pixel_type = PixelType::Sprite;
+            match pixel.pixel_type {
+                PixelType::Background(bg_priority) => {
+                    // TODO: fix this mess
+                    if (master_priority
+                        || ((!bg_priority || pixel.color == 0)
+                            && (!oam_bg_priority || pixel.color == 0)))
+                        && sprite_color != 0
+                    {
+                        pixel.color = sprite_color;
+                        pixel.palette = palette;
+                        pixel.pixel_type = PixelType::Sprite(index);
+                    }
                 }
-            } else if pixel.color == 0 {
-                pixel.color = sprite_color;
-                pixel.palette = palette;
-                pixel.pixel_type = PixelType::Sprite;
+                PixelType::Sprite(sprite_index) => {
+                    if sprite_index > index || pixel.color == 0 {
+                        pixel.color = sprite_color;
+                        pixel.palette = palette;
+                        pixel.pixel_type = PixelType::Sprite(index);
+                    }
+                }
             }
         }
     }

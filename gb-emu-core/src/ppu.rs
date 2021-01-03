@@ -177,7 +177,7 @@ pub struct Ppu {
     vram_bank: u8,
     oam: [Sprite; 40],
     // the sprites that got selected
-    selected_oam: [Sprite; 10],
+    selected_oam: [(Sprite, u8); 10],
     selected_oam_size: u8,
 
     bg_palettes: ColorPalettesCollection,
@@ -217,7 +217,7 @@ impl Default for Ppu {
             vram: [0; 0x4000],
             vram_bank: 0,
             oam: [Sprite::default(); 40],
-            selected_oam: [Sprite::default(); 10],
+            selected_oam: [(Sprite::default(), 0xFF); 10],
             selected_oam_size: 0,
             bg_palettes: ColorPalettesCollection::default(),
             sprite_palettes: ColorPalettesCollection::default(),
@@ -616,10 +616,10 @@ impl Ppu {
 
     fn load_selected_sprites_oam(&mut self) {
         let mut count = 0;
-        for &sprite in self.oam.iter() {
+        for (i, &sprite) in self.oam.iter().enumerate() {
             // in range
             if self.scanline.wrapping_sub(sprite.screen_y()) < self.lcd_control.sprite_size() {
-                self.selected_oam[count] = sprite;
+                self.selected_oam[count] = (sprite, i as u8);
                 count += 1;
 
                 if count == 10 {
@@ -632,7 +632,7 @@ impl Ppu {
 
     fn try_add_sprite(&mut self) {
         if self.lcd_control.sprite_enable() {
-            for sprite in self
+            for (sprite, index) in self
                 .selected_oam
                 .iter()
                 .take(self.selected_oam_size as usize)
@@ -664,6 +664,7 @@ impl Ppu {
                     self.fifo.mix_sprite(
                         colors,
                         self.sprite_palettes.get_palette(sprite.cgb_palette()),
+                        *index,
                         sprite.bg_priority(),
                         !self.lcd_control.bg_window_priority(),
                     )
