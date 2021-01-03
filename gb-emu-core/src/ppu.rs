@@ -8,7 +8,7 @@ use crate::memory::{InterruptManager, InterruptType};
 use bg_attribs::BgAttribute;
 use bitflags::bitflags;
 use colors::{Color, ColorPalette, ColorPalettesCollection};
-use fifo::Fifo;
+use fifo::{Fifo, SpritePriorityMode};
 use lcd::Lcd;
 use sprite::Sprite;
 
@@ -197,6 +197,8 @@ pub struct Ppu {
 
     /// track if the next frame is LCD still turning on
     lcd_turned_on: bool,
+
+    sprite_priority_mode: SpritePriorityMode,
 }
 
 impl Default for Ppu {
@@ -230,6 +232,9 @@ impl Default for Ppu {
             cycle: 4,
             scanline: 0,
             lcd_turned_on: false,
+            // CGB by default, the bootrom of the CGB will change
+            // it if it detected the rom is DMG
+            sprite_priority_mode: SpritePriorityMode::ByIndex,
         }
     }
 }
@@ -363,6 +368,22 @@ impl Ppu {
             0xFF6A => self.sprite_palettes.write_index(data),
             0xFF6B => self.sprite_palettes.write_color_data(data),
             _ => unreachable!(),
+        }
+    }
+
+    pub fn write_sprite_priority_mode(&mut self, data: u8) {
+        self.sprite_priority_mode = if data & 1 == 0 {
+            SpritePriorityMode::ByIndex
+        } else {
+            SpritePriorityMode::ByCoord
+        };
+    }
+
+    pub fn read_sprite_priority_mode(&self) -> u8 {
+        if let SpritePriorityMode::ByIndex = self.sprite_priority_mode {
+            1
+        } else {
+            0
         }
     }
 
@@ -661,10 +682,12 @@ impl Ppu {
                         }
                     }
 
+                    // TODO: fix all these parameters
                     self.fifo.mix_sprite(
                         colors,
                         self.sprite_palettes.get_palette(sprite.cgb_palette()),
                         *index,
+                        self.sprite_priority_mode,
                         sprite.bg_priority(),
                         !self.lcd_control.bg_window_priority(),
                     )

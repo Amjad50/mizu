@@ -259,9 +259,7 @@ impl Bus {
             (0xFF68..=0xFF69, _) | (0xFF6A..=0xFF6B, _) => {
                 self.ppu.read_color_register(addr) // ppu colors
             }
-            (0xFF6C, _) => {
-                todo!("object priority mode 1 for OAM 0 for coord (DMG style)");
-            }
+            (0xFF6C, _) => self.ppu.read_sprite_priority_mode(),
             (0xFF70, _) => self.wram.get_wram_bank(), // wram bank
             (0xFF80..=0xFFFE, _) => self.hram[addr as usize & 0x7F], // hram
             (0xFFFF, _) => self.interrupts.read_interrupt_enable(), //interrupts enable
@@ -306,9 +304,7 @@ impl Bus {
             (0xFF68..=0xFF69, _) | (0xFF6A..=0xFF6B, _) => {
                 self.ppu.write_color_register(addr, data); // ppu colors
             }
-            (0xFF6C, _) => {
-                todo!("object priority mode 1 for OAM 0 for coord (DMG style)");
-            }
+            (0xFF6C, _) => self.ppu.write_sprite_priority_mode(data),
             (0xFF70, _) => self.wram.set_wram_bank(data), // wram bank
             (0xFF80..=0xFFFE, _) => self.hram[addr as usize & 0x7F] = data, // hram
             (0xFFFF, _) => self.interrupts.write_interrupt_enable(data), // interrupts enable

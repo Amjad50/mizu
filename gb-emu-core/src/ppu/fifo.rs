@@ -1,6 +1,12 @@
 use super::colors::ColorPalette;
 use fixed_vec_deque::FixedVecDeque;
 
+#[derive(PartialEq, Clone, Copy)]
+pub enum SpritePriorityMode {
+    ByIndex, // CGB
+    ByCoord, // DMG
+}
+
 // Background store the `bg_priority` of the `bg_attribs` for the pixel data
 // Sprite store the index of the sprite, as in CGB priority is done by index
 //  and not by coordinate
@@ -61,6 +67,7 @@ impl Fifo {
         colors: [u8; 8],
         palette: ColorPalette,
         index: u8,
+        sprite_priority_mode: SpritePriorityMode,
         oam_bg_priority: bool,
         master_priority: bool,
     ) {
@@ -81,7 +88,9 @@ impl Fifo {
                     }
                 }
                 PixelType::Sprite(sprite_index) => {
-                    if sprite_index > index || pixel.color == 0 {
+                    if (sprite_priority_mode == SpritePriorityMode::ByIndex && sprite_index > index)
+                        || pixel.color == 0
+                    {
                         pixel.color = sprite_color;
                         pixel.palette = palette;
                         pixel.pixel_type = PixelType::Sprite(index);
