@@ -122,6 +122,10 @@ impl Wram {
 
     fn set_wram_bank(&mut self, data: u8) {
         self.bank = data & 3;
+        // bank cannot be 0
+        if self.bank == 0 {
+            self.bank = 1;
+        }
     }
 
     fn get_wram_bank(&self) -> u8 {
