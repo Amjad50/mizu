@@ -80,7 +80,7 @@ impl Mapper for Mbc5 {
             0x4000..=0x5FFF => {
                 self.ram_bank = data & 0xF;
             }
-            _ => unreachable!(),
+            _ => {}
         }
     }
 }

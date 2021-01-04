@@ -114,7 +114,7 @@ impl Mapper for Mbc1 {
             0x6000..=0x7FFF => {
                 self.mode = data & 1 == 1;
             }
-            _ => unreachable!(),
+            _ => {}
         }
     }
 }
