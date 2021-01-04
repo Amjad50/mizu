@@ -387,6 +387,10 @@ impl Ppu {
         }
     }
 
+    pub fn get_current_mode(&self) -> u8 {
+        self.lcd_status.current_mode()
+    }
+
     pub fn screen_buffer(&self) -> &[u8] {
         self.lcd.screen_buffer()
     }

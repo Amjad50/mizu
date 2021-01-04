@@ -34,6 +34,97 @@ enum BusType {
 }
 
 #[derive(Default)]
+struct HDMA {
+    source_addr: u16,
+    dest_addr: u16,
+    length: u8,
+    block_size_remaining: u8,
+    hdma_type: bool,
+    active: bool,
+}
+
+impl HDMA {
+    fn write_register(&mut self, addr: u16, data: u8) {
+        match addr {
+            0xFF51 => {
+                // high src
+                self.source_addr &= 0xFF;
+                self.source_addr |= (data as u16) << 8;
+            }
+            0xFF52 => {
+                // low src
+                self.source_addr &= 0xFF00;
+                // the lower 4 bits are ignored
+                self.source_addr |= (data & 0xF0) as u16;
+            }
+            0xFF53 => {
+                // high dest
+                self.dest_addr &= 0xFF;
+                // the top 3 bits are ignored and forced to 0x8 to be
+                // in VRAM at all time
+                self.dest_addr |= (((data & 0x1F) | 0x80) as u16) << 8;
+            }
+            0xFF54 => {
+                // low dest
+                self.dest_addr &= 0xFF00;
+                // the lower 4 bits are ignored
+                self.dest_addr |= (data & 0xF0) as u16;
+            }
+            0xFF55 => {
+                // control
+                self.length = data & 0x7F;
+                if self.active {
+                    let new_flag = data & 0x80 != 0;
+                    // TODO: if new_flag is true, it should restart transfere.
+                    //  check if source should start from the beginning or
+                    //  current value
+                    self.active = new_flag;
+                } else {
+                    self.active = true;
+                    self.block_size_remaining = 0x10;
+                    self.hdma_type = data & 0x80 != 0;
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn read_register(&mut self, addr: u16) -> u8 {
+        match addr {
+            0xFF51..=0xFF54 => 0xFF,
+            0xFF55 => (((!self.active) as u8) << 7) | self.length, // control
+            _ => unreachable!(),
+        }
+    }
+
+    fn next_addresses_to_read(&mut self) -> Vec<u16> {
+        let result = vec![self.source_addr, self.source_addr + 1];
+        self.source_addr += 2;
+        result
+    }
+
+    fn transfer_clock(&mut self, ppu: &mut Ppu, values: Vec<u8>) {
+        for value in values {
+            ppu.write_vram(self.dest_addr, value);
+            self.dest_addr += 1;
+            self.block_size_remaining -= 1;
+
+            if self.block_size_remaining == 0 {
+                self.block_size_remaining = 0x10;
+                self.length = self.length.wrapping_sub(1);
+                if self.length == 0xFF {
+                    self.active = false;
+                }
+            }
+        }
+    }
+
+    fn is_transferreing(&self, ppu: &Ppu) -> bool {
+        self.active && (!self.hdma_type || (self.hdma_type && ppu.get_current_mode() == 0))
+    }
+}
+
+#[derive(Default)]
 struct DMA {
     conflicting_bus: Option<BusType>,
     current_value: u8,
@@ -142,6 +233,7 @@ pub struct Bus {
     joypad: Joypad,
     serial: Serial,
     dma: DMA,
+    hdma: HDMA,
     apu: Apu,
     hram: [u8; 127],
     boot_rom: BootRom,
@@ -160,6 +252,7 @@ impl Bus {
             joypad: Joypad::default(),
             serial: Serial::default(),
             dma: DMA::default(),
+            hdma: HDMA::default(),
             apu: Apu::new_skip_boot_rom(),
             hram: [0; 127],
             boot_rom: BootRom::default(),
@@ -213,6 +306,16 @@ impl Bus {
             let value = self.read_not_ticked(self.dma.address, None);
             self.dma.transfer_clock(&mut self.ppu, value);
         }
+
+        if self.hdma.is_transferreing(&self.ppu) {
+            let values: Vec<_> = self
+                .hdma
+                .next_addresses_to_read()
+                .iter()
+                .map(|addr| self.read_not_ticked(*addr, None))
+                .collect();
+            self.hdma.transfer_clock(&mut self.ppu, values);
+        }
     }
 
     fn read_not_ticked(&mut self, addr: u16, block_for_dma: Option<BusType>) -> u8 {
@@ -250,9 +353,7 @@ impl Bus {
             }
             (0xFF4F, _) => self.ppu.get_vram_bank(), // vram bank
             (0xFF50, _) => 0xFF,                     // boot rom stop
-            (0xFF51..=0xFF55, _) => {
-                todo!("HDMA");
-            }
+            (0xFF51..=0xFF55, _) => self.hdma.read_register(addr), // hdma
             (0xFF56, _) => {
                 todo!("RP port");
             }
@@ -294,10 +395,7 @@ impl Bus {
             }
             (0xFF4F, _) => self.ppu.set_vram_bank(data), // vram bank
             (0xFF50, _) => self.boot_rom.enabled = false, // boot rom stop
-            (0xFF51..=0xFF55, _) => {
-                //looks like its needed, but not sure where since the bios looks normal
-                //todo!("HDMA");
-            }
+            (0xFF51..=0xFF55, _) => self.hdma.write_register(addr, data), // hdma
             (0xFF56, _) => {
                 todo!("RP port");
             }
@@ -342,5 +440,9 @@ impl CpuBusProvider for Bus {
 
     fn check_interrupts(&self) -> bool {
         self.interrupts.is_interrupts_available()
+    }
+
+    fn is_hdma_running(&mut self) -> bool {
+        self.hdma.is_transferreing(&self.ppu)
     }
 }

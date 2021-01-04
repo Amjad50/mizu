@@ -13,6 +13,8 @@ pub trait CpuBusProvider {
     fn take_next_interrupt(&mut self) -> Option<InterruptType>;
     fn peek_next_interrupt(&mut self) -> Option<InterruptType>;
     fn check_interrupts(&self) -> bool;
+
+    fn is_hdma_running(&mut self) -> bool;
 }
 
 const INTERRUPTS_VECTOR: [u16; 5] = [0x40, 0x48, 0x50, 0x58, 0x60];
@@ -36,6 +38,7 @@ pub enum CpuState {
     Normal,
     InfiniteLoop,
     Halting,
+    RunningHDMA,
     RunningInterrupt(InterruptType),
     Breakpoint(CpuRegisters),
 }
@@ -113,10 +116,15 @@ impl Cpu {
     }
 
     pub fn next_instruction<P: CpuBusProvider>(&mut self, bus: &mut P) -> CpuState {
+        if bus.is_hdma_running() {
+            self.advance_bus(bus);
+            return CpuState::RunningHDMA;
+        }
+
         if self.halt_mode == HaltMode::HaltRunInterrupt
             || self.halt_mode == HaltMode::HaltNoRunInterrupt
         {
-            self.dummy_fetch(bus);
+            self.advance_bus(bus);
 
             if bus.check_interrupts() {
                 self.halt_mode = HaltMode::NotHalting;
@@ -149,9 +157,9 @@ impl Cpu {
             bus.write(self.reg_sp, pc as u8);
 
             // delay for interrupt
-            self.dummy_fetch(bus);
-            self.dummy_fetch(bus);
-            self.dummy_fetch(bus);
+            self.advance_bus(bus);
+            self.advance_bus(bus);
+            self.advance_bus(bus);
             return cpu_state;
         }
 
@@ -351,7 +359,8 @@ impl Cpu {
         }
     }
 
-    fn dummy_fetch<P: CpuBusProvider>(&mut self, bus: &mut P) {
+    /// advances the bus and all other components by one machine cycle
+    fn advance_bus<P: CpuBusProvider>(&mut self, bus: &mut P) {
         bus.read(0);
     }
 
@@ -402,12 +411,12 @@ impl Cpu {
                 0
             }
             Opcode::LdSPHL => {
-                self.dummy_fetch(bus);
+                self.advance_bus(bus);
                 self.reg_sp = self.reg_hl_read();
                 0
             }
             Opcode::LdHLSPSigned8 => {
-                self.dummy_fetch(bus);
+                self.advance_bus(bus);
                 let result = self.reg_sp.wrapping_add(src);
 
                 self.flag_set(CpuFlags::Z, false);
@@ -418,13 +427,13 @@ impl Cpu {
                 result
             }
             Opcode::Push => {
-                self.dummy_fetch(bus);
+                self.advance_bus(bus);
                 self.stack_push(src, bus);
                 0
             }
             Opcode::Pop => self.stack_pop(bus),
             Opcode::Inc16 => {
-                self.dummy_fetch(bus);
+                self.advance_bus(bus);
                 src.wrapping_add(1)
             }
 
@@ -438,7 +447,7 @@ impl Cpu {
                 result
             }
             Opcode::Dec16 => {
-                self.dummy_fetch(bus);
+                self.advance_bus(bus);
                 src.wrapping_sub(1)
             }
             Opcode::Dec => {
@@ -460,7 +469,7 @@ impl Cpu {
                 result & 0xFF
             }
             Opcode::Add16 => {
-                self.dummy_fetch(bus);
+                self.advance_bus(bus);
                 let dest = self.read_operand(instruction.dest, bus);
                 let result = (dest as u32).wrapping_add(src as u32);
 
@@ -471,8 +480,8 @@ impl Cpu {
                 result as u16
             }
             Opcode::AddSPSigned8 => {
-                self.dummy_fetch(bus);
-                self.dummy_fetch(bus);
+                self.advance_bus(bus);
+                self.advance_bus(bus);
                 let dest = self.read_operand(instruction.dest, bus);
                 let result = dest.wrapping_add(src);
 
@@ -568,7 +577,7 @@ impl Cpu {
             }
             Opcode::Jp(cond) => {
                 if self.check_cond(cond) {
-                    self.dummy_fetch(bus);
+                    self.advance_bus(bus);
                     if cond == Condition::Unconditional && src == instruction.pc {
                         cpu_state = CpuState::InfiniteLoop;
                     }
@@ -587,7 +596,7 @@ impl Cpu {
             }
             Opcode::Jr(cond) => {
                 if self.check_cond(cond) {
-                    self.dummy_fetch(bus);
+                    self.advance_bus(bus);
                     let new_pc = self.reg_pc.wrapping_add(src);
 
                     if cond == Condition::Unconditional && new_pc == instruction.pc {
@@ -600,7 +609,7 @@ impl Cpu {
             }
             Opcode::Call(cond) => {
                 if self.check_cond(cond) {
-                    self.dummy_fetch(bus);
+                    self.advance_bus(bus);
                     self.stack_push(self.reg_pc, bus);
                     self.reg_pc = src;
                 }
@@ -608,22 +617,22 @@ impl Cpu {
             }
             Opcode::Ret(cond) => {
                 if cond != Condition::Unconditional {
-                    self.dummy_fetch(bus);
+                    self.advance_bus(bus);
                 }
                 if self.check_cond(cond) {
                     self.reg_pc = self.stack_pop(bus);
-                    self.dummy_fetch(bus);
+                    self.advance_bus(bus);
                 }
                 0
             }
             Opcode::Reti => {
                 self.reg_pc = self.stack_pop(bus);
-                self.dummy_fetch(bus);
+                self.advance_bus(bus);
                 self.ime = true;
                 0
             }
             Opcode::Rst(loc) => {
-                self.dummy_fetch(bus);
+                self.advance_bus(bus);
                 self.stack_push(self.reg_pc, bus);
                 self.reg_pc = loc as u16;
                 0
