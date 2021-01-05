@@ -88,8 +88,10 @@ impl Fifo {
                     }
                 }
                 PixelType::Sprite(sprite_index) => {
-                    if (sprite_priority_mode == SpritePriorityMode::ByIndex && sprite_index > index)
-                        || pixel.color == 0
+                    if ((sprite_priority_mode == SpritePriorityMode::ByIndex
+                        && sprite_index > index)
+                        || pixel.color == 0)
+                        && sprite_color != 0
                     {
                         pixel.color = sprite_color;
                         pixel.palette = palette;
