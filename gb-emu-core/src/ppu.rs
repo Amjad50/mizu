@@ -564,7 +564,10 @@ impl Ppu {
         palette.get_color(color_index)
     }
 
-    fn get_bg_window_tile_and_y(&mut self) -> (u8, BgAttribute, u8) {
+    /// Gets the tile number, BgAttribute for that tile, and its y position
+    /// because the y position is different if we are drawing a window or
+    /// normal background
+    fn fetch_bg_tile_meta(&mut self) -> (u8, BgAttribute, u8) {
         let tile_x;
         let tile_y;
         let tile_map;
@@ -631,7 +634,7 @@ impl Ppu {
     }
 
     fn fetch_bg(&mut self) -> ([u8; 8], BgAttribute) {
-        let (tile, attribs, y) = self.get_bg_window_tile_and_y();
+        let (tile, attribs, y) = self.fetch_bg_tile_meta();
 
         let y = if attribs.is_vertical_flip() {
             7 - (y % 8)
