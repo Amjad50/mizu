@@ -103,6 +103,13 @@ fn main() {
                     Key::A => gameboy.press_joypad(JoypadButton::Left),
                     Key::D => gameboy.press_joypad(JoypadButton::Right),
 
+                    Key::Return => {
+                        gameboy.press_joypad(JoypadButton::A);
+                        gameboy.press_joypad(JoypadButton::B);
+                        gameboy.press_joypad(JoypadButton::Start);
+                        gameboy.press_joypad(JoypadButton::Select);
+                    }
+
                     // change FPS
                     Key::Equal => {
                         fps += 5;
@@ -123,6 +130,13 @@ fn main() {
                     Key::S => gameboy.release_joypad(JoypadButton::Down),
                     Key::A => gameboy.release_joypad(JoypadButton::Left),
                     Key::D => gameboy.release_joypad(JoypadButton::Right),
+
+                    Key::Return => {
+                        gameboy.release_joypad(JoypadButton::A);
+                        gameboy.release_joypad(JoypadButton::B);
+                        gameboy.release_joypad(JoypadButton::Start);
+                        gameboy.release_joypad(JoypadButton::Select);
+                    }
                     _ => {}
                 },
                 Event::Resized { width, height } => {
