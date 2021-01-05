@@ -287,7 +287,9 @@ pub struct Bus {
     boot_rom: BootRom,
     speed_controller: SpeedController,
 
-    cpu_cycles: u32,
+    /// Used to track how many ppu cycles have elapsed
+    /// when the frontend gets the elapsed value, its reset to 0
+    elapsed_ppu_cycles: u32,
 }
 
 impl Bus {
@@ -307,7 +309,7 @@ impl Bus {
             boot_rom: BootRom::default(),
             speed_controller: SpeedController::default(),
 
-            cpu_cycles: 0,
+            elapsed_ppu_cycles: 0,
         }
     }
 
@@ -337,13 +339,8 @@ impl Bus {
         self.joypad.release_joypad(button);
     }
 
-    pub fn elapsed_cpu_cycles(&mut self) -> u32 {
-        // `self.cpu_cycles` will hold the number of cycles, `2` cycles when running
-        // in normal speed mode, and `1` when running in double speed mode,
-        // the reason is not to change anything in the frontend
-        //
-        // TODO: replace this design by waiting for VBLANK signal
-        std::mem::replace(&mut self.cpu_cycles, 0) / 2
+    pub fn elapsed_ppu_cycles(&mut self) -> u32 {
+        std::mem::replace(&mut self.elapsed_ppu_cycles, 0)
     }
 }
 
@@ -353,10 +350,10 @@ impl Bus {
 
         // will be 2 in normal speed and 1 in double speed
         let cpu_clocks_added = ((!double_speed) as u8) + 1;
-        self.cpu_cycles += cpu_clocks_added as u32;
 
         // will be 4 in normal speed and 2 in double speed
         let t_clocks = cpu_clocks_added * 2;
+        self.elapsed_ppu_cycles += t_clocks as u32;
 
         // APU stays at the same speed even if CPU is in double speed
         self.ppu.clock(&mut self.interrupts, t_clocks);

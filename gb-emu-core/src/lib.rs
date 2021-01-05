@@ -57,15 +57,18 @@ impl GameBoy {
         Ok(Self { bus, cpu })
     }
 
-    /// Note entirly accurate, but its better than looping over a fixed
-    /// number of CPU instructions per frame
+    /// Synced to PPU
+    ///
+    /// Not sure if this is an accurate apporach, but it looks good, as the
+    /// number of PPU cycles per frame is fixed, counting for the number
+    /// of ppu cycles is better than waiting for Vblank, as if the lcd
+    /// is off, Vblank is not coming
     pub fn clock_for_frame(&mut self) {
-        const CPU_CYCLES_PER_FRAME: u32 = 16384 * 256 / 4 / 60;
+        const PPU_CYCLES_PER_FRAME: u32 = 456 * 154;
         let mut cycles = 0u32;
-        while cycles < CPU_CYCLES_PER_FRAME {
+        while cycles < PPU_CYCLES_PER_FRAME {
             self.cpu.next_instruction(&mut self.bus);
-
-            cycles += self.bus.elapsed_cpu_cycles() as u32;
+            cycles += self.bus.elapsed_ppu_cycles() as u32;
         }
     }
 
