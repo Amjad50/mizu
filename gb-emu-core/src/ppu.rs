@@ -264,11 +264,15 @@ impl Ppu {
     }
 
     pub fn read_vram(&self, addr: u16) -> u8 {
-        self.vram[(self.vram_bank as usize * 0x2000) + (addr as usize & 0x1FFF)]
+        self.read_vram_banked(self.vram_bank, addr)
     }
 
     pub fn write_vram(&mut self, addr: u16, data: u8) {
-        self.vram[(self.vram_bank as usize * 0x2000) + (addr as usize & 0x1FFF)] = data;
+        // here since this is the only place vram is written to, no need
+        // to make another function `write_vram_banked`
+        let offset = addr as usize & 0x1FFF;
+        let bank_start = self.vram_bank as usize * 0x2000;
+        self.vram[bank_start + offset] = data;
     }
 
     pub fn read_oam(&self, addr: u16) -> u8 {
@@ -510,6 +514,12 @@ impl Ppu {
 }
 
 impl Ppu {
+    fn read_vram_banked(&self, bank: u8, addr: u16) -> u8 {
+        let offset = addr as usize & 0x1FFF;
+        let bank_start = bank as usize * 0x2000;
+        self.vram[bank_start + offset]
+    }
+
     /// return true, if this is the last draw in the current scanline, and
     /// mode 0 is being activated
     fn draw(&mut self) -> bool {
@@ -572,8 +582,9 @@ impl Ppu {
         }
 
         let tile_index = self.get_tile_index(tile_x, tile_y / 8);
-        let tile = self.vram[(tile_map + tile_index) as usize];
-        let tile_attribs = BgAttribute::new(self.vram[0x2000 + (tile_map + tile_index) as usize]);
+        let vram_index = tile_map + tile_index;
+        let tile = self.read_vram_banked(0, vram_index);
+        let tile_attribs = BgAttribute::new(self.read_vram_banked(1, vram_index));
 
         (tile, tile_attribs, tile_y)
     }
@@ -606,10 +617,8 @@ impl Ppu {
     }
 
     fn get_tile_pattern_from_index(&self, index: u16, y: u8, bank: u8) -> [u8; 8] {
-        let index = index as usize;
-
-        let low = self.vram[(bank as usize * 0x2000) + index + ((y as usize) * 2)];
-        let high = self.vram[(bank as usize * 0x2000) + index + ((y as usize) * 2 + 1)];
+        let low = self.read_vram_banked(bank, index + ((y as u16) * 2));
+        let high = self.read_vram_banked(bank, index + ((y as u16) * 2 + 1));
 
         let mut result = [0; 8];
 
