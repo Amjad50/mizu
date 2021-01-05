@@ -850,6 +850,12 @@ impl Cpu {
             Opcode::Prefix => unreachable!(),
         };
 
+        // DEBUG
+        // println!(
+        //     "{:04X}: {}, src={:04X}, result={:04X}",
+        //     instruction.pc, instruction, src, result
+        // );
+
         self.write_operand(instruction.dest, result, bus);
 
         cpu_state
