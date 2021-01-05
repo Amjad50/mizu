@@ -15,6 +15,9 @@ pub trait CpuBusProvider {
     fn check_interrupts(&self) -> bool;
 
     fn is_hdma_running(&mut self) -> bool;
+
+    fn is_speed_switch_prepared(&mut self) -> bool;
+    fn commit_speed_switch(&mut self);
 }
 
 const INTERRUPTS_VECTOR: [u16; 5] = [0x40, 0x48, 0x50, 0x58, 0x60];
@@ -845,7 +848,15 @@ impl Cpu {
                 }
                 0
             }
-            Opcode::Stop => todo!(),
+            Opcode::Stop => {
+                // TODO: respect wait time for speed switch
+                if bus.is_speed_switch_prepared() {
+                    bus.commit_speed_switch();
+                } else {
+                    todo!()
+                }
+                0
+            }
             Opcode::Illegal => todo!(),
             Opcode::Prefix => unreachable!(),
         };

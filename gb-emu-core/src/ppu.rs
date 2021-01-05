@@ -399,8 +399,7 @@ impl Ppu {
         self.lcd.screen_buffer()
     }
 
-    // clocks the PPU 4 times in a row
-    pub fn clock_4_times<I: InterruptManager>(&mut self, interrupt_manager: &mut I) {
+    pub fn clock<I: InterruptManager>(&mut self, interrupt_manager: &mut I, clocks: u8) {
         let mut new_stat_int_happened = false;
 
         if !self.lcd_control.display_enable() {
@@ -469,7 +468,7 @@ impl Ppu {
                 }
             }
             3 => {
-                for _ in 0..4 {
+                for _ in 0..clocks {
                     if self.draw() {
                         // change mode to 0 from 3
                         self.lcd_status.current_mode_set(0);
@@ -498,7 +497,7 @@ impl Ppu {
         }
 
         // increment cycle
-        self.cycle += 4;
+        self.cycle += clocks as u16;
         if self.cycle == 456 {
             self.cycle = 0;
             self.scanline += 1;

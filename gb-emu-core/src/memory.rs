@@ -25,6 +25,54 @@ impl Default for BootRom {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Speed {
+    Normal,
+    Double,
+}
+
+impl Default for Speed {
+    fn default() -> Self {
+        Self::Normal
+    }
+}
+
+#[derive(Default)]
+struct SpeedController {
+    preparing_switch: bool,
+    target_switch: Speed,
+    current_speed: Speed,
+}
+
+impl SpeedController {
+    fn read_key1(&self) -> u8 {
+        self.preparing_switch as u8
+    }
+
+    fn write_key1(&mut self, data: u8) {
+        self.preparing_switch = data & 1 != 0;
+        self.target_switch = if data & 0x80 != 0 {
+            Speed::Double
+        } else {
+            Speed::Normal
+        };
+    }
+
+    fn preparing_switch(&self) -> bool {
+        self.preparing_switch
+    }
+
+    fn current_speed(&self) -> Speed {
+        self.current_speed
+    }
+
+    fn commit_speed_switch(&mut self) {
+        assert!(self.preparing_switch);
+        self.current_speed = self.target_switch;
+        self.preparing_switch = false;
+    }
+}
+
 #[derive(Clone, Copy)]
 enum BusType {
     // VRAM
@@ -97,15 +145,15 @@ impl HDMA {
         }
     }
 
-    fn next_addresses_to_read(&mut self) -> Vec<u16> {
-        let result = vec![self.source_addr, self.source_addr + 1];
-        self.source_addr += 2;
+    fn get_next_src_address(&mut self) -> u16 {
+        let result = self.source_addr;
+        self.source_addr += 1;
         result
     }
 
-    fn transfer_clock(&mut self, ppu: &mut Ppu, values: Vec<u8>) {
+    fn transfer_clock(&mut self, ppu: &mut Ppu, values: &[u8]) {
         for value in values {
-            ppu.write_vram(self.dest_addr, value);
+            ppu.write_vram(self.dest_addr, *value);
             self.dest_addr += 1;
             self.block_size_remaining -= 1;
 
@@ -237,6 +285,7 @@ pub struct Bus {
     apu: Apu,
     hram: [u8; 127],
     boot_rom: BootRom,
+    speed_controller: SpeedController,
 
     cpu_cycles: u32,
 }
@@ -256,6 +305,7 @@ impl Bus {
             apu: Apu::new_skip_boot_rom(),
             hram: [0; 127],
             boot_rom: BootRom::default(),
+            speed_controller: SpeedController::default(),
 
             cpu_cycles: 0,
         }
@@ -288,16 +338,52 @@ impl Bus {
     }
 
     pub fn elapsed_cpu_cycles(&mut self) -> u32 {
-        std::mem::replace(&mut self.cpu_cycles, 0)
+        // `self.cpu_cycles` will hold the number of cycles, `2` cycles when running
+        // in normal speed mode, and `1` when running in double speed mode,
+        // the reason is not to change anything in the frontend
+        //
+        // TODO: replace this design by waiting for VBLANK signal
+        std::mem::replace(&mut self.cpu_cycles, 0) / 2
     }
 }
 
 impl Bus {
     fn on_cpu_machine_cycle(&mut self) {
-        self.cpu_cycles += 1;
-        // clock the ppu four times
-        self.ppu.clock_4_times(&mut self.interrupts);
-        self.apu.clock();
+        let double_speed = self.speed_controller.current_speed() == Speed::Double;
+
+        // will be 2 in normal speed and 1 in double speed
+        let cpu_clocks_added = ((!double_speed) as u8) + 1;
+        self.cpu_cycles += cpu_clocks_added as u32;
+
+        // will be 4 in normal speed and 2 in double speed
+        let t_clocks = cpu_clocks_added * 2;
+
+        // APU stays at the same speed even if CPU is in double speed
+        self.ppu.clock(&mut self.interrupts, t_clocks);
+
+        // APU stays at the same speed even if CPU is in double speed
+        self.apu.clock(t_clocks);
+
+        // HDMA stays at the same speed even if CPU is in double speed
+        if self.hdma.is_transferreing(&self.ppu) {
+            // this can be filled with 1 values in double mode and 2 in normal
+            // mode
+            let mut values = [0; 2];
+            let addr = self.hdma.get_next_src_address();
+            values[0] = self.read_not_ticked(addr, None);
+            let mut values_len = 1;
+            if !double_speed {
+                values_len = 2;
+                let addr = self.hdma.get_next_src_address();
+                values[1] = self.read_not_ticked(addr, None);
+            }
+
+            self.hdma
+                .transfer_clock(&mut self.ppu, &values[..values_len]);
+        }
+
+        // timer, DMA, and serial follow the CPU in speed and operates at double speed
+        // if CPU is in double speed
         self.timer.clock_divider(&mut self.interrupts);
         self.joypad.update_interrupts(&mut self.interrupts);
         self.serial.clock(&mut self.interrupts);
@@ -305,16 +391,6 @@ impl Bus {
         if self.dma.in_transfer {
             let value = self.read_not_ticked(self.dma.address, None);
             self.dma.transfer_clock(&mut self.ppu, value);
-        }
-
-        if self.hdma.is_transferreing(&self.ppu) {
-            let values: Vec<_> = self
-                .hdma
-                .next_addresses_to_read()
-                .iter()
-                .map(|addr| self.read_not_ticked(*addr, None))
-                .collect();
-            self.hdma.transfer_clock(&mut self.ppu, values);
         }
     }
 
@@ -348,11 +424,9 @@ impl Bus {
             (0xFF10..=0xFF3F, _) => self.apu.read_register(addr), // apu
             (0xFF40..=0xFF45, _) | (0xFF47..=0xFF4B, _) => self.ppu.read_register(addr), // ppu io registers
             (0xFF46, _) => self.dma.read(), // dma start
-            (0xFF4D, _) => {
-                todo!("CGB speed switch");
-            }
+            (0xFF4D, _) => self.speed_controller.read_key1(), // speed
             (0xFF4F, _) => self.ppu.get_vram_bank(), // vram bank
-            (0xFF50, _) => 0xFF,                     // boot rom stop
+            (0xFF50, _) => 0xFF,            // boot rom stop
             (0xFF51..=0xFF55, _) => self.hdma.read_register(addr), // hdma
             (0xFF56, _) => {
                 todo!("RP port");
@@ -390,9 +464,7 @@ impl Bus {
             (0xFF10..=0xFF3F, _) => self.apu.write_register(addr, data), // apu
             (0xFF40..=0xFF45, _) | (0xFF47..=0xFF4B, _) => self.ppu.write_register(addr, data), // ppu io registers
             (0xFF46, _) => self.dma.start_dma(data), // dma start
-            (0xFF4D, _) => {
-                todo!("CGB speed switch");
-            }
+            (0xFF4D, _) => self.speed_controller.write_key1(data), // speed
             (0xFF4F, _) => self.ppu.set_vram_bank(data), // vram bank
             (0xFF50, _) => self.boot_rom.enabled = false, // boot rom stop
             (0xFF51..=0xFF55, _) => self.hdma.write_register(addr, data), // hdma
@@ -444,5 +516,13 @@ impl CpuBusProvider for Bus {
 
     fn is_hdma_running(&mut self) -> bool {
         self.hdma.is_transferreing(&self.ppu)
+    }
+
+    fn is_speed_switch_prepared(&mut self) -> bool {
+        self.speed_controller.preparing_switch()
+    }
+
+    fn commit_speed_switch(&mut self) {
+        self.speed_controller.commit_speed_switch();
     }
 }

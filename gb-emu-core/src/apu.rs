@@ -57,6 +57,10 @@ pub struct Apu {
     buffer: Vec<f32>,
 
     cycle: u16,
+
+    // Keep track when to clock the APU, it should be clocked every 4 tcycles
+    // this is to keep working normally even in CPU double speed mode
+    clocks_counter: u8,
 }
 
 impl Default for Apu {
@@ -72,6 +76,7 @@ impl Default for Apu {
             wave: Dac::new(LengthCountedChannel::new(WaveChannel::default(), 256)),
             noise: Dac::new(LengthCountedChannel::new(NoiseChannel::default(), 64)),
             cycle: 0,
+            clocks_counter: 0,
         }
     }
 }
@@ -292,7 +297,15 @@ impl Apu {
         std::mem::replace(&mut self.buffer, Vec::new())
     }
 
-    pub fn clock(&mut self) {
+    pub fn clock(&mut self, clocks: u8) {
+        self.clocks_counter += clocks;
+        if self.clocks_counter >= 4 {
+            self.clocks_counter -= 4;
+        } else {
+            // don't do anything, wait for the next cycle
+            return;
+        }
+
         const SAMPLE_RATE: f64 = 44100.;
         const SAMPLE_EVERY_N_CLOCKS: f64 = (((16384 * 256) / 4) as f64) / SAMPLE_RATE;
 
