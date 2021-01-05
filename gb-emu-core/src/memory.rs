@@ -200,7 +200,7 @@ impl Wram {
     }
 
     fn read_wramx(&self, addr: u16) -> u8 {
-        self.data[0x1000 * self.bank as usize + addr as usize & 0xFFF]
+        self.data[(0x1000 * self.bank as usize) + (addr as usize & 0xFFF)]
     }
 
     fn write_wram0(&mut self, addr: u16, data: u8) {
@@ -208,11 +208,11 @@ impl Wram {
     }
 
     fn write_wramx(&mut self, addr: u16, data: u8) {
-        self.data[0x1000 * self.bank as usize + addr as usize & 0xFFF] = data;
+        self.data[(0x1000 * self.bank as usize) + (addr as usize & 0xFFF)] = data;
     }
 
     fn set_wram_bank(&mut self, data: u8) {
-        self.bank = data & 3;
+        self.bank = data & 7;
         // bank cannot be 0
         if self.bank == 0 {
             self.bank = 1;
