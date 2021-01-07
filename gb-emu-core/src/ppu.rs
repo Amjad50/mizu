@@ -1,5 +1,6 @@
-mod bg_attribs;
+#[macro_use]
 mod colors;
+mod bg_attribs;
 mod fifo;
 mod lcd;
 mod sprite;
@@ -7,7 +8,7 @@ mod sprite;
 use crate::memory::{InterruptManager, InterruptType};
 use bg_attribs::BgAttribute;
 use bitflags::bitflags;
-use colors::{Color, ColorPalettesCollection};
+use colors::{Color, ColorPalette, ColorPalettesCollection};
 use fifo::{Fifo, FifoPixel, PixelType, SpritePriorityMode};
 use lcd::Lcd;
 use sprite::{SelectedSprite, Sprite};
@@ -246,7 +247,7 @@ impl Default for Ppu {
 impl Ppu {
     /// create a ppu instance that match the one the ppu would have when the
     /// boot_rom finishes execution
-    pub fn new_skip_boot_rom() -> Self {
+    pub fn new_skip_boot_rom(cgb_mode: bool) -> Self {
         let mut s = Self::default();
         // set I/O registers to the value which would have if boot_rom ran
         s.write_register(0xFF40, 0x91);
@@ -258,6 +259,31 @@ impl Ppu {
         s.write_register(0xFF49, 0xFF);
         s.write_register(0xFF4A, 0x00);
         s.write_register(0xFF4B, 0x00);
+
+        // palettes for DMG only
+        if !cgb_mode {
+            s.cgb_bg_palettes.set_palette(
+                0,
+                ColorPalette::new([
+                    color!(21, 31, 21),
+                    color!(13, 21, 13),
+                    color!(6, 10, 6),
+                    color!(0, 0, 0),
+                ]),
+            );
+
+            s.cgb_sprite_palettes.set_palette(
+                0,
+                ColorPalette::new([
+                    color!(21, 31, 21),
+                    color!(13, 21, 13),
+                    color!(6, 10, 6),
+                    color!(0, 0, 0),
+                ]),
+            );
+        }
+
+        s.is_cgb_mode = cgb_mode;
 
         s.scanline = 153;
         s.cycle = 400;
@@ -725,12 +751,20 @@ impl Ppu {
                         }
                     }
 
+                    // `cgb_sprite_palettes` 0, 1 will be used in DMG mode
+                    // together with `dmg_sprite_palettes`
+                    let palette_selector = if self.is_cgb_mode {
+                        sprite.cgb_palette()
+                    } else {
+                        sprite.dmg_palette()
+                    };
+
                     // TODO: fix all these parameters
                     self.fifo.mix_sprite(
                         colors,
                         index,
                         sprite,
-                        self.cgb_sprite_palettes.get_palette(sprite.cgb_palette()),
+                        self.cgb_sprite_palettes.get_palette(palette_selector),
                         self.sprite_priority_mode,
                         self.is_cgb_mode && !self.lcd_control.bg_window_priority(),
                     )

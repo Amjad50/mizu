@@ -1,7 +1,37 @@
+macro_rules! color {
+    ($r:expr, $g:expr, $b:expr) => {
+        Color {
+            r: $r,
+            g: $g,
+            b: $b,
+        }
+    };
+}
+
 pub struct Color {
     pub r: u8,
     pub g: u8,
     pub b: u8,
+}
+
+impl Color {
+    pub fn from_raw(mut color: u16) -> Self {
+        let r = (color & 0x1F) as u8;
+        color >>= 5;
+        let g = (color & 0x1F) as u8;
+        color >>= 5;
+        let b = (color & 0x1F) as u8;
+
+        Self { r, g, b }
+    }
+
+    pub fn to_raw(&self) -> u16 {
+        let r = (self.r & 0x1F) as u16;
+        let g = (self.g & 0x1F) as u16;
+        let b = (self.b & 0x1F) as u16;
+
+        r | (g << 5) | (b << 10)
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -16,16 +46,17 @@ impl Default for ColorPalette {
 }
 
 impl ColorPalette {
+    pub fn new(colors: [Color; 4]) -> Self {
+        let mut raw_colors = [0; 4];
+        for (i, color) in colors.iter().enumerate() {
+            raw_colors[i] = color.to_raw();
+        }
+        Self { data: raw_colors }
+    }
+
     pub fn get_color(&self, color_index: u8) -> Color {
-        let mut color = self.data[color_index as usize & 3];
-
-        let r = (color & 0x1F) as u8;
-        color >>= 5;
-        let g = (color & 0x1F) as u8;
-        color >>= 5;
-        let b = (color & 0x1F) as u8;
-
-        Color { r, g, b }
+        let color = self.data[color_index as usize & 3];
+        Color::from_raw(color)
     }
 }
 
@@ -63,7 +94,7 @@ impl Default for ColorPalettesCollection {
     fn default() -> Self {
         Self {
             index: 0,
-            auto_increment: false,
+            auto_increment: true,
             palettes: [ColorPalette::default(); 8],
         }
     }
@@ -95,5 +126,9 @@ impl ColorPalettesCollection {
 
     pub fn get_palette(&self, index: u8) -> ColorPalette {
         self.palettes[index as usize & 7]
+    }
+
+    pub fn set_palette(&mut self, index: u8, palette: ColorPalette) {
+        self.palettes[index as usize & 7] = palette;
     }
 }

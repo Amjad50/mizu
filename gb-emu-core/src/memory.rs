@@ -291,9 +291,11 @@ pub struct Bus {
 
 impl Bus {
     pub fn new_without_boot_rom(cartridge: Cartridge) -> Self {
+        let cgb_mode = cartridge.is_cartridge_color();
+
         Self {
             cartridge,
-            ppu: Ppu::new_skip_boot_rom(),
+            ppu: Ppu::new_skip_boot_rom(cgb_mode),
             wram: Wram::default(),
             interrupts: Interrupts::default(),
             timer: Timer::new_skip_boot_rom(),
