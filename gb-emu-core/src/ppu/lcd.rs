@@ -21,9 +21,22 @@ impl Lcd {
     pub fn push(&mut self, color: Color, y: u8) {
         let index = (y as usize * LCD_WIDTH + self.x as usize) * 3;
 
-        self.buf[index + 0] = color.r;
-        self.buf[index + 1] = color.g;
-        self.buf[index + 2] = color.b;
+        let r = color.r as u16;
+        let g = color.g as u16;
+        let b = color.b as u16;
+
+        let rr = r * 26 + g * 4 + b * 2;
+        let gg = g * 24 + b * 8;
+        let bb = r * 6 + g * 4 + b * 22;
+
+        let rr = rr.min(960) >> 2;
+        let gg = gg.min(960) >> 2;
+        let bb = bb.min(960) >> 2;
+
+        self.buf[index + 0] = rr as u8;
+        self.buf[index + 1] = gg as u8;
+        self.buf[index + 2] = bb as u8;
+
         self.x += 1;
     }
 

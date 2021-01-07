@@ -168,9 +168,9 @@ fn main() {
 
 fn convert_to_rgba(data: &[u8], output: &mut [u8]) {
     for (dest, src) in output.chunks_mut(4).zip(data.chunks(3)) {
-        dest[0] = (src[0] as f32 * 8.2) as u8;
-        dest[1] = (src[1] as f32 * 8.2) as u8;
-        dest[2] = (src[2] as f32 * 8.2) as u8;
+        dest[0] = src[0];
+        dest[1] = src[1];
+        dest[2] = src[2];
         dest[3] = 0xFF;
     }
 }
