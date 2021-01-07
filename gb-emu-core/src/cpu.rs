@@ -108,10 +108,10 @@ impl Cpu {
         let mut cpu = Self::new();
 
         // initial values of the registers (DMG)
-        cpu.reg_af_write(0x01B0);
-        cpu.reg_bc_write(0x0013);
-        cpu.reg_de_write(0x00D8);
-        cpu.reg_hl_write(0x014D);
+        cpu.reg_af_write(0x1180);
+        cpu.reg_bc_write(0x0000);
+        cpu.reg_de_write(0xFF56);
+        cpu.reg_hl_write(0x000D);
         cpu.reg_sp = 0xFFFE;
         cpu.reg_pc = 0x0100;
 
