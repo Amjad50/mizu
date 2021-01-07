@@ -40,22 +40,16 @@ impl Default for Speed {
 #[derive(Default)]
 struct SpeedController {
     preparing_switch: bool,
-    target_switch: Speed,
     current_speed: Speed,
 }
 
 impl SpeedController {
     fn read_key1(&self) -> u8 {
-        self.preparing_switch as u8
+        ((self.current_speed as u8) << 7) | self.preparing_switch as u8
     }
 
     fn write_key1(&mut self, data: u8) {
         self.preparing_switch = data & 1 != 0;
-        self.target_switch = if data & 0x80 != 0 {
-            Speed::Double
-        } else {
-            Speed::Normal
-        };
     }
 
     fn preparing_switch(&self) -> bool {
@@ -68,7 +62,10 @@ impl SpeedController {
 
     fn commit_speed_switch(&mut self) {
         assert!(self.preparing_switch);
-        self.current_speed = self.target_switch;
+        self.current_speed = match self.current_speed {
+            Speed::Normal => Speed::Double,
+            Speed::Double => Speed::Normal,
+        };
         self.preparing_switch = false;
     }
 }
