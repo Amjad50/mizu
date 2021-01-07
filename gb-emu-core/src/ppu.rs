@@ -7,10 +7,10 @@ mod sprite;
 use crate::memory::{InterruptManager, InterruptType};
 use bg_attribs::BgAttribute;
 use bitflags::bitflags;
-use colors::{Color, ColorPalette, ColorPalettesCollection};
+use colors::{Color, ColorPalettesCollection};
 use fifo::{Fifo, FifoPixel, PixelType, SpritePriorityMode};
 use lcd::Lcd;
-use sprite::Sprite;
+use sprite::{SelectedSprite, Sprite};
 
 bitflags! {
     struct LcdControl: u8 {
@@ -177,7 +177,7 @@ pub struct Ppu {
     vram_bank: u8,
     oam: [Sprite; 40],
     // the sprites that got selected
-    selected_oam: [(Sprite, u8); 10],
+    selected_oam: [SelectedSprite; 10],
     selected_oam_size: u8,
 
     cgb_bg_palettes: ColorPalettesCollection,
@@ -221,7 +221,7 @@ impl Default for Ppu {
             vram: [0; 0x4000],
             vram_bank: 0,
             oam: [Sprite::default(); 40],
-            selected_oam: [(Sprite::default(), 0xFF); 10],
+            selected_oam: [SelectedSprite::default(); 10],
             selected_oam_size: 0,
             cgb_bg_palettes: ColorPalettesCollection::default(),
             cgb_sprite_palettes: ColorPalettesCollection::default(),
@@ -548,12 +548,12 @@ impl Ppu {
         }
 
         if self.fifo.len() > 8 {
-            self.try_add_sprite();
-
             if self.fine_scroll_x_discard > 0 {
                 self.fine_scroll_x_discard -= 1;
                 self.fifo.pop();
             } else {
+                self.try_add_sprite();
+
                 let pixel = self.fifo.pop();
 
                 self.lcd.push(self.get_color(pixel), self.scanline);
@@ -680,7 +680,7 @@ impl Ppu {
         for (i, &sprite) in self.oam.iter().enumerate() {
             // in range
             if self.scanline.wrapping_sub(sprite.screen_y()) < self.lcd_control.sprite_size() {
-                self.selected_oam[count] = (sprite, i as u8);
+                self.selected_oam[count] = SelectedSprite::new(sprite, i as u8);
                 count += 1;
 
                 if count == 10 {
@@ -693,11 +693,14 @@ impl Ppu {
 
     fn try_add_sprite(&mut self) {
         if self.lcd_control.sprite_enable() {
-            for (sprite, index) in self
+            for selected_sprite in self
                 .selected_oam
                 .iter()
                 .take(self.selected_oam_size as usize)
             {
+                let sprite = selected_sprite.sprite();
+                let index = selected_sprite.index();
+
                 // the x index of the sprite is of the left of the display
                 let left_out_of_bounds = self.lcd.x() == 0 && sprite.x() < 8;
 
@@ -725,7 +728,7 @@ impl Ppu {
                     // TODO: fix all these parameters
                     self.fifo.mix_sprite(
                         colors,
-                        *index,
+                        index,
                         sprite,
                         self.cgb_sprite_palettes.get_palette(sprite.cgb_palette()),
                         self.sprite_priority_mode,

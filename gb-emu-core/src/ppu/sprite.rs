@@ -12,6 +12,26 @@ bitflags! {
     }
 }
 
+#[derive(Default, Copy, Clone)]
+pub struct SelectedSprite {
+    sprite: Sprite,
+    index: u8,
+}
+
+impl SelectedSprite {
+    pub fn new(sprite: Sprite, index: u8) -> Self {
+        Self { sprite, index }
+    }
+
+    pub fn sprite(&self) -> &Sprite {
+        &self.sprite
+    }
+
+    pub fn index(&self) -> u8 {
+        self.index
+    }
+}
+
 #[derive(Clone, Copy, Default, Debug)]
 pub struct Sprite {
     y: u8,
