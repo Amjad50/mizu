@@ -8,7 +8,7 @@ use crate::memory::{InterruptManager, InterruptType};
 use bg_attribs::BgAttribute;
 use bitflags::bitflags;
 use colors::{Color, ColorPalette, ColorPalettesCollection};
-use fifo::{Fifo, SpritePriorityMode};
+use fifo::{Fifo, FifoPixel, PixelType, SpritePriorityMode};
 use lcd::Lcd;
 use sprite::Sprite;
 
@@ -168,8 +168,8 @@ pub struct Ppu {
     ly: u8,
     lyc: u8,
     stat_interrupt_line: bool,
-    bg_palette: u8,
-    sprite_palette: [u8; 2],
+    dmg_bg_palette: u8,
+    dmg_sprite_palettes: [u8; 2],
     windows_y: u8,
     windows_x: u8,
 
@@ -180,8 +180,8 @@ pub struct Ppu {
     selected_oam: [(Sprite, u8); 10],
     selected_oam_size: u8,
 
-    bg_palettes: ColorPalettesCollection,
-    sprite_palettes: ColorPalettesCollection,
+    cgb_bg_palettes: ColorPalettesCollection,
+    cgb_sprite_palettes: ColorPalettesCollection,
 
     fine_scroll_x_discard: u8,
     fetcher: Fetcher,
@@ -199,6 +199,8 @@ pub struct Ppu {
     lcd_turned_on: bool,
 
     sprite_priority_mode: SpritePriorityMode,
+
+    is_cgb_mode: bool,
 }
 
 impl Default for Ppu {
@@ -212,8 +214,8 @@ impl Default for Ppu {
             ly: 0,
             lyc: 0,
             stat_interrupt_line: false,
-            bg_palette: 0xFC,
-            sprite_palette: [0xFF; 2],
+            dmg_bg_palette: 0xFC,
+            dmg_sprite_palettes: [0xFF; 2],
             windows_y: 0,
             windows_x: 0,
             vram: [0; 0x4000],
@@ -221,8 +223,8 @@ impl Default for Ppu {
             oam: [Sprite::default(); 40],
             selected_oam: [(Sprite::default(), 0xFF); 10],
             selected_oam_size: 0,
-            bg_palettes: ColorPalettesCollection::default(),
-            sprite_palettes: ColorPalettesCollection::default(),
+            cgb_bg_palettes: ColorPalettesCollection::default(),
+            cgb_sprite_palettes: ColorPalettesCollection::default(),
             fine_scroll_x_discard: 0,
             fetcher: Fetcher::default(),
             is_drawing_window: false,
@@ -235,6 +237,8 @@ impl Default for Ppu {
             // CGB by default, the bootrom of the CGB will change
             // it if it detected the rom is DMG
             sprite_priority_mode: SpritePriorityMode::ByIndex,
+
+            is_cgb_mode: true,
         }
     }
 }
@@ -293,9 +297,9 @@ impl Ppu {
             0xFF43 => self.scroll_x,
             0xFF44 => self.ly,
             0xFF45 => self.lyc,
-            0xFF47 => self.bg_palette,
-            0xFF48 => self.sprite_palette[0],
-            0xFF49 => self.sprite_palette[1],
+            0xFF47 => self.dmg_bg_palette,
+            0xFF48 => self.dmg_sprite_palettes[0],
+            0xFF49 => self.dmg_sprite_palettes[1],
             0xFF4A => self.windows_y,
             0xFF4B => self.windows_x,
             _ => unreachable!(),
@@ -338,9 +342,9 @@ impl Ppu {
                 // not writable??
             }
             0xFF45 => self.lyc = data,
-            0xFF47 => self.bg_palette = data,
-            0xFF48 => self.sprite_palette[0] = data,
-            0xFF49 => self.sprite_palette[1] = data,
+            0xFF47 => self.dmg_bg_palette = data,
+            0xFF48 => self.dmg_sprite_palettes[0] = data,
+            0xFF49 => self.dmg_sprite_palettes[1] = data,
             0xFF4A => self.windows_y = data,
             0xFF4B => self.windows_x = data,
             _ => unreachable!(),
@@ -357,20 +361,20 @@ impl Ppu {
 
     pub fn read_color_register(&mut self, addr: u16) -> u8 {
         match addr {
-            0xFF68 => self.bg_palettes.read_index(),
-            0xFF69 => self.bg_palettes.read_color_data(),
-            0xFF6A => self.sprite_palettes.read_index(),
-            0xFF6B => self.sprite_palettes.read_color_data(),
+            0xFF68 => self.cgb_bg_palettes.read_index(),
+            0xFF69 => self.cgb_bg_palettes.read_color_data(),
+            0xFF6A => self.cgb_sprite_palettes.read_index(),
+            0xFF6B => self.cgb_sprite_palettes.read_color_data(),
             _ => unreachable!(),
         }
     }
 
     pub fn write_color_register(&mut self, addr: u16, data: u8) {
         match addr {
-            0xFF68 => self.bg_palettes.write_index(data),
-            0xFF69 => self.bg_palettes.write_color_data(data),
-            0xFF6A => self.sprite_palettes.write_index(data),
-            0xFF6B => self.sprite_palettes.write_color_data(data),
+            0xFF68 => self.cgb_bg_palettes.write_index(data),
+            0xFF69 => self.cgb_bg_palettes.write_color_data(data),
+            0xFF6A => self.cgb_sprite_palettes.write_index(data),
+            0xFF6B => self.cgb_sprite_palettes.write_color_data(data),
             _ => unreachable!(),
         }
     }
@@ -389,6 +393,10 @@ impl Ppu {
         } else {
             0
         }
+    }
+
+    pub fn update_cgb_mode(&mut self, cgb_mode: bool) {
+        self.is_cgb_mode = cgb_mode;
     }
 
     pub fn get_current_mode(&self) -> u8 {
@@ -533,7 +541,7 @@ impl Ppu {
             if let Some((pixels, attribs)) = self.fetcher.pop() {
                 self.fifo.push_bg(
                     pixels,
-                    self.bg_palettes.get_palette(attribs.palette()),
+                    self.cgb_bg_palettes.get_palette(attribs.palette()),
                     attribs.priority(),
                 );
             }
@@ -546,9 +554,9 @@ impl Ppu {
                 self.fine_scroll_x_discard -= 1;
                 self.fifo.pop();
             } else {
-                let (color, palette) = self.fifo.pop();
+                let pixel = self.fifo.pop();
 
-                self.lcd.push(self.get_color(color, palette), self.scanline);
+                self.lcd.push(self.get_color(pixel), self.scanline);
 
                 if self.lcd.x() == 160 {
                     return true;
@@ -559,8 +567,21 @@ impl Ppu {
         false
     }
 
-    fn get_color(&self, color_index: u8, palette: ColorPalette) -> Color {
-        palette.get_color(color_index)
+    fn get_color(&self, pixel: FifoPixel) -> Color {
+        let mut color_index = pixel.color;
+
+        if !self.is_cgb_mode {
+            let dmg_palette = match pixel.pixel_type {
+                PixelType::Background(_) => self.dmg_bg_palette,
+                PixelType::Sprite { dmg_palette, .. } => {
+                    self.dmg_sprite_palettes[dmg_palette as usize]
+                }
+            };
+
+            color_index = (dmg_palette >> (2 * color_index)) & 0b11;
+        }
+
+        pixel.palette.get_color(color_index)
     }
 
     /// Gets the tile number, BgAttribute for that tile, and its y position
@@ -633,21 +654,25 @@ impl Ppu {
     }
 
     fn fetch_bg(&mut self) -> ([u8; 8], BgAttribute) {
-        let (tile, attribs, y) = self.fetch_bg_tile_meta();
-
-        let y = if attribs.is_vertical_flip() {
-            7 - (y % 8)
+        if !self.is_cgb_mode && !self.lcd_control.bg_window_priority() {
+            ([0; 8], BgAttribute::new(0))
         } else {
-            y % 8
-        };
+            let (tile, attribs, y) = self.fetch_bg_tile_meta();
 
-        let mut pattern = self.get_bg_pattern(tile, y, attribs.bank());
+            let y = if attribs.is_vertical_flip() {
+                7 - (y % 8)
+            } else {
+                y % 8
+            };
 
-        if attribs.is_horizontal_flip() {
-            pattern.reverse();
+            let mut pattern = self.get_bg_pattern(tile, y, attribs.bank());
+
+            if attribs.is_horizontal_flip() {
+                pattern.reverse();
+            }
+
+            (pattern, attribs)
         }
-
-        (pattern, attribs)
     }
 
     fn load_selected_sprites_oam(&mut self) {
@@ -700,11 +725,11 @@ impl Ppu {
                     // TODO: fix all these parameters
                     self.fifo.mix_sprite(
                         colors,
-                        self.sprite_palettes.get_palette(sprite.cgb_palette()),
                         *index,
+                        sprite,
+                        self.cgb_sprite_palettes.get_palette(sprite.cgb_palette()),
                         self.sprite_priority_mode,
-                        sprite.bg_priority(),
-                        !self.lcd_control.bg_window_priority(),
+                        self.is_cgb_mode && !self.lcd_control.bg_window_priority(),
                     )
                 }
             }

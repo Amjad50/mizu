@@ -463,7 +463,11 @@ impl Bus {
             (0xFF46, _) => self.dma.start_dma(data), // dma start
             (0xFF4D, _) => self.speed_controller.write_key1(data), // speed
             (0xFF4F, _) => self.ppu.set_vram_bank(data), // vram bank
-            (0xFF50, _) => self.boot_rom.enabled = false, // boot rom stop
+            (0xFF50, _) => {
+                self.boot_rom.enabled = false;
+                self.ppu
+                    .update_cgb_mode(self.cartridge.is_cartridge_color());
+            } // boot rom stop
             (0xFF51..=0xFF55, _) => self.hdma.write_register(addr, data), // hdma
             (0xFF56, _) => {
                 todo!("RP port");

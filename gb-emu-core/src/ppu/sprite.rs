@@ -6,7 +6,7 @@ bitflags! {
         const PRIORITY    = 1 << 7;
         const Y_FLIP      = 1 << 6;
         const X_FLIP      = 1 << 5;
-        const PALLETE     = 1 << 4;
+        const DMG_PALLETE = 1 << 4;
         const BANK        = 1 << 3;
         const CGB_PALETTE = 0b111;
     }
@@ -65,9 +65,8 @@ impl Sprite {
         self.tile
     }
 
-    // TODO: should be used in DMG mode
-    pub fn palette_selector(&self) -> u8 {
-        self.flags.intersects(SpriteFlags::PALLETE) as u8
+    pub fn dmg_palette(&self) -> u8 {
+        self.flags.intersects(SpriteFlags::DMG_PALLETE) as u8
     }
 
     /// False if its above background (1-3)
