@@ -45,7 +45,7 @@ struct SpeedController {
 
 impl SpeedController {
     fn read_key1(&self) -> u8 {
-        ((self.current_speed as u8) << 7) | self.preparing_switch as u8
+        0x7E | ((self.current_speed as u8) << 7) | self.preparing_switch as u8
     }
 
     fn write_key1(&mut self, data: u8) {
@@ -281,7 +281,7 @@ impl Wram {
     }
 
     fn get_wram_bank(&self) -> u8 {
-        self.bank
+        0xF8 | self.bank
     }
 }
 

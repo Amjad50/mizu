@@ -378,7 +378,7 @@ impl Ppu {
     }
 
     pub fn get_vram_bank(&self) -> u8 {
-        self.vram_bank
+        0xFE | self.vram_bank
     }
 
     pub fn set_vram_bank(&mut self, data: u8) {
@@ -414,7 +414,7 @@ impl Ppu {
     }
 
     pub fn read_sprite_priority_mode(&self) -> u8 {
-        if let SpritePriorityMode::ByIndex = self.sprite_priority_mode {
+        0xFE | if let SpritePriorityMode::ByIndex = self.sprite_priority_mode {
             1
         } else {
             0

@@ -102,7 +102,7 @@ impl Default for ColorPalettesCollection {
 
 impl ColorPalettesCollection {
     pub fn read_index(&self) -> u8 {
-        ((self.auto_increment as u8) << 7) | self.index
+        ((self.auto_increment as u8) << 7) | 0x40 | self.index
     }
 
     pub fn write_index(&mut self, data: u8) {
