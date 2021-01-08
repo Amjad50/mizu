@@ -367,7 +367,6 @@ impl Cartridge {
 
     pub fn is_cartridge_color(&self) -> bool {
         self.target_device == TargetDevice::ColorOnly
-            || self.target_device == TargetDevice::ColorAndDMG
     }
 }
 
