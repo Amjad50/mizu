@@ -83,9 +83,11 @@ struct HDMA {
     source_addr: u16,
     dest_addr: u16,
     length: u8,
-    block_size_remaining: u8,
-    hdma_type: bool,
-    active: bool,
+    /// `true` if transfere during hblank only
+    hblank_dma: bool,
+    master_dma_active: bool,
+    hblank_dma_active: bool,
+    cached_ppu_hblank: bool,
 }
 
 impl HDMA {
@@ -118,16 +120,21 @@ impl HDMA {
             0xFF55 => {
                 // control
                 self.length = data & 0x7F;
-                if self.active {
-                    let new_flag = data & 0x80 != 0;
+                if self.master_dma_active {
+                    // make sure we are in hblank only
+                    assert!(self.hblank_dma);
+
+                    self.master_dma_active = data & 0x80 != 0;
+
                     // TODO: if new_flag is true, it should restart transfere.
                     //  check if source should start from the beginning or
                     //  current value
-                    self.active = new_flag;
+                    self.source_addr &= 0xFFF0;
+                    self.dest_addr &= 0xFFF0;
                 } else {
-                    self.active = true;
-                    self.block_size_remaining = 0x10;
-                    self.hdma_type = data & 0x80 != 0;
+                    self.master_dma_active = true;
+                    self.cached_ppu_hblank = false;
+                    self.hblank_dma = data & 0x80 != 0;
                 }
             }
             _ => unreachable!(),
@@ -137,7 +144,7 @@ impl HDMA {
     fn read_register(&mut self, addr: u16) -> u8 {
         match addr {
             0xFF51..=0xFF54 => 0xFF,
-            0xFF55 => (((!self.active) as u8) << 7) | self.length, // control
+            0xFF55 => (((!self.master_dma_active) as u8) << 7) | self.length, // control
             _ => unreachable!(),
         }
     }
@@ -152,20 +159,29 @@ impl HDMA {
         for value in values {
             ppu.write_vram(self.dest_addr, *value);
             self.dest_addr += 1;
-            self.block_size_remaining -= 1;
 
-            if self.block_size_remaining == 0 {
-                self.block_size_remaining = 0x10;
+            if self.dest_addr & 0xF == 0 {
+                self.hblank_dma_active = false;
                 self.length = self.length.wrapping_sub(1);
+
                 if self.length == 0xFF {
-                    self.active = false;
+                    self.master_dma_active = false;
                 }
             }
         }
     }
 
-    fn is_transferreing(&self, ppu: &Ppu) -> bool {
-        self.active && (!self.hdma_type || (self.hdma_type && ppu.get_current_mode() == 0))
+    fn is_transferreing(&mut self, ppu: &Ppu) -> bool {
+        let new_ppu_hblank_mode = ppu.get_current_mode() == 0;
+
+        if self.hblank_dma && !self.hblank_dma_active {
+            if !self.cached_ppu_hblank && new_ppu_hblank_mode {
+                self.hblank_dma_active = true;
+            }
+        }
+        self.cached_ppu_hblank = new_ppu_hblank_mode;
+
+        self.master_dma_active && (!self.hblank_dma || self.hblank_dma_active)
     }
 }
 
