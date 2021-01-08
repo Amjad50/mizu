@@ -133,6 +133,7 @@ impl HDMA {
                     self.dest_addr &= 0xFFF0;
                 } else {
                     self.master_dma_active = true;
+                    self.hblank_dma_active = false;
                     self.cached_ppu_hblank = false;
                     self.hblank_dma = data & 0x80 != 0;
                 }
