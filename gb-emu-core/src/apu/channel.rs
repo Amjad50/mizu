@@ -75,6 +75,11 @@ impl<C: ApuChannel> LengthCountedChannel<C> {
         }
         self.trigger();
     }
+
+    pub fn reset_length_counter(&mut self) {
+        self.length = self.max_length;
+        self.current_counter = self.length;
+    }
 }
 
 impl<C: ApuChannel> ApuChannel for LengthCountedChannel<C> {

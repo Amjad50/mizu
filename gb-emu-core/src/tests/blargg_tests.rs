@@ -49,12 +49,54 @@ gb_tests!(
     "blargg-gb-tests/dmg_sound/rom_singles/07-len sweep period sync.gb",
     10534885036225965023;
 
-    blargg_dmg_sound_08_len_ctr_during_power,
-    "blargg-gb-tests/dmg_sound/rom_singles/08-len ctr during power.gb",
-    12779871937667929616;
+    // fail in CGB
+    // blargg_dmg_sound_08_len_ctr_during_power,
+    // "blargg-gb-tests/dmg_sound/rom_singles/08-len ctr during power.gb",
+    // 12779871937667929616;
 
-    blargg_dmg_sound_11_regs_after_power,
-    "blargg-gb-tests/dmg_sound/rom_singles/11-regs after power.gb",
+    // fail in CGB
+    //blargg_dmg_sound_11_regs_after_power,
+    //"blargg-gb-tests/dmg_sound/rom_singles/11-regs after power.gb",
+    //14344078491883240837;
+
+
+    blargg_cgb_sound_01_registers,
+    "blargg-gb-tests/cgb_sound/rom_singles/01-registers.gb",
+    17440332955472206150;
+
+    blargg_cgb_sound_02_len_ctr,
+    "blargg-gb-tests/cgb_sound/rom_singles/02-len ctr.gb",
+    4060957075670844583;
+
+    blargg_cgb_sound_03_trigger,
+    "blargg-gb-tests/cgb_sound/rom_singles/03-trigger.gb",
+    7262377342751395856;
+
+    blargg_cgb_sound_04_sweep,
+    "blargg-gb-tests/cgb_sound/rom_singles/04-sweep.gb",
+    13946185113601916246;
+
+    blargg_cgb_sound_05_sweep_details,
+    "blargg-gb-tests/cgb_sound/rom_singles/05-sweep details.gb",
+    11178214727532716427;
+
+    blargg_cgb_sound_06_overflow_on_trigger,
+    "blargg-gb-tests/cgb_sound/rom_singles/06-overflow on trigger.gb",
+    2121820975398441942;
+
+    blargg_cgb_sound_07_len_sweep_period_sync,
+    "blargg-gb-tests/cgb_sound/rom_singles/07-len sweep period sync.gb",
+    10534885036225965023;
+
+    blargg_cgb_sound_08_len_ctr_during_power,
+    "blargg-gb-tests/cgb_sound/rom_singles/08-len ctr during power.gb",
+    9996406654520990387;
+
+    blargg_cgb_sound_10_wave_trigger_while_on,
+    "blargg-gb-tests/cgb_sound/rom_singles/10-wave trigger while on.gb",
+    13663923319467209877;
+
+    blargg_cgb_sound_11_regs_after_power,
+    "blargg-gb-tests/cgb_sound/rom_singles/11-regs after power.gb",
     14344078491883240837;
-
 );

@@ -445,6 +445,12 @@ impl Apu {
         self.pulse1.channel_mut().reset_sequencer();
         self.pulse2.channel_mut().reset_sequencer();
         self.wave.channel_mut().reset_buffer_index();
+
+        // reset length counters in CGB
+        self.pulse1.reset_length_counter();
+        self.pulse2.reset_length_counter();
+        self.wave.reset_length_counter();
+        self.noise.reset_length_counter();
     }
 
     /// determines if the next frame sequencer clock is going to include
