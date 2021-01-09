@@ -532,8 +532,8 @@ impl Ppu {
 
         // increment cycle
         self.cycle += clocks as u16;
-        if self.cycle == 456 {
-            self.cycle = 0;
+        if self.cycle >= 456 {
+            self.cycle -= 456;
             self.scanline += 1;
             if self.scanline == 154 {
                 self.scanline = 0;
