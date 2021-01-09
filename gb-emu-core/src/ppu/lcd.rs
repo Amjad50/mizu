@@ -6,6 +6,7 @@ pub const LCD_HEIGHT: usize = 144;
 pub struct Lcd {
     x: u8,
     buf: [u8; LCD_WIDTH * LCD_HEIGHT * 3],
+    raw_buf: [u8; LCD_WIDTH * LCD_HEIGHT * 3],
 }
 
 impl Default for Lcd {
@@ -13,6 +14,7 @@ impl Default for Lcd {
         Self {
             x: 0,
             buf: [0xFF; LCD_WIDTH * LCD_HEIGHT * 3],
+            raw_buf: [0x1F; LCD_WIDTH * LCD_HEIGHT * 3],
         }
     }
 }
@@ -37,6 +39,11 @@ impl Lcd {
         self.buf[index + 1] = gg as u8;
         self.buf[index + 2] = bb as u8;
 
+        // used for testing
+        self.raw_buf[index + 0] = color.r & 0x1F;
+        self.raw_buf[index + 1] = color.g & 0x1F;
+        self.raw_buf[index + 2] = color.b & 0x1F;
+
         self.x += 1;
     }
 
@@ -52,10 +59,16 @@ impl Lcd {
         &self.buf
     }
 
+    #[cfg(test)]
+    pub fn raw_screen_buffer(&self) -> &[u8] {
+        &self.raw_buf
+    }
+
     pub fn clear(&mut self) {
-        for i in &mut self.buf {
+        for (byte, raw_byte) in self.buf.iter_mut().zip(self.raw_buf.iter_mut()) {
             // fill with white
-            *i = 0xFF;
+            *byte = 0xFF;
+            *raw_byte = 0x1F;
         }
     }
 }

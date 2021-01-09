@@ -28,8 +28,8 @@ macro_rules! gb_tests {
 
                 gb.$looping_statement();
 
-                let screen_buffer = gb.screen_buffer();
-                crate::tests::print_screen_buffer(screen_buffer);
+                let screen_buffer = gb.raw_screen_buffer();
+                gb.print_screen_buffer();
 
                 assert_eq!(
                     crc::crc64::checksum_ecma(screen_buffer),
@@ -46,23 +46,6 @@ mod blargg_tests;
 mod mooneye_tests;
 mod scribbltests;
 
-fn print_screen_buffer(buffer: &[u8]) {
-    const TV_WIDTH: u32 = 160;
-    const TV_HEIGHT: u32 = 144;
-
-    let brightness_ascii = &[' ', '.', ':', '#'];
-
-    for i in 0..TV_HEIGHT as usize {
-        for j in 0..TV_WIDTH as usize {
-            print!(
-                "{}",
-                brightness_ascii[(buffer[i * TV_WIDTH as usize + j] / 85) as usize]
-            )
-        }
-        println!()
-    }
-}
-
 struct TestingGameBoy {
     cpu: Cpu,
     bus: Bus,
@@ -78,8 +61,42 @@ impl TestingGameBoy {
         })
     }
 
-    pub fn screen_buffer(&self) -> &[u8] {
-        self.bus.screen_buffer()
+    pub fn raw_screen_buffer(&self) -> &[u8] {
+        self.bus.raw_screen_buffer()
+    }
+
+    pub fn print_screen_buffer(&self) {
+        let buffer = self.raw_screen_buffer();
+
+        const TV_WIDTH: u32 = 160;
+        const TV_HEIGHT: u32 = 144;
+
+        const BRIGHTNESS_ASCII: [char; 10] = ['@', '%', '#', '*', '+', '=', '-', ':', '.', ' '];
+
+        let mut i = 0;
+        let mut j = 0;
+        for pixel in buffer.chunks(3) {
+            // we shouldn't go beyond the limit
+            assert_ne!(j, TV_HEIGHT);
+
+            let r = pixel[0] as f32;
+            let g = pixel[0] as f32;
+            let b = pixel[0] as f32;
+            let brightness = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            let brightness_index = (brightness / (31.0 / 9.0)).round() as usize;
+
+            print!("{}", BRIGHTNESS_ASCII[brightness_index]);
+
+            i += 1;
+            if i == TV_WIDTH {
+                j += 1;
+                i = 0;
+
+                println!();
+            }
+        }
+
+        println!();
     }
 
     pub fn clock_until_infinte_loop(&mut self) {

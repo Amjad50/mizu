@@ -434,6 +434,11 @@ impl Ppu {
         self.lcd.screen_buffer()
     }
 
+    #[cfg(test)]
+    pub fn raw_screen_buffer(&self) -> &[u8] {
+        self.lcd.raw_screen_buffer()
+    }
+
     pub fn clock<I: InterruptManager>(&mut self, interrupt_manager: &mut I, clocks: u8) {
         let mut new_stat_int_happened = false;
 

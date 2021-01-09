@@ -7,9 +7,8 @@ mod ppu;
 mod serial;
 mod timer;
 
-//#[cfg(test)]
-//TODO: re enable tests once the CGB implementation is finished
-//mod tests;
+#[cfg(test)]
+mod tests;
 
 use cartridge::{Cartridge, CartridgeError};
 use cpu::Cpu;

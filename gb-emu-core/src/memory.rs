@@ -343,6 +343,11 @@ impl Bus {
         self.ppu.screen_buffer()
     }
 
+    #[cfg(test)]
+    pub(in crate) fn raw_screen_buffer(&self) -> &[u8] {
+        self.ppu.raw_screen_buffer()
+    }
+
     pub fn audio_buffer(&mut self) -> Vec<f32> {
         self.apu.get_buffer()
     }

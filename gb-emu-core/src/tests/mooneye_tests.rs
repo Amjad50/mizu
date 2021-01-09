@@ -15,8 +15,7 @@ macro_rules! mooneye_tests {
 
                 let regs = gb.clock_until_breakpoint();
 
-                let screen_buffer = gb.screen_buffer();
-                crate::tests::print_screen_buffer(screen_buffer);
+                gb.print_screen_buffer();
 
                 // These checks are taken from mooneye emulator
                 if regs.a != 0 {
@@ -83,20 +82,20 @@ mod mbc5 {
 mod acceptance {
     mooneye_tests!("acceptance";
         add_sp_e_timing,
-        boot_div-dmgABCmgb,
-        boot_hwio-dmgABCmgb,
-        boot_regs-dmgABC,
+        boot_div-dmgABCmgb, // should fail
+        // boot_hwio-dmgABCmgb,
+        // boot_regs-dmgABC,
         call_cc_timing2,
         call_cc_timing,
         call_timing2,
         call_timing,
-        di_timing-GS,
+        di_timing-GS, // should fail
         div_timing,
         ei_sequence,
         ei_timing,
         halt_ime0_ei,
         halt_ime0_nointr_timing,
-        halt_ime1_timing2-GS,
+        halt_ime1_timing2-GS, // should fail
         halt_ime1_timing,
         if_ie_registers,
         intr_timing,
@@ -117,7 +116,7 @@ mod acceptance {
     );
 
     mod bits {
-        mooneye_tests!("acceptance/bits"; mem_oam, reg_f, unused_hwio-GS);
+        mooneye_tests!("acceptance/bits"; mem_oam, reg_f, /* unused_hwio-GS */);
     }
 
     mod instr {
@@ -132,14 +131,14 @@ mod acceptance {
         mooneye_tests!("acceptance/oam_dma";
             basic,
             reg_read,
-            sources-GS
+            sources-GS // should fail
         );
     }
 
     mod ppu {
         mooneye_tests!("acceptance/ppu";
             //hblank_ly_scx_timing-GS,
-            intr_1_2_timing-GS,
+            intr_1_2_timing-GS, // should fail
             //intr_2_0_timing,
             intr_2_mode0_timing,
             //intr_2_mode0_timing_sprites,
@@ -149,7 +148,7 @@ mod acceptance {
             //lcdon_write_timing-GS,
             stat_irq_blocking,
             stat_lyc_onoff,
-            vblank_stat_intr-GS,
+            vblank_stat_intr-GS, // should fail
         );
     }
 
