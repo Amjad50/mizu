@@ -281,6 +281,7 @@ impl Ppu {
                     color!(0, 0, 0),
                 ]),
             );
+            s.sprite_priority_mode = SpritePriorityMode::ByCoord;
         }
 
         s.is_cgb_mode = cgb_mode;
