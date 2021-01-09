@@ -447,7 +447,8 @@ impl Bus {
             (0xFF50, _) => 0xFF,            // boot rom stop
             (0xFF51..=0xFF55, _) => self.hdma.read_register(addr), // hdma
             (0xFF56, _) => {
-                todo!("RP port");
+                // TODO: implement RP port
+                0xFF
             }
             (0xFF68..=0xFF69, _) | (0xFF6A..=0xFF6B, _) => {
                 self.ppu.read_color_register(addr) // ppu colors
@@ -491,7 +492,7 @@ impl Bus {
             } // boot rom stop
             (0xFF51..=0xFF55, _) => self.hdma.write_register(addr, data), // hdma
             (0xFF56, _) => {
-                todo!("RP port");
+                //TODO: implement RP port
             }
             (0xFF68..=0xFF69, _) | (0xFF6A..=0xFF6B, _) => {
                 self.ppu.write_color_register(addr, data); // ppu colors
