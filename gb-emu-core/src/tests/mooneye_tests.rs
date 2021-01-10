@@ -89,13 +89,13 @@ mod acceptance {
         call_cc_timing,
         call_timing2,
         call_timing,
-        di_timing-GS, // should fail
+        // di_timing-GS,
         div_timing,
         ei_sequence,
         ei_timing,
         halt_ime0_ei,
         halt_ime0_nointr_timing,
-        halt_ime1_timing2-GS, // should fail
+        // halt_ime1_timing2-GS,
         halt_ime1_timing,
         if_ie_registers,
         intr_timing,
@@ -138,11 +138,11 @@ mod acceptance {
     mod ppu {
         mooneye_tests!("acceptance/ppu";
             //hblank_ly_scx_timing-GS,
-            intr_1_2_timing-GS, // should fail
-            //intr_2_0_timing,
-            intr_2_mode0_timing,
+            //intr_1_2_timing-GS,
+            intr_2_0_timing,
+            //intr_2_mode0_timing,
             //intr_2_mode0_timing_sprites,
-            intr_2_mode3_timing,
+            //intr_2_mode3_timing,
             //intr_2_oam_ok_timing,
             //lcdon_timing-GS,
             //lcdon_write_timing-GS,

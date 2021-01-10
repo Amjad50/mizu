@@ -131,6 +131,7 @@ impl Cpu {
 
             if bus.check_interrupts() {
                 self.halt_mode = HaltMode::NotHalting;
+                self.advance_bus(bus);
             } else {
                 return CpuState::Halting;
             }
