@@ -37,11 +37,11 @@ impl WaveChannel {
     }
 
     pub fn write_buffer(&mut self, offset: u8, data: u8) {
-        self.buffer[offset as usize & 0xF] = data;
+        self.buffer[self.wave_buffer_index(offset)] = data;
     }
 
     pub fn read_buffer(&self, offset: u8) -> u8 {
-        self.buffer[offset as usize & 0xF]
+        self.buffer[self.wave_buffer_index(offset)]
     }
 
     pub fn clock(&mut self) {
@@ -63,6 +63,15 @@ impl WaveChannel {
 impl WaveChannel {
     fn clock_position(&mut self) {
         self.buffer_position = (self.buffer_position + 1) & 0x1F;
+    }
+
+    fn wave_buffer_index(&self, offset: u8) -> usize {
+        (if self.dac_enable && self.channel_enable {
+            self.buffer_position / 2
+        } else {
+            offset
+        }) as usize
+            & 0xF
     }
 }
 
@@ -90,6 +99,9 @@ impl ApuChannel for WaveChannel {
 
     fn trigger(&mut self) {
         self.buffer_position = 0;
+        // no idea why `3` works here, but with this tests pass and found it
+        // in other emulators
+        self.frequency_timer = (0x7FF - self.frequency + 3) / 2;
     }
 
     fn set_dac_enable(&mut self, enabled: bool) {
