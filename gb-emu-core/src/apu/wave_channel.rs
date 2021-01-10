@@ -10,6 +10,7 @@ pub struct WaveChannel {
 
     buffer: [u8; 16],
     buffer_position: u8,
+    buffer_position_just_clocked: bool,
 
     frequency_timer: u16,
 
@@ -37,21 +38,32 @@ impl WaveChannel {
     }
 
     pub fn write_buffer(&mut self, offset: u8, data: u8) {
-        self.buffer[self.wave_buffer_index(offset)] = data;
+        if let Some(index) = self.wave_buffer_index(offset) {
+            self.buffer[index] = data;
+        }
     }
 
     pub fn read_buffer(&self, offset: u8) -> u8 {
-        self.buffer[self.wave_buffer_index(offset)]
+        if let Some(index) = self.wave_buffer_index(offset) {
+            self.buffer[index]
+        } else {
+            0xFF
+        }
     }
 
     pub fn clock(&mut self) {
-        if self.frequency_timer == 0 {
-            self.clock_position();
+        // wave is clocked two times
+        for _ in 0..2 {
+            self.buffer_position_just_clocked = false;
+            if self.frequency_timer == 0 {
+                self.clock_position();
+                self.buffer_position_just_clocked = true;
 
-            // reload timer
-            self.frequency_timer = (0x7FF - self.frequency) / 2;
-        } else {
-            self.frequency_timer -= 1;
+                // reload timer
+                self.frequency_timer = 0x7FF - self.frequency;
+            } else {
+                self.frequency_timer -= 1;
+            }
         }
     }
 
@@ -65,13 +77,18 @@ impl WaveChannel {
         self.buffer_position = (self.buffer_position + 1) & 0x1F;
     }
 
-    fn wave_buffer_index(&self, offset: u8) -> usize {
-        (if self.dac_enable && self.channel_enable {
+    /// returns `Some` if the wave is accessable, `None` otherwise (for DMG)
+    fn wave_buffer_index(&self, offset: u8) -> Option<usize> {
+        let index = if self.dac_enable && self.channel_enable {
+            // TODO: when there is support for DMG, change this to return None
+            //  if appropriate
             self.buffer_position / 2
         } else {
             offset
-        }) as usize
-            & 0xF
+        } as usize
+            & 0xF;
+
+        Some(index)
     }
 }
 
@@ -101,7 +118,7 @@ impl ApuChannel for WaveChannel {
         self.buffer_position = 0;
         // no idea why `3` works here, but with this tests pass and found it
         // in other emulators
-        self.frequency_timer = (0x7FF - self.frequency + 3) / 2;
+        self.frequency_timer = 0x7FF - self.frequency + 3;
     }
 
     fn set_dac_enable(&mut self, enabled: bool) {
