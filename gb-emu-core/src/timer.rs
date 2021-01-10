@@ -51,7 +51,7 @@ impl Default for Timer {
 impl Timer {
     pub fn new_skip_boot_rom() -> Self {
         Self {
-            divider: 0xABCC, // divider value after the boot_rom finish executing
+            divider: 0x2678, // divider value after the boot_rom finish executing
             ..Self::default()
         }
     }

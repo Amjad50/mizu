@@ -82,7 +82,7 @@ mod mbc5 {
 mod acceptance {
     mooneye_tests!("acceptance";
         add_sp_e_timing,
-        boot_div-dmgABCmgb, // should fail
+        // boot_div-dmgABCmgb,
         // boot_hwio-dmgABCmgb,
         // boot_regs-dmgABC,
         call_cc_timing2,
