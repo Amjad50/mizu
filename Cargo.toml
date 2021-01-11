@@ -1,7 +1,8 @@
 [workspace]
 members = [
     "gb-emu-core",
-    "gb-emu-sfml"
+    "gb-emu-sfml",
+    "gb-emu-druid"
 ]
 
 [profile.dev]
