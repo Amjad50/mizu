@@ -56,64 +56,68 @@ impl Timer {
         }
     }
 
-    pub fn read_register(&self, addr: u16) -> u8 {
-        match addr {
-            0xFF04 => (self.divider >> 8) as u8,
-            0xFF05 => self.timer_counter,
-            0xFF06 => self.timer_reload,
-            0xFF07 => self.timer_control.bits() | 0xF8,
-            _ => unreachable!(),
+    pub fn read_div(&self) -> u8 {
+        (self.divider >> 8) as u8
+    }
+
+    pub fn write_div(&mut self, data: u8) {
+        let old_divider_bit = self.divider_bit();
+        self.divider = 0; // reset
+        let new_divider_bit = self.divider_bit();
+
+        if old_divider_bit && !new_divider_bit {
+            self.increment_timer();
         }
     }
 
-    pub fn write_register(&mut self, addr: u16, data: u8) {
-        match addr {
-            0xFF04 => {
-                let old_divider_bit = self.divider_bit();
-                self.divider = 0; // reset
-                let new_divider_bit = self.divider_bit();
+    pub fn read_timer_counter(&self) -> u8 {
+        self.timer_counter
+    }
 
-                if old_divider_bit && !new_divider_bit {
-                    self.increment_timer();
-                }
-            }
-            0xFF05 => {
-                // ignore timer reload and interrupt if there is an interrupt_next
-                self.interrupt_next = false;
+    pub fn write_timer_counter(&mut self, data: u8) {
+        // ignore timer reload and interrupt if there is an interrupt_next
+        self.interrupt_next = false;
 
-                // in the case this is the timer counter(TIMA) is reloaded
-                // (and interrupt is triggered), then reload from the (TMA)
-                // and ignore `data`
-                self.timer_counter = if self.during_interrupt {
-                    self.timer_reload
-                } else {
-                    data
-                };
-            }
-            0xFF06 => {
-                self.timer_reload = data;
+        // in the case this is the timer counter(TIMA) is reloaded
+        // (and interrupt is triggered), then reload from the (TMA)
+        // and ignore `data`
+        self.timer_counter = if self.during_interrupt {
+            self.timer_reload
+        } else {
+            data
+        };
+    }
 
-                // if TMA is written during the same cycle it is reloaded into
-                // the timer counter (TIMA), then reload TIMA as well
-                if self.during_interrupt {
-                    self.timer_counter = self.timer_reload;
-                }
-            }
-            0xFF07 => {
-                let old_enable = self.timer_control.timer_enabled();
-                let old_divider_bit = old_enable && self.divider_bit();
+    pub fn read_timer_reload(&self) -> u8 {
+        self.timer_reload
+    }
 
-                self.timer_control
-                    .clone_from(&TimerControl::from_bits_truncate(data));
+    pub fn write_timer_reload(&mut self, data: u8) {
+        self.timer_reload = data;
 
-                let new_enable = self.timer_control.timer_enabled();
-                let new_divider_bit = new_enable && self.divider_bit();
+        // if TMA is written during the same cycle it is reloaded into
+        // the timer counter (TIMA), then reload TIMA as well
+        if self.during_interrupt {
+            self.timer_counter = self.timer_reload;
+        }
+    }
 
-                if old_divider_bit && !new_divider_bit {
-                    self.increment_timer();
-                }
-            }
-            _ => unreachable!(),
+    pub fn read_control(&self) -> u8 {
+        self.timer_control.bits() | 0xF8
+    }
+
+    pub fn write_control(&mut self, data: u8) {
+        let old_enable = self.timer_control.timer_enabled();
+        let old_divider_bit = old_enable && self.divider_bit();
+
+        self.timer_control
+            .clone_from(&TimerControl::from_bits_truncate(data));
+
+        let new_enable = self.timer_control.timer_enabled();
+        let new_divider_bit = new_enable && self.divider_bit();
+
+        if old_divider_bit && !new_divider_bit {
+            self.increment_timer();
         }
     }
 

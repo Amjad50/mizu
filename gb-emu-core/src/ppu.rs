@@ -250,15 +250,15 @@ impl Ppu {
     pub fn new_skip_boot_rom(cgb_mode: bool) -> Self {
         let mut s = Self::default();
         // set I/O registers to the value which would have if boot_rom ran
-        s.write_register(0xFF40, 0x91);
-        s.write_register(0xFF42, 0x00);
-        s.write_register(0xFF43, 0x00);
-        s.write_register(0xFF45, 0x00);
-        s.write_register(0xFF47, 0xFC);
-        s.write_register(0xFF48, 0xFF);
-        s.write_register(0xFF49, 0xFF);
-        s.write_register(0xFF4A, 0x00);
-        s.write_register(0xFF4B, 0x00);
+        s.write_lcd_control(0x91);
+        s.write_scroll_y(0x00);
+        s.write_scroll_x(0x00);
+        s.write_lyc(0x00);
+        s.write_dmg_bg_palette(0xFC);
+        s.write_dmg_sprite_palettes(0, 0xFF);
+        s.write_dmg_sprite_palettes(1, 0xFF);
+        s.write_window_y(0x00);
+        s.write_window_x(0x00);
 
         // palettes for DMG only
         if !cgb_mode {
@@ -316,94 +316,144 @@ impl Ppu {
         self.oam[addr as usize / 4].set_at_offset(addr as u8 % 4, data);
     }
 
-    pub fn read_register(&mut self, addr: u16) -> u8 {
-        match addr {
-            0xFF40 => self.lcd_control.bits(),
-            0xFF41 => 0x80 | self.lcd_status.bits(),
-            0xFF42 => self.scroll_y,
-            0xFF43 => self.scroll_x,
-            0xFF44 => self.ly,
-            0xFF45 => self.lyc,
-            0xFF47 => self.dmg_bg_palette,
-            0xFF48 => self.dmg_sprite_palettes[0],
-            0xFF49 => self.dmg_sprite_palettes[1],
-            0xFF4A => self.windows_y,
-            0xFF4B => self.windows_x,
-            _ => unreachable!(),
+    pub fn read_lcd_control(&self) -> u8 {
+        self.lcd_control.bits()
+    }
+
+    pub fn write_lcd_control(&mut self, data: u8) {
+        let old_disply_enable = self.lcd_control.display_enable();
+
+        self.lcd_control
+            .clone_from(&LcdControl::from_bits_truncate(data));
+
+        if !self.lcd_control.display_enable() && old_disply_enable {
+            if self.scanline < 144 {
+                println!(
+                    "[WARN] Tried to turn off display outside VBLANK, hardware may get corrupted"
+                );
+            }
+
+            self.ly = 0;
+            self.cycle = 4;
+            self.scanline = 0;
+            self.lcd_status.current_mode_set(0);
+            self.lcd.clear();
+
+            // to function as soon as lcd is turned on
+            self.lcd_turned_on = true;
         }
     }
 
-    pub fn write_register(&mut self, addr: u16, data: u8) {
-        match addr {
-            0xFF40 => {
-                let old_disply_enable = self.lcd_control.display_enable();
-
-                self.lcd_control
-                    .clone_from(&LcdControl::from_bits_truncate(data));
-
-                if !self.lcd_control.display_enable() && old_disply_enable {
-                    if self.scanline < 144 {
-                        println!(
-                            "[WARN] Tried to turn off display outside VBLANK, hardware may get corrupted"
-                        );
-                    }
-
-                    self.ly = 0;
-                    self.cycle = 4;
-                    self.scanline = 0;
-                    self.lcd_status.current_mode_set(0);
-                    self.lcd.clear();
-
-                    // to function as soon as lcd is turned on
-                    self.lcd_turned_on = true;
-                }
-            }
-            0xFF41 => {
-                self.lcd_status.clone_from(&LcdStatus::from_bits_truncate(
-                    (self.lcd_status.bits() & !0x78) | (data & 0x78),
-                ));
-            }
-            0xFF42 => self.scroll_y = data,
-            0xFF43 => self.scroll_x = data,
-            0xFF44 => {
-                // not writable??
-            }
-            0xFF45 => self.lyc = data,
-            0xFF47 => self.dmg_bg_palette = data,
-            0xFF48 => self.dmg_sprite_palettes[0] = data,
-            0xFF49 => self.dmg_sprite_palettes[1] = data,
-            0xFF4A => self.windows_y = data,
-            0xFF4B => self.windows_x = data,
-            _ => unreachable!(),
-        }
+    pub fn read_lcd_status(&self) -> u8 {
+        0x80 | self.lcd_status.bits()
     }
 
-    pub fn get_vram_bank(&self) -> u8 {
+    pub fn write_lcd_status(&mut self, data: u8) {
+        self.lcd_status.clone_from(&LcdStatus::from_bits_truncate(
+            (self.lcd_status.bits() & !0x78) | (data & 0x78),
+        ));
+    }
+
+    pub fn read_scroll_y(&self) -> u8 {
+        self.scroll_y
+    }
+
+    pub fn write_scroll_y(&mut self, data: u8) {
+        self.scroll_y = data;
+    }
+
+    pub fn read_scroll_x(&self) -> u8 {
+        self.scroll_x
+    }
+
+    pub fn write_scroll_x(&mut self, data: u8) {
+        self.scroll_x = data;
+    }
+
+    pub fn read_ly(&self) -> u8 {
+        self.ly
+    }
+
+    pub fn write_ly(&mut self, _data: u8) {}
+
+    pub fn read_lyc(&self) -> u8 {
+        self.lyc
+    }
+
+    pub fn write_lyc(&mut self, data: u8) {
+        self.lyc = data;
+    }
+
+    pub fn read_dmg_bg_palette(&self) -> u8 {
+        self.dmg_bg_palette
+    }
+
+    pub fn write_dmg_bg_palette(&mut self, data: u8) {
+        self.dmg_bg_palette = data;
+    }
+
+    pub fn read_dmg_sprite_palettes(&self, index: u8) -> u8 {
+        self.dmg_sprite_palettes[index as usize & 1]
+    }
+
+    pub fn write_dmg_sprite_palettes(&mut self, index: u8, data: u8) {
+        self.dmg_sprite_palettes[index as usize & 1] = data;
+    }
+
+    pub fn read_window_y(&self) -> u8 {
+        self.windows_y
+    }
+
+    pub fn write_window_y(&mut self, data: u8) {
+        self.windows_y = data;
+    }
+
+    pub fn read_window_x(&self) -> u8 {
+        self.windows_x
+    }
+
+    pub fn write_window_x(&mut self, data: u8) {
+        self.windows_x = data;
+    }
+
+    pub fn read_vram_bank(&self) -> u8 {
         0xFE | self.vram_bank
     }
 
-    pub fn set_vram_bank(&mut self, data: u8) {
+    pub fn write_vram_bank(&mut self, data: u8) {
         self.vram_bank = data & 1;
     }
 
-    pub fn read_color_register(&mut self, addr: u16) -> u8 {
-        match addr {
-            0xFF68 => self.cgb_bg_palettes.read_index(),
-            0xFF69 => self.cgb_bg_palettes.read_color_data(),
-            0xFF6A => self.cgb_sprite_palettes.read_index(),
-            0xFF6B => self.cgb_sprite_palettes.read_color_data(),
-            _ => unreachable!(),
-        }
+    pub fn read_cgb_bg_palettes_index(&self) -> u8 {
+        self.cgb_bg_palettes.read_index()
     }
 
-    pub fn write_color_register(&mut self, addr: u16, data: u8) {
-        match addr {
-            0xFF68 => self.cgb_bg_palettes.write_index(data),
-            0xFF69 => self.cgb_bg_palettes.write_color_data(data),
-            0xFF6A => self.cgb_sprite_palettes.write_index(data),
-            0xFF6B => self.cgb_sprite_palettes.write_color_data(data),
-            _ => unreachable!(),
-        }
+    pub fn write_cgb_bg_palettes_index(&mut self, data: u8) {
+        self.cgb_bg_palettes.write_index(data);
+    }
+
+    pub fn read_cgb_bg_palettes_data(&self) -> u8 {
+        self.cgb_bg_palettes.read_color_data()
+    }
+
+    pub fn write_cgb_bg_palettes_data(&mut self, data: u8) {
+        self.cgb_bg_palettes.write_color_data(data);
+    }
+
+    pub fn read_cgb_sprite_palettes_index(&self) -> u8 {
+        self.cgb_sprite_palettes.read_index()
+    }
+
+    pub fn write_cgb_sprite_palettes_index(&mut self, data: u8) {
+        self.cgb_sprite_palettes.write_index(data);
+    }
+
+    pub fn read_cgb_sprite_palettes_data(&self) -> u8 {
+        self.cgb_sprite_palettes.read_color_data()
+    }
+
+    pub fn write_cgb_sprite_palettes_data(&mut self, data: u8) {
+        self.cgb_sprite_palettes.write_color_data(data);
     }
 
     pub fn write_sprite_priority_mode(&mut self, data: u8) {

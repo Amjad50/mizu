@@ -45,27 +45,25 @@ pub struct Serial {
 }
 
 impl Serial {
-    pub fn read_register(&mut self, addr: u16) -> u8 {
-        match addr {
-            0xFF01 => 0,
-            0xFF02 => 0x7E | self.serial_control.bits(),
-            _ => unreachable!(),
-        }
+    pub fn read_data(&self) -> u8 {
+        0
     }
 
-    pub fn write_register(&mut self, addr: u16, data: u8) {
-        match addr {
-            0xFF01 => self.transfere_data = data,
-            0xFF02 => {
-                self.serial_control
-                    .clone_from(&SerialControl::from_bits_truncate(data));
-                // should start transfere
-                if self.serial_control.in_transfer() {
-                    self.transfere_timer = self.serial_control.clock_reload();
-                    self.bits_remaining = 8;
-                }
-            }
-            _ => unreachable!(),
+    pub fn write_data(&mut self, data: u8) {
+        self.transfere_data = data
+    }
+
+    pub fn read_control(&self) -> u8 {
+        0x7E | self.serial_control.bits()
+    }
+
+    pub fn write_control(&mut self, data: u8) {
+        self.serial_control
+            .clone_from(&SerialControl::from_bits_truncate(data));
+        // should start transfere
+        if self.serial_control.in_transfer() {
+            self.transfere_timer = self.serial_control.clock_reload();
+            self.bits_remaining = 8;
         }
     }
 
