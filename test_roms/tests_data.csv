@@ -4,4 +4,6 @@ https://github.com/Hacktix/scribbltests,git,scribbltests
 https://github.com/mattcurrie/dmg-acid2/releases/latest/download/dmg-acid2.gb,none,dmg-acid2.gb
 https://github.com/mattcurrie/cgb-acid2/releases/download/v1.1/cgb-acid2.gbc,none,cgb-acid2.gbc
 https://github.com/retrio/gb-test-roms,git,blargg-gb-tests
+#dependancy_for_SameSuite
+https://github.com/gbdev/rgbds,git_make_install,rgbds
 https://github.com/LIJI32/SameSuite,git_make,SameSuite
