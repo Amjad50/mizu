@@ -304,11 +304,16 @@ impl Default for Lock {
 
 impl Lock {
     fn write(&mut self, data: u8) {
+        // TODO: check if this registers lock after bootrom or after
+        //  first write
         if !self.written_to {
-            self.during_boot = false;
             self.written_to = true;
             self.is_dmg_mode = data & 0x4 != 0;
         }
+    }
+
+    fn finish_boot(&mut self) {
+        self.during_boot = false;
     }
 
     /// The bootrom can write to both CGB and DMG registers during bootrom,
@@ -356,6 +361,8 @@ impl Bus {
             // TODO: change this to take the value from the cartridge addr 0x143
             lock.write(0x80);
         }
+
+        lock.finish_boot();
 
         Self {
             cartridge,
@@ -589,6 +596,7 @@ impl Bus {
             0x4D if self.lock.is_cgb_mode() => self.speed_controller.write_key1(data), // speed
             0x4F if self.lock.is_cgb_mode() => self.ppu.write_vram_bank(data), // vram bank
             0x50 => {
+                self.lock.finish_boot();
                 self.boot_rom.enabled = false;
                 self.ppu
                     .update_cgb_mode(self.cartridge.is_cartridge_color());
