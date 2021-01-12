@@ -1,9 +1,10 @@
 use std::env::args;
 use std::time::Duration;
 
-use druid::piet::ImageFormat;
+use druid::keyboard_types::Key;
+use druid::piet::{ImageFormat, InterpolationMode};
 use druid::widget::prelude::*;
-use druid::widget::Flex;
+use druid::widget::Align;
 use druid::{AppLauncher, Data, Point, Rect, TimerToken, WindowDesc};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -23,6 +24,15 @@ impl Data for GameBoyData {
     fn same(&self, _other: &Self) -> bool {
         // screen should always be refereshed
         false
+    }
+}
+
+impl GameBoyData {
+    fn new(gameboy: GameBoy) -> Self {
+        Self {
+            gameboy: Rc::new(RefCell::new(gameboy)),
+            screen_buffer: [0; TV_HEIGHT as usize * TV_WIDTH as usize * 3],
+        }
     }
 }
 
@@ -46,6 +56,14 @@ impl GameBoyWidget {
     }
 }
 
+impl Default for GameBoyWidget {
+    fn default() -> Self {
+        Self {
+            timer_id: TimerToken::INVALID,
+        }
+    }
+}
+
 impl Widget<GameBoyData> for GameBoyWidget {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut GameBoyData, _env: &Env) {
         match event {
@@ -57,13 +75,15 @@ impl Widget<GameBoyData> for GameBoyWidget {
             }
             Event::Timer(id) => {
                 if *id == self.timer_id {
-                    let mut gameboy = data.gameboy.borrow_mut();
-                    gameboy.clock_for_frame();
-                    gameboy.audio_buffer();
+                    let buffer;
 
-                    let buffer = gameboy.screen_buffer().to_owned();
+                    {
+                        let mut gameboy = data.gameboy.borrow_mut();
+                        gameboy.clock_for_frame();
+                        gameboy.audio_buffer();
 
-                    drop(gameboy);
+                        buffer = gameboy.screen_buffer().to_owned();
+                    }
 
                     data.screen_buffer.copy_from_slice(&buffer);
 
@@ -72,7 +92,7 @@ impl Widget<GameBoyData> for GameBoyWidget {
                 }
             }
             Event::KeyDown(key_event) => match &key_event.key {
-                druid::keyboard_types::Key::Character(key) if !key_event.repeat => {
+                Key::Character(key) if !key_event.repeat => {
                     if let Some(key) = Self::convert_key_into_joypad(&key) {
                         data.gameboy.borrow_mut().press_joypad(key);
                     }
@@ -80,7 +100,7 @@ impl Widget<GameBoyData> for GameBoyWidget {
                 _ => {}
             },
             Event::KeyUp(key_event) => match &key_event.key {
-                druid::keyboard_types::Key::Character(key) if !key_event.repeat => {
+                Key::Character(key) if !key_event.repeat => {
                     if let Some(key) = Self::convert_key_into_joypad(&key) {
                         data.gameboy.borrow_mut().release_joypad(key);
                     }
@@ -138,21 +158,12 @@ impl Widget<GameBoyData> for GameBoyWidget {
 
         let rect = Rect::from_origin_size(Point::new(0., 0.), ctx.size());
 
-        ctx.draw_image(
-            &image,
-            rect,
-            druid::piet::InterpolationMode::NearestNeighbor,
-        )
+        ctx.draw_image(&image, rect, InterpolationMode::NearestNeighbor)
     }
 }
 
 fn ui_builder() -> impl Widget<GameBoyData> {
-    Flex::column().with_flex_child(
-        GameBoyWidget {
-            timer_id: TimerToken::INVALID,
-        },
-        1.0,
-    )
+    Align::centered(GameBoyWidget::default())
 }
 
 pub fn main() {
@@ -175,9 +186,6 @@ pub fn main() {
 
     AppLauncher::with_window(window)
         .use_simple_logger()
-        .launch(GameBoyData {
-            gameboy: Rc::new(RefCell::new(gameboy)),
-            screen_buffer: [0; TV_HEIGHT as usize * TV_WIDTH as usize * 3],
-        })
+        .launch(GameBoyData::new(gameboy))
         .expect("launch failed");
 }
