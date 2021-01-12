@@ -789,6 +789,9 @@ impl Ppu {
                 if self.lcd.x() == sprite.screen_x() || left_out_of_bounds {
                     let mut y = self.scanline.wrapping_sub(sprite.screen_y());
                     if sprite.y_flipped() {
+                        // FIXME: one time while playing game, crashed here
+                        //  subtract with overflow (possibly sprite size changed
+                        //  between sprite selection and drawing?)
                         y = (self.lcd_control.sprite_size() - 1) - y;
                     }
 
