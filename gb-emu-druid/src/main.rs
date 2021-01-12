@@ -1,17 +1,12 @@
 use std::env::args;
-use std::ops::{Index, IndexMut};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use druid::piet::ImageFormat;
 use druid::widget::prelude::*;
-use druid::widget::{Button, Controller, Flex, Image, Label, Slider};
-use druid::{
-    AppLauncher, Color, Data, ImageBuf, Lens, LocalizedString, MouseButton, Point, Rect,
-    TimerToken, WidgetExt, WindowDesc,
-};
+use druid::widget::Flex;
+use druid::{AppLauncher, Data, Point, Rect, TimerToken, WindowDesc};
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::Arc;
 
 use gb_emu_core::{GameBoy, JoypadButton};
 
@@ -25,7 +20,8 @@ struct GameBoyData {
 }
 
 impl Data for GameBoyData {
-    fn same(&self, other: &Self) -> bool {
+    fn same(&self, _other: &Self) -> bool {
+        // screen should always be refereshed
         false
     }
 }
@@ -34,12 +30,28 @@ struct GameBoyWidget {
     timer_id: TimerToken,
 }
 
-impl GameBoyWidget {}
+impl GameBoyWidget {
+    fn convert_key_into_joypad(key: &str) -> Option<JoypadButton> {
+        match key.chars().next().unwrap().to_ascii_uppercase() {
+            'J' => Some(JoypadButton::B),
+            'K' => Some(JoypadButton::A),
+            'U' => Some(JoypadButton::Select),
+            'I' => Some(JoypadButton::Start),
+            'W' => Some(JoypadButton::Up),
+            'S' => Some(JoypadButton::Down),
+            'A' => Some(JoypadButton::Left),
+            'D' => Some(JoypadButton::Right),
+            _ => None,
+        }
+    }
+}
 
 impl Widget<GameBoyData> for GameBoyWidget {
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut GameBoyData, env: &Env) {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut GameBoyData, _env: &Env) {
         match event {
             Event::WindowConnected => {
+                // focus is important to capture keyboard events
+                ctx.request_focus();
                 ctx.request_paint();
                 self.timer_id = ctx.request_timer(Duration::from_micros(1000_000 / 60));
             }
@@ -59,56 +71,50 @@ impl Widget<GameBoyData> for GameBoyWidget {
                     self.timer_id = ctx.request_timer(Duration::from_micros(1000_000 / 60));
                 }
             }
-            Event::KeyDown(key_event) => {
-                //let mut gameboy = data.gameboy.borrow_mut();
-                println!("key down");
-
-                match &key_event.key {
-                    druid::keyboard_types::Key::Character(key) => {
-                        println!("{}", key);
+            Event::KeyDown(key_event) => match &key_event.key {
+                druid::keyboard_types::Key::Character(key) if !key_event.repeat => {
+                    if let Some(key) = Self::convert_key_into_joypad(&key) {
+                        data.gameboy.borrow_mut().press_joypad(key);
                     }
-                    _ => {}
                 }
-            }
-            Event::KeyUp(key_event) => {
-                //let mut gameboy = data.gameboy.borrow_mut();
-                println!("key down");
-
-                match &key_event.key {
-                    druid::keyboard_types::Key::Character(key) => {
-                        println!("{}", key);
+                _ => {}
+            },
+            Event::KeyUp(key_event) => match &key_event.key {
+                druid::keyboard_types::Key::Character(key) if !key_event.repeat => {
+                    if let Some(key) = Self::convert_key_into_joypad(&key) {
+                        data.gameboy.borrow_mut().release_joypad(key);
                     }
-                    _ => {}
                 }
-            }
+                _ => {}
+            },
             _ => {}
         }
     }
 
     fn lifecycle(
         &mut self,
-        ctx: &mut LifeCycleCtx,
-        event: &LifeCycle,
-        data: &GameBoyData,
-        env: &Env,
+        _ctx: &mut LifeCycleCtx,
+        _event: &LifeCycle,
+        _data: &GameBoyData,
+        _env: &Env,
     ) {
     }
 
     fn update(
         &mut self,
-        ctx: &mut UpdateCtx,
-        old_data: &GameBoyData,
-        data: &GameBoyData,
-        env: &Env,
+        _ctx: &mut UpdateCtx,
+        _old_data: &GameBoyData,
+        _data: &GameBoyData,
+        _env: &Env,
     ) {
     }
 
     fn layout(
         &mut self,
-        ctx: &mut LayoutCtx,
+        _ctx: &mut LayoutCtx,
         bc: &BoxConstraints,
-        data: &GameBoyData,
-        env: &Env,
+        _data: &GameBoyData,
+        _env: &Env,
     ) -> Size {
         let max_size = bc.max();
         let width_perc = max_size.width / TV_WIDTH as f64;
@@ -120,7 +126,7 @@ impl Widget<GameBoyData> for GameBoyWidget {
         }
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &GameBoyData, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &GameBoyData, _env: &Env) {
         let image = ctx
             .make_image(
                 TV_WIDTH as usize,
@@ -140,49 +146,11 @@ impl Widget<GameBoyData> for GameBoyWidget {
     }
 }
 
-struct GameBoyController {}
-
-impl Controller<GameBoyData, GameBoyWidget> for GameBoyController {
-    fn event(
-        &mut self,
-        child: &mut GameBoyWidget,
-        ctx: &mut EventCtx,
-        event: &Event,
-        data: &mut GameBoyData,
-        env: &Env,
-    ) {
-        child.event(ctx, event, data, env)
-    }
-
-    fn lifecycle(
-        &mut self,
-        child: &mut GameBoyWidget,
-        ctx: &mut LifeCycleCtx,
-        event: &LifeCycle,
-        data: &GameBoyData,
-        env: &Env,
-    ) {
-        child.lifecycle(ctx, event, data, env)
-    }
-
-    fn update(
-        &mut self,
-        child: &mut GameBoyWidget,
-        ctx: &mut UpdateCtx,
-        old_data: &GameBoyData,
-        data: &GameBoyData,
-        env: &Env,
-    ) {
-        child.update(ctx, old_data, data, env)
-    }
-}
-
 fn ui_builder() -> impl Widget<GameBoyData> {
     Flex::column().with_flex_child(
         GameBoyWidget {
             timer_id: TimerToken::INVALID,
-        }
-        .controller(GameBoyController {}),
+        },
         1.0,
     )
 }
