@@ -4,10 +4,10 @@ use std::time::Duration;
 use druid::keyboard_types::Key;
 use druid::piet::{ImageFormat, InterpolationMode};
 use druid::widget::prelude::*;
-use druid::widget::Align;
+use druid::widget::{Align, Label};
 use druid::{
-    AppLauncher, Data, LocalizedString, MenuDesc, MenuItem, Point, Rect, Selector, TimerToken,
-    WindowDesc,
+    commands, AppLauncher, Data, FileDialogOptions, FileSpec, LocalizedString, MenuDesc, MenuItem,
+    Point, Rect, Selector, TimerToken, WindowDesc,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -23,6 +23,8 @@ const RESET: Selector = Selector::new("gb-emu_cmd_reset");
 struct GameBoyData {
     gameboy: Rc<RefCell<GameBoy>>,
     screen_buffer: [u8; TV_HEIGHT as usize * TV_WIDTH as usize * 3],
+
+    error: Option<String>,
 }
 
 impl Data for GameBoyData {
@@ -37,6 +39,7 @@ impl GameBoyData {
         Self {
             gameboy: Rc::new(RefCell::new(gameboy)),
             screen_buffer: [0; TV_HEIGHT as usize * TV_WIDTH as usize * 3],
+            error: None,
         }
     }
 }
@@ -113,7 +116,26 @@ impl Widget<GameBoyData> for GameBoyWidget {
                 _ => {}
             },
             Event::Command(command) => {
-                if command.is(RESET) {
+                if command.is(commands::OPEN_FILE) {
+                    if let Some(file) = command.get(commands::OPEN_FILE) {
+                        match GameBoy::new(file.path(), None) {
+                            Ok(gameboy) => {
+                                data.gameboy.replace(gameboy);
+                            }
+                            Err(err) => {
+                                data.error = Some(format!("{}", err));
+
+                                // FIXME: resize window and find a way to clear
+                                //  error when closed
+                                let window = WindowDesc::new(error_builder)
+                                    .title("Error")
+                                    .with_min_size((0., 0.));
+
+                                ctx.new_window(window);
+                            }
+                        }
+                    }
+                } else if command.is(RESET) {
                     data.gameboy.borrow_mut().reset();
                 }
             }
@@ -172,6 +194,15 @@ impl Widget<GameBoyData> for GameBoyWidget {
     }
 }
 
+fn error_builder() -> impl Widget<GameBoyData> {
+    Align::centered(Label::dynamic(|data: &GameBoyData, _env| {
+        data.error
+            .as_ref()
+            .unwrap_or(&"There is no error statement".to_string())
+            .to_string()
+    }))
+}
+
 fn ui_builder() -> impl Widget<GameBoyData> {
     Align::centered(GameBoyWidget::default())
 }
@@ -186,6 +217,10 @@ pub fn main() {
 
     let gameboy = GameBoy::new(&args[1], args.get(2)).unwrap();
 
+    let open_file_cmd = commands::SHOW_OPEN_PANEL.with(
+        FileDialogOptions::new().allowed_types(vec![FileSpec::new("Gameboy Rom", &["gb", "gbc"])]),
+    );
+
     let window = WindowDesc::new(ui_builder)
         .window_size(Size {
             width: TV_WIDTH as f64 * 5.,
@@ -193,14 +228,26 @@ pub fn main() {
         })
         .resizable(true)
         .menu(
-            MenuDesc::empty().append(
-                MenuDesc::new(LocalizedString::new("gb-emu_menu_game").with_placeholder("Game"))
+            MenuDesc::empty()
+                .append(
+                    MenuDesc::new(
+                        LocalizedString::new("gb-emu_menu_file").with_placeholder("File"),
+                    )
+                    .append(MenuItem::new(
+                        LocalizedString::new("gb-emu_menuitem_file_open").with_placeholder("Open"),
+                        open_file_cmd,
+                    )),
+                )
+                .append(
+                    MenuDesc::new(
+                        LocalizedString::new("gb-emu_menu_game").with_placeholder("Game"),
+                    )
                     .append(MenuItem::new(
                         LocalizedString::new("gb-emu_menuitem_game_reset")
                             .with_placeholder("Reset"),
                         RESET,
                     )),
-            ),
+                ),
         )
         .title("GB-emu");
 
