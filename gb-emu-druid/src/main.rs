@@ -18,13 +18,12 @@ const TV_WIDTH: u32 = 160;
 const TV_HEIGHT: u32 = 144;
 
 const RESET: Selector = Selector::new("gb-emu_cmd_reset");
+const ERROR: Selector<String> = Selector::new("gb-emu_cmd_error");
 
 #[derive(Clone)]
 struct GameBoyData {
     gameboy: Rc<RefCell<GameBoy>>,
     screen_buffer: [u8; TV_HEIGHT as usize * TV_WIDTH as usize * 3],
-
-    error: Option<String>,
 }
 
 impl Data for GameBoyData {
@@ -39,7 +38,6 @@ impl GameBoyData {
         Self {
             gameboy: Rc::new(RefCell::new(gameboy)),
             screen_buffer: [0; TV_HEIGHT as usize * TV_WIDTH as usize * 3],
-            error: None,
         }
     }
 }
@@ -123,20 +121,24 @@ impl Widget<GameBoyData> for GameBoyWidget {
                                 data.gameboy.replace(gameboy);
                             }
                             Err(err) => {
-                                data.error = Some(format!("{}", err));
-
-                                // FIXME: resize window and find a way to clear
-                                //  error when closed
-                                let window = WindowDesc::new(error_builder)
-                                    .title("Error")
-                                    .with_min_size((0., 0.));
-
-                                ctx.new_window(window);
+                                let error = format!("{}", err);
+                                ctx.submit_command(ERROR.with(error));
                             }
                         }
                     }
                 } else if command.is(RESET) {
                     data.gameboy.borrow_mut().reset();
+                } else if command.is(ERROR) {
+                    if let Some(error) = command.get(ERROR) {
+                        let error = error.to_string();
+
+                        // FIXME: control window size to make it smaller for alerts
+                        let window = WindowDesc::new(|| error_builder(error))
+                            .title("Error")
+                            .with_min_size((0., 0.));
+
+                        ctx.new_window(window);
+                    }
                 }
             }
             _ => {}
@@ -194,13 +196,8 @@ impl Widget<GameBoyData> for GameBoyWidget {
     }
 }
 
-fn error_builder() -> impl Widget<GameBoyData> {
-    Align::centered(Label::dynamic(|data: &GameBoyData, _env| {
-        data.error
-            .as_ref()
-            .unwrap_or(&"There is no error statement".to_string())
-            .to_string()
-    }))
+fn error_builder(error: String) -> impl Widget<GameBoyData> {
+    Align::centered(Label::new(error))
 }
 
 fn ui_builder() -> impl Widget<GameBoyData> {
