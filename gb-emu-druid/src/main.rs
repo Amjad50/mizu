@@ -1,5 +1,5 @@
 use std::env::args;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use druid::keyboard_types::Key;
 use druid::piet::{ImageFormat, InterpolationMode};
@@ -23,6 +23,7 @@ const ERROR: Selector<String> = Selector::new("gb-emu_cmd_error");
 #[derive(Clone)]
 struct GameBoyData {
     gameboy: Rc<RefCell<GameBoy>>,
+    last_updated: Instant,
     screen_buffer: [u8; TV_HEIGHT as usize * TV_WIDTH as usize * 3],
 }
 
@@ -37,6 +38,7 @@ impl GameBoyData {
     fn new(gameboy: GameBoy) -> Self {
         Self {
             gameboy: Rc::new(RefCell::new(gameboy)),
+            last_updated: Instant::now(),
             screen_buffer: [0; TV_HEIGHT as usize * TV_WIDTH as usize * 3],
         }
     }
@@ -81,20 +83,31 @@ impl Widget<GameBoyData> for GameBoyWidget {
             }
             Event::Timer(id) => {
                 if *id == self.timer_id {
-                    let buffer;
+                    self.timer_id = ctx.request_timer(Duration::from_micros(1000_000 / 60));
 
-                    {
-                        let mut gameboy = data.gameboy.borrow_mut();
+                    ctx.window().set_title(&format!(
+                        "GB-emu - FPS: {}",
+                        (1. / data.last_updated.elapsed().as_secs_f64()).round()
+                    ));
+                    data.last_updated = Instant::now();
+
+                    let mut buffer = None;
+                    // If the emulation is running less than 60FPS, then two
+                    //  or more timers might occure while gameboy is still
+                    //  executing, so we can't allow that, if it happened,
+                    //  we just ignore it this time and wait for the next timer
+                    if let Ok(mut gameboy) = data.gameboy.try_borrow_mut() {
                         gameboy.clock_for_frame();
                         gameboy.audio_buffer();
 
-                        buffer = gameboy.screen_buffer().to_owned();
+                        buffer = Some(gameboy.screen_buffer().to_owned());
                     }
 
-                    data.screen_buffer.copy_from_slice(&buffer);
+                    if let Some(buffer) = buffer {
+                        data.screen_buffer.copy_from_slice(&buffer);
+                    }
 
                     ctx.request_paint();
-                    self.timer_id = ctx.request_timer(Duration::from_micros(1000_000 / 60));
                 }
             }
             Event::KeyDown(key_event) => match &key_event.key {
