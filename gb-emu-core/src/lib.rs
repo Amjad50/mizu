@@ -86,4 +86,14 @@ impl GameBoy {
     pub fn release_joypad(&mut self, button: JoypadButton) {
         self.bus.release_joypad(button);
     }
+
+    pub fn reset(&mut self) {
+        self.bus.reset();
+
+        if self.bus.with_boot_rom() {
+            self.cpu = Cpu::new();
+        } else {
+            self.cpu = Cpu::new_without_boot_rom();
+        }
+    }
 }

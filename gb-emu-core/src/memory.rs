@@ -340,6 +340,9 @@ pub struct Bus {
     speed_controller: SpeedController,
     lock: Lock,
 
+    /// The emulator was run with or without boot_rom file
+    with_boot_rom: bool,
+
     /// Used to track how many ppu cycles have elapsed
     /// when the frontend gets the elapsed value, its reset to 0
     elapsed_ppu_cycles: u32,
@@ -373,6 +376,8 @@ impl Bus {
             speed_controller: SpeedController::default(),
             lock,
 
+            with_boot_rom: false,
+
             elapsed_ppu_cycles: 0,
         }
     }
@@ -385,6 +390,7 @@ impl Bus {
         s.lock = Lock::default();
         s.boot_rom.data = boot_rom_data;
         s.boot_rom.enabled = true;
+        s.with_boot_rom = true;
         s
     }
 
@@ -411,6 +417,20 @@ impl Bus {
 
     pub fn elapsed_ppu_cycles(&mut self) -> u32 {
         std::mem::replace(&mut self.elapsed_ppu_cycles, 0)
+    }
+
+    pub fn with_boot_rom(&self) -> bool {
+        self.with_boot_rom
+    }
+
+    pub fn reset(&mut self) {
+        let bus = if self.with_boot_rom {
+            Self::new_with_boot_rom(self.cartridge.copy_new(), self.boot_rom.data)
+        } else {
+            Self::new_without_boot_rom(self.cartridge.copy_new())
+        };
+
+        let _ = std::mem::replace(self, bus);
     }
 }
 

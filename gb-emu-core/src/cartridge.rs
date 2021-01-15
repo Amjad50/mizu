@@ -216,6 +216,68 @@ impl Cartridge {
             );
         }
 
+        Self::new(file_path, data)
+    }
+
+    /// 0x0000-0x3FFF
+    pub fn read_rom0(&self, addr: u16) -> u8 {
+        let addr = self.mapper.map_read_rom0(addr);
+
+        self.rom[addr]
+    }
+
+    // TODO: implement mapper
+    /// 0x4000-0x7FFF
+    pub fn read_romx(&self, addr: u16) -> u8 {
+        let addr = self.mapper.map_read_romx(addr);
+
+        self.rom[addr]
+    }
+
+    /// 0x0000-0x7FFF
+    pub fn write_to_bank_controller(&mut self, addr: u16, data: u8) {
+        self.mapper.write_bank_controller_register(addr, data);
+    }
+
+    /// 0xA000-0xBFFF
+    pub fn read_ram(&mut self, addr: u16) -> u8 {
+        match self.mapper.map_ram_read(addr) {
+            MappingResult::Addr(addr) => self.ram[addr],
+            MappingResult::Value(value) => value,
+            MappingResult::NotMapped => 0xFF,
+        }
+    }
+
+    /// 0xA000-0xBFFF
+    pub fn write_ram(&mut self, addr: u16, data: u8) {
+        match self.mapper.map_ram_write(addr, data) {
+            MappingResult::Addr(addr) => self.ram[addr] = data,
+            MappingResult::NotMapped | MappingResult::Value(_) => {}
+        }
+    }
+
+    pub fn is_cartridge_color(&self) -> bool {
+        self.target_device == TargetDevice::ColorOnly
+    }
+
+    pub fn copy_new(&self) -> Self {
+        // save SRAM to file, so that it can be retreived when creating new
+        // cartridge
+        self.save_sram_file().unwrap();
+
+        let s = Self::new(self.file_path.as_ref(), self.rom.to_vec()).expect("Copy cartridge");
+
+        if self.cartridge_type.battery {
+            // Just to make sure, SRAM content MUST be equal
+            assert_eq!(s.ram, self.ram);
+        }
+        s
+    }
+}
+
+impl Cartridge {
+    /// Inner method to be used when creating new cartridge and when coying
+    fn new<P: AsRef<Path>>(file_path: P, mut data: Vec<u8>) -> Result<Self, CartridgeError> {
         // extend the data, as some roms don't follow the rules :(
         if data.len() < 0x8000 {
             data.extend_from_slice(&vec![0; 0x8000 - data.len()]);
@@ -328,49 +390,6 @@ impl Cartridge {
         })
     }
 
-    /// 0x0000-0x3FFF
-    pub fn read_rom0(&self, addr: u16) -> u8 {
-        let addr = self.mapper.map_read_rom0(addr);
-
-        self.rom[addr]
-    }
-
-    // TODO: implement mapper
-    /// 0x4000-0x7FFF
-    pub fn read_romx(&self, addr: u16) -> u8 {
-        let addr = self.mapper.map_read_romx(addr);
-
-        self.rom[addr]
-    }
-
-    /// 0x0000-0x7FFF
-    pub fn write_to_bank_controller(&mut self, addr: u16, data: u8) {
-        self.mapper.write_bank_controller_register(addr, data);
-    }
-
-    /// 0xA000-0xBFFF
-    pub fn read_ram(&mut self, addr: u16) -> u8 {
-        match self.mapper.map_ram_read(addr) {
-            MappingResult::Addr(addr) => self.ram[addr],
-            MappingResult::Value(value) => value,
-            MappingResult::NotMapped => 0xFF,
-        }
-    }
-
-    /// 0xA000-0xBFFF
-    pub fn write_ram(&mut self, addr: u16, data: u8) {
-        match self.mapper.map_ram_write(addr, data) {
-            MappingResult::Addr(addr) => self.ram[addr] = data,
-            MappingResult::NotMapped | MappingResult::Value(_) => {}
-        }
-    }
-
-    pub fn is_cartridge_color(&self) -> bool {
-        self.target_device == TargetDevice::ColorOnly
-    }
-}
-
-impl Cartridge {
     fn load_sram_file<P: AsRef<Path>>(
         path: P,
         sram_size: usize,

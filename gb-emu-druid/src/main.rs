@@ -5,7 +5,10 @@ use druid::keyboard_types::Key;
 use druid::piet::{ImageFormat, InterpolationMode};
 use druid::widget::prelude::*;
 use druid::widget::Align;
-use druid::{AppLauncher, Data, Point, Rect, TimerToken, WindowDesc};
+use druid::{
+    AppLauncher, Data, LocalizedString, MenuDesc, MenuItem, Point, Rect, Selector, TimerToken,
+    WindowDesc,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -13,6 +16,8 @@ use gb_emu_core::{GameBoy, JoypadButton};
 
 const TV_WIDTH: u32 = 160;
 const TV_HEIGHT: u32 = 144;
+
+const RESET: Selector = Selector::new("gb-emu_cmd_reset");
 
 #[derive(Clone)]
 struct GameBoyData {
@@ -107,6 +112,11 @@ impl Widget<GameBoyData> for GameBoyWidget {
                 }
                 _ => {}
             },
+            Event::Command(command) => {
+                if command.is(RESET) {
+                    data.gameboy.borrow_mut().reset();
+                }
+            }
             _ => {}
         }
     }
@@ -182,6 +192,16 @@ pub fn main() {
             height: TV_HEIGHT as f64 * 5.,
         })
         .resizable(true)
+        .menu(
+            MenuDesc::empty().append(
+                MenuDesc::new(LocalizedString::new("gb-emu_menu_game").with_placeholder("Game"))
+                    .append(MenuItem::new(
+                        LocalizedString::new("gb-emu_menuitem_game_reset")
+                            .with_placeholder("Reset"),
+                        RESET,
+                    )),
+            ),
+        )
         .title("GB-emu");
 
     AppLauncher::with_window(window)
