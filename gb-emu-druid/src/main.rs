@@ -1,3 +1,6 @@
+mod audio;
+use audio::AudioPlayer;
+
 use std::env::args;
 use std::time::{Duration, Instant};
 
@@ -23,6 +26,7 @@ const ERROR: Selector<String> = Selector::new("gb-emu_cmd_error");
 #[derive(Clone)]
 struct GameBoyData {
     gameboy: Rc<RefCell<GameBoy>>,
+    audio_player: Rc<RefCell<AudioPlayer>>,
     last_updated: Instant,
     screen_buffer: [u8; TV_HEIGHT as usize * TV_WIDTH as usize * 3],
 }
@@ -36,8 +40,12 @@ impl Data for GameBoyData {
 
 impl GameBoyData {
     fn new(gameboy: GameBoy) -> Self {
+        let audio_player = AudioPlayer::new(44100);
+        audio_player.play();
+
         Self {
             gameboy: Rc::new(RefCell::new(gameboy)),
+            audio_player: Rc::new(RefCell::new(audio_player)),
             last_updated: Instant::now(),
             screen_buffer: [0; TV_HEIGHT as usize * TV_WIDTH as usize * 3],
         }
@@ -91,19 +99,17 @@ impl Widget<GameBoyData> for GameBoyWidget {
                     ));
                     data.last_updated = Instant::now();
 
-                    let mut buffer = None;
                     // If the emulation is running less than 60FPS, then two
                     //  or more timers might occure while gameboy is still
                     //  executing, so we can't allow that, if it happened,
                     //  we just ignore it this time and wait for the next timer
                     if let Ok(mut gameboy) = data.gameboy.try_borrow_mut() {
                         gameboy.clock_for_frame();
-                        gameboy.audio_buffer();
 
-                        buffer = Some(gameboy.screen_buffer().to_owned());
-                    }
+                        let audio_buffer = gameboy.audio_buffer();
+                        let buffer = gameboy.screen_buffer().to_owned();
 
-                    if let Some(buffer) = buffer {
+                        data.audio_player.borrow_mut().queue(&audio_buffer);
                         data.screen_buffer.copy_from_slice(&buffer);
                     }
 
