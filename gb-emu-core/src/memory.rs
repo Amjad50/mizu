@@ -318,12 +318,6 @@ impl Lock {
 
     /// The bootrom can write to both CGB and DMG registers during bootrom,
     /// so this should return true if we are still in bootrom
-    fn is_dmg_mode(&self) -> bool {
-        self.is_dmg_mode || self.during_boot
-    }
-
-    /// The bootrom can write to both CGB and DMG registers during bootrom,
-    /// so this should return true if we are still in bootrom
     fn is_cgb_mode(&self) -> bool {
         !self.is_dmg_mode || self.during_boot
     }
@@ -541,12 +535,12 @@ impl Bus {
             0x43 => self.ppu.read_scroll_x(),               // ppu
             0x44 => self.ppu.read_ly(),                     // ppu
             0x45 => self.ppu.read_lyc(),                    // ppu
-            0x47 if self.lock.is_dmg_mode() => self.ppu.read_dmg_bg_palette(), // ppu
-            0x48 if self.lock.is_dmg_mode() => self.ppu.read_dmg_sprite_palettes(0), // ppu
-            0x49 if self.lock.is_dmg_mode() => self.ppu.read_dmg_sprite_palettes(1), // ppu
+            0x46 => self.dma.read(),                        // dma start
+            0x47 => self.ppu.read_dmg_bg_palette(),         // ppu
+            0x48 => self.ppu.read_dmg_sprite_palettes(0),   // ppu
+            0x49 => self.ppu.read_dmg_sprite_palettes(1),   // ppu
             0x4A => self.ppu.read_window_y(),               // ppu
             0x4B => self.ppu.read_window_x(),               // ppu
-            0x46 => self.dma.read(),                        // dma start
             0x4D if self.lock.is_cgb_mode() => self.speed_controller.read_key1(), // speed
             0x4F if self.lock.is_cgb_mode() => self.ppu.read_vram_bank(), // vram bank
             0x50 => 0xFF,                                   // boot rom stop
@@ -586,12 +580,12 @@ impl Bus {
             0x43 => self.ppu.write_scroll_x(data),               // ppu
             0x44 => self.ppu.write_ly(data),                     // ppu
             0x45 => self.ppu.write_lyc(data),                    // ppu
-            0x47 if self.lock.is_dmg_mode() => self.ppu.write_dmg_bg_palette(data), // ppu
-            0x48 if self.lock.is_dmg_mode() => self.ppu.write_dmg_sprite_palettes(0, data), // ppu
-            0x49 if self.lock.is_dmg_mode() => self.ppu.write_dmg_sprite_palettes(1, data), // ppu
+            0x46 => self.dma.start_dma(data),                    // dma start
+            0x47 => self.ppu.write_dmg_bg_palette(data),         // ppu
+            0x48 => self.ppu.write_dmg_sprite_palettes(0, data), // ppu
+            0x49 => self.ppu.write_dmg_sprite_palettes(1, data), // ppu
             0x4A => self.ppu.write_window_y(data),               // ppu
             0x4B => self.ppu.write_window_x(data),               // ppu
-            0x46 => self.dma.start_dma(data),                    // dma start
             0x4C if self.lock.is_cgb_mode() => self.lock.write(data), // DMG/CGB lock register
             0x4D if self.lock.is_cgb_mode() => self.speed_controller.write_key1(data), // speed
             0x4F if self.lock.is_cgb_mode() => self.ppu.write_vram_bank(data), // vram bank
