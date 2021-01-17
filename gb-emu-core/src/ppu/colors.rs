@@ -74,6 +74,8 @@ impl ColorPalette {
     }
 
     fn get_color_data(&self, index: u8) -> u8 {
+        let index = index & 7;
+
         let color = self.data[index as usize / 2];
 
         if index & 1 != 0 {
@@ -121,7 +123,7 @@ impl ColorPalettesCollection {
     pub fn read_color_data(&self) -> u8 {
         let palette = &self.palettes[self.index as usize / 8];
 
-        palette.get_color_data(self.index)
+        palette.get_color_data(self.index % 8)
     }
 
     pub fn get_palette(&self, index: u8) -> ColorPalette {
