@@ -9,16 +9,16 @@ use std::path::Path;
 
 macro_rules! gb_tests {
     // clock until infinite loop
-    (inf; $($test_name: ident, $file_path: expr, $crc_checksome: expr;)*) => {
-        gb_tests!($($test_name, $file_path, $crc_checksome;)*, clock_until_infinte_loop);
+    (inf; $($test_name: ident $(for $dmg: expr)?, $file_path: expr, $crc_checksome: expr;)*) => {
+        gb_tests!($($test_name $(for $dmg)?, $file_path, $crc_checksome;)*, clock_until_infinte_loop);
     };
 
     // clock until breakpoint
-    (brk; $($test_name: ident, $file_path: expr, $crc_checksome: expr;)*) => {
-        gb_tests!($($test_name, $file_path, $crc_checksome;)*, clock_until_breakpoint);
+    (brk; $($test_name: ident $(for $dmg: expr)?, $file_path: expr, $crc_checksome: expr;)*) => {
+        gb_tests!($($test_name $(for $dmg)?, $file_path, $crc_checksome;)*, clock_until_breakpoint);
     };
 
-    ($($test_name: ident, $file_path: expr, $crc_checksome: expr $(,$dmg: expr)?;)*, $looping_statement: tt) => {
+    ($($test_name: ident $(for $dmg: expr)?, $file_path: expr, $crc_checksome: expr;)*, $looping_statement: tt) => {
         $(
             /// Run the test and check the checksum of the screen buffer
             #[test]

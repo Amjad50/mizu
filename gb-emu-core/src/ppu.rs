@@ -327,6 +327,15 @@ impl Ppu {
                 ]),
             );
 
+            s.cgb_sprite_palettes.set_palette(
+                1,
+                ColorPalette::new([
+                    color!(21, 31, 21),
+                    color!(13, 21, 13),
+                    color!(6, 10, 6),
+                    color!(0, 0, 0),
+                ]),
+            );
             s.sprite_priority_mode = SpritePriorityMode::ByCoord;
         }
 
