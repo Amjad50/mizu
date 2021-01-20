@@ -31,7 +31,7 @@ handle_installation() {
             git clone $link $dest_rename
             cd $dest_rename
             make
-            make install
+            sudo make install
             cd ..
             ;;
         none)
