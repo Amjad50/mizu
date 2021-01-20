@@ -127,6 +127,24 @@ impl ApuChannel for WaveChannel {
     }
 
     fn trigger(&mut self) {
+        // if its DMG and will clock next, meaning that it is reading buffer now,
+        // then activate the wave-ram rewrite bug
+        //
+        // Some bytes from wave-ram are rewritten based on the current index
+        if self.config.is_dmg && self.frequency_timer == 0 {
+            // get the next index that will be incremented to in the next clock
+            let index = ((self.buffer_position + 1) & 0x1F) / 2;
+
+            if index < 4 {
+                self.buffer[0] = self.buffer[index as usize];
+            } else {
+                let four_bytes_align_start = ((index / 4) * 4) as usize;
+                for i in 0..4 {
+                    self.buffer[i] = self.buffer[four_bytes_align_start + i];
+                }
+            }
+        }
+
         self.buffer_position = 0;
         // no idea why `3` works here, but with this tests pass and found it
         // in other emulators

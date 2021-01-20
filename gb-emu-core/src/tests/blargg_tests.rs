@@ -49,15 +49,9 @@ gb_tests!(
     "blargg-gb-tests/dmg_sound/rom_singles/07-len sweep period sync.gb",
     1423221729427222721;
 
-    // fail in CGB
-    // blargg_dmg_sound_08_len_ctr_during_power,
-    // "blargg-gb-tests/dmg_sound/rom_singles/08-len ctr during power.gb",
-    // 12779871937667929616;
-
-    // fail in CGB
-    //blargg_dmg_sound_11_regs_after_power,
-    //"blargg-gb-tests/dmg_sound/rom_singles/11-regs after power.gb",
-    //14344078491883240837;
+    blargg_dmg_sound_all for "dmg",
+    "blargg-gb-tests/dmg_sound/dmg_sound.gb",
+    1594458519587061298;
 
     blargg_cgb_sound_all,
     "blargg-gb-tests/cgb_sound/cgb_sound.gb",
