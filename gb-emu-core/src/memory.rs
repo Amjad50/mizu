@@ -9,18 +9,19 @@ use crate::joypad::{Joypad, JoypadButton};
 use crate::ppu::Ppu;
 use crate::serial::Serial;
 use crate::timer::Timer;
+use crate::GameboyConfig;
 use interrupts::Interrupts;
 
 struct BootRom {
     enabled: bool,
-    data: [u8; 0x900],
+    data: Vec<u8>,
 }
 
 impl Default for BootRom {
     fn default() -> Self {
         Self {
             enabled: false,
-            data: [0; 0x900],
+            data: Vec::new(),
         }
     }
 }
@@ -342,14 +343,16 @@ pub struct Bus {
     /// Used to track how many ppu cycles have elapsed
     /// when the frontend gets the elapsed value, its reset to 0
     elapsed_ppu_cycles: u32,
+
+    config: GameboyConfig,
 }
 
 impl Bus {
-    pub fn new_without_boot_rom(cartridge: Cartridge) -> Self {
+    pub fn new_without_boot_rom(cartridge: Cartridge, config: GameboyConfig) -> Self {
         let cgb_mode = cartridge.is_cartridge_color();
         let mut lock = Lock::default();
 
-        if !cgb_mode {
+        if !cgb_mode || config.is_dmg {
             lock.write(4);
         } else {
             // TODO: change this to take the value from the cartridge addr 0x143
@@ -360,30 +363,50 @@ impl Bus {
 
         Self {
             cartridge,
-            ppu: Ppu::new_skip_boot_rom(cgb_mode),
+            ppu: Ppu::new_skip_boot_rom(cgb_mode, config),
             wram: Wram::default(),
             interrupts: Interrupts::default(),
-            timer: Timer::new_skip_boot_rom(),
+            timer: Timer::new_skip_boot_rom(config),
             joypad: Joypad::default(),
             serial: Serial::default(),
             dma: DMA::default(),
             hdma: HDMA::default(),
-            apu: Apu::new_skip_boot_rom(),
+            apu: Apu::new_skip_boot_rom(config),
             hram: [0; 127],
             boot_rom: BootRom::default(),
             speed_controller: SpeedController::default(),
             lock,
 
             elapsed_ppu_cycles: 0,
+
+            config,
         }
     }
 
-    pub fn new_with_boot_rom(cartridge: Cartridge, boot_rom_data: [u8; 0x900]) -> Self {
-        let mut s = Self::new_without_boot_rom(cartridge);
+    pub fn new_with_boot_rom(
+        cartridge: Cartridge,
+        boot_rom_data: Vec<u8>,
+        config: GameboyConfig,
+    ) -> Self {
+        let mut s = Self::new_without_boot_rom(cartridge, config);
         s.timer = Timer::default();
-        s.ppu = Ppu::default();
-        s.apu = Apu::default();
+        s.ppu = Ppu::new(config);
+        s.apu = Apu::new(config);
         s.lock = Lock::default();
+
+        if config.is_dmg {
+            s.lock.write(4);
+            s.lock.finish_boot();
+        }
+
+        // should always pass as another check is done in `lib.rs`, but this is needed
+        // if the Bus was used elsewhere
+        assert_eq!(
+            boot_rom_data.len(),
+            config.boot_rom_len(),
+            "Bootrom length does not match"
+        );
+
         s.boot_rom.data = boot_rom_data;
         s.boot_rom.enabled = true;
         s
@@ -476,6 +499,9 @@ impl Bus {
             (0x00, _) | (0x02..=0x08, _) if self.boot_rom.enabled => {
                 self.boot_rom.data[addr as usize]
             } // boot rom
+            (0x02..=0x08, _) if self.boot_rom.enabled && !self.config.is_dmg => {
+                self.boot_rom.data[addr as usize]
+            } // boot rom
             (0x00..=0x7F, Some(BusType::External)) => dma_value, // external bus DMA conflict
             (0x00..=0x3F, _) => self.cartridge.read_rom0(addr),  // rom0
             (0x40..=0x7F, _) => self.cartridge.read_romx(addr),  // romx
@@ -553,7 +579,7 @@ impl Bus {
             0x69 if self.lock.is_cgb_mode() => self.ppu.read_cgb_bg_palettes_data(),  // ppu
             0x6A if self.lock.is_cgb_mode() => self.ppu.read_cgb_sprite_palettes_index(), // ppu
             0x6B if self.lock.is_cgb_mode() => self.ppu.read_cgb_sprite_palettes_data(), // ppu
-            0x6C => self.ppu.read_sprite_priority_mode(),
+            0x6C if !self.config.is_dmg => self.ppu.read_sprite_priority_mode(),
             0x70 if self.lock.is_cgb_mode() => self.wram.get_wram_bank(), // wram bank
             0x80..=0xFE => self.hram[addr as usize & 0x7F],               // hram
             0xFF => self.interrupts.read_interrupt_enable(),              //interrupts enable
@@ -603,7 +629,7 @@ impl Bus {
             0x69 if self.lock.is_cgb_mode() => self.ppu.write_cgb_bg_palettes_data(data),  // ppu
             0x6A if self.lock.is_cgb_mode() => self.ppu.write_cgb_sprite_palettes_index(data), // ppu
             0x6B if self.lock.is_cgb_mode() => self.ppu.write_cgb_sprite_palettes_data(data), // ppu
-            0x6C => self.ppu.write_sprite_priority_mode(data),
+            0x6C if !self.config.is_dmg => self.ppu.write_sprite_priority_mode(data),
             0x70 if self.lock.is_cgb_mode() => self.wram.set_wram_bank(data), // wram bank
             0x80..=0xFE => self.hram[addr as usize & 0x7F] = data,            // hram
             0xFF => self.interrupts.write_interrupt_enable(data),             // interrupts enable
@@ -652,6 +678,7 @@ impl CpuBusProvider for Bus {
     }
 
     fn commit_speed_switch(&mut self) {
+        assert!(!self.config.is_dmg, "Cannot switch speed in DMG");
         self.speed_controller.commit_speed_switch();
     }
 }

@@ -6,6 +6,7 @@ mod lcd;
 mod sprite;
 
 use crate::memory::{InterruptManager, InterruptType};
+use crate::GameboyConfig;
 use bg_attribs::BgAttribute;
 use bitflags::bitflags;
 use colors::{Color, ColorPalette, ColorPalettesCollection};
@@ -202,10 +203,47 @@ pub struct Ppu {
     sprite_priority_mode: SpritePriorityMode,
 
     is_cgb_mode: bool,
+
+    config: GameboyConfig,
 }
 
-impl Default for Ppu {
-    fn default() -> Self {
+impl Ppu {
+    pub fn new(config: GameboyConfig) -> Self {
+        let mut cgb_bg_palettes = ColorPalettesCollection::default();
+        let mut cgb_sprite_palettes = ColorPalettesCollection::default();
+
+        if config.is_dmg {
+            cgb_bg_palettes.set_palette(
+                0,
+                ColorPalette::new([
+                    color!(21, 31, 21),
+                    color!(13, 21, 13),
+                    color!(6, 10, 6),
+                    color!(0, 0, 0),
+                ]),
+            );
+
+            cgb_sprite_palettes.set_palette(
+                0,
+                ColorPalette::new([
+                    color!(21, 31, 21),
+                    color!(13, 21, 13),
+                    color!(6, 10, 6),
+                    color!(0, 0, 0),
+                ]),
+            );
+
+            cgb_sprite_palettes.set_palette(
+                1,
+                ColorPalette::new([
+                    color!(21, 31, 21),
+                    color!(13, 21, 13),
+                    color!(6, 10, 6),
+                    color!(0, 0, 0),
+                ]),
+            );
+        }
+
         Self {
             lcd_control: LcdControl::from_bits_truncate(0),
             // COINCIDENCE_FLAG flag set because LYC and LY are 0 at the beginning
@@ -224,8 +262,8 @@ impl Default for Ppu {
             oam: [Sprite::default(); 40],
             selected_oam: [SelectedSprite::default(); 10],
             selected_oam_size: 0,
-            cgb_bg_palettes: ColorPalettesCollection::default(),
-            cgb_sprite_palettes: ColorPalettesCollection::default(),
+            cgb_bg_palettes,
+            cgb_sprite_palettes,
             fine_scroll_x_discard: 0,
             fetcher: Fetcher::default(),
             is_drawing_window: false,
@@ -237,18 +275,21 @@ impl Default for Ppu {
             lcd_turned_on: false,
             // CGB by default, the bootrom of the CGB will change
             // it if it detected the rom is DMG
-            sprite_priority_mode: SpritePriorityMode::ByIndex,
+            sprite_priority_mode: if config.is_dmg {
+                SpritePriorityMode::ByCoord
+            } else {
+                SpritePriorityMode::ByIndex
+            },
 
-            is_cgb_mode: true,
+            is_cgb_mode: !config.is_dmg,
+
+            config,
         }
     }
-}
-
-impl Ppu {
     /// create a ppu instance that match the one the ppu would have when the
     /// boot_rom finishes execution
-    pub fn new_skip_boot_rom(cgb_mode: bool) -> Self {
-        let mut s = Self::default();
+    pub fn new_skip_boot_rom(mut cgb_mode: bool, config: GameboyConfig) -> Self {
+        let mut s = Self::new(config);
         // set I/O registers to the value which would have if boot_rom ran
         s.write_lcd_control(0x91);
         s.write_scroll_y(0x00);
@@ -259,6 +300,10 @@ impl Ppu {
         s.write_dmg_sprite_palettes(1, 0xFF);
         s.write_window_y(0x00);
         s.write_window_x(0x00);
+
+        if config.is_dmg {
+            cgb_mode = false;
+        }
 
         // palettes for DMG only
         if !cgb_mode {
@@ -281,6 +326,7 @@ impl Ppu {
                     color!(0, 0, 0),
                 ]),
             );
+
             s.sprite_priority_mode = SpritePriorityMode::ByCoord;
         }
 
@@ -473,7 +519,7 @@ impl Ppu {
     }
 
     pub fn update_cgb_mode(&mut self, cgb_mode: bool) {
-        self.is_cgb_mode = cgb_mode;
+        self.is_cgb_mode = cgb_mode && !self.config.is_dmg;
     }
 
     pub fn get_current_mode(&self) -> u8 {

@@ -1,4 +1,5 @@
 use crate::memory::{InterruptManager, InterruptType};
+use crate::GameboyConfig;
 use bitflags::bitflags;
 
 bitflags! {
@@ -49,9 +50,9 @@ impl Default for Timer {
 }
 
 impl Timer {
-    pub fn new_skip_boot_rom() -> Self {
+    pub fn new_skip_boot_rom(config: GameboyConfig) -> Self {
         Self {
-            divider: 0x2678, // divider value after the boot_rom finish executing
+            divider: if config.is_dmg { 0xABCC } else { 0x2678 }, // divider value after the boot_rom finish executing
             ..Self::default()
         }
     }
@@ -60,7 +61,7 @@ impl Timer {
         (self.divider >> 8) as u8
     }
 
-    pub fn write_div(&mut self, data: u8) {
+    pub fn write_div(&mut self, _data: u8) {
         let old_divider_bit = self.divider_bit();
         self.divider = 0; // reset
         let new_divider_bit = self.divider_bit();

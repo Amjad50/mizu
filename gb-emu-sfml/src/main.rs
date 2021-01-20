@@ -1,14 +1,15 @@
 mod audio;
 use audio::AudioPlayer;
 
-use gb_emu_core::{GameBoy, JoypadButton};
-use std::env::args;
+use gb_emu_core::{GameBoy, GameboyConfig, JoypadButton};
 
 use sfml::{
     graphics::{Color, FloatRect, Image, RenderTarget, RenderWindow, Sprite, Texture, View},
     system::{SfBox, Vector2f},
     window::{Event, Key, Style},
 };
+
+use clap::{App, Arg};
 
 const TV_WIDTH: u32 = 160;
 const TV_HEIGHT: u32 = 144;
@@ -43,14 +44,22 @@ fn get_view(
 }
 
 fn main() {
-    let args = args().collect::<Vec<String>>();
+    let matches = App::new("GB-emu")
+        .version("1.0")
+        .author("Amjad Alsharafi")
+        .about("Gameboy DMG and Gameboy Color emulator")
+        .arg(Arg::with_name("rom").required(true))
+        .arg(Arg::with_name("boot_rom"))
+        .arg(Arg::with_name("dmg").long("dmg").short("d"))
+        .get_matches();
 
-    if args.len() < 2 {
-        eprintln!("USAGE: {} <rom-file> <boot-rom-file>", args[0]);
-        return;
-    }
+    let is_dmg = matches.is_present("dmg");
+    let rom_file = matches.value_of("rom").expect("rom file argument");
+    let boot_rom_file = matches.value_of("boot_rom");
 
-    let mut gameboy = GameBoy::new(&args[1], args.get(2)).unwrap();
+    let config = GameboyConfig { is_dmg };
+
+    let mut gameboy = GameBoy::new(rom_file, boot_rom_file, config).unwrap();
 
     let mut audio_player = AudioPlayer::new(44100);
     audio_player.play();

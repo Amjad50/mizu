@@ -3,6 +3,7 @@
 use super::cartridge::{Cartridge, CartridgeError};
 use super::cpu::{Cpu, CpuRegisters, CpuState};
 use super::memory::Bus;
+use super::GameboyConfig;
 
 use std::path::Path;
 
@@ -17,13 +18,15 @@ macro_rules! gb_tests {
         gb_tests!($($test_name, $file_path, $crc_checksome;)*, clock_until_breakpoint);
     };
 
-    ($($test_name: ident, $file_path: expr, $crc_checksome: expr;)*, $looping_statement: tt) => {
+    ($($test_name: ident, $file_path: expr, $crc_checksome: expr $(,$dmg: expr)?;)*, $looping_statement: tt) => {
         $(
             /// Run the test and check the checksum of the screen buffer
             #[test]
             fn $test_name() {
+                let is_dmg = false $(|| $dmg == "dmg")?;
                 let mut gb = crate::tests::TestingGameBoy::new(
-                    concat!("../test_roms/", $file_path)
+                    concat!("../test_roms/", $file_path),
+                    is_dmg
                 ).unwrap();
 
                 gb.$looping_statement();
@@ -53,12 +56,14 @@ struct TestingGameBoy {
 }
 
 impl TestingGameBoy {
-    pub fn new<P: AsRef<Path>>(file_path: P) -> Result<Self, CartridgeError> {
+    pub fn new<P: AsRef<Path>>(file_path: P, is_dmg: bool) -> Result<Self, CartridgeError> {
         let cartridge = Cartridge::from_file(file_path)?;
 
+        let config = GameboyConfig { is_dmg };
+
         Ok(Self {
-            bus: Bus::new_without_boot_rom(cartridge),
-            cpu: Cpu::new_without_boot_rom(),
+            bus: Bus::new_without_boot_rom(cartridge, config),
+            cpu: Cpu::new_without_boot_rom(config),
         })
     }
 

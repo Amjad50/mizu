@@ -4,6 +4,7 @@ mod instructions_table;
 use bitflags::bitflags;
 
 use crate::memory::InterruptType;
+use crate::GameboyConfig;
 use instruction::{Condition, Instruction, Opcode, OperandType};
 
 pub trait CpuBusProvider {
@@ -80,10 +81,12 @@ pub struct Cpu {
     enable_interrupt_next: bool,
     ime: bool,
     halt_mode: HaltMode,
+
+    config: GameboyConfig,
 }
 
 impl Cpu {
-    pub fn new() -> Self {
+    pub fn new(config: GameboyConfig) -> Self {
         Self {
             reg_a: 0,
             reg_b: 0,
@@ -99,19 +102,29 @@ impl Cpu {
             enable_interrupt_next: false,
             ime: false,
             halt_mode: HaltMode::NotHalting,
+
+            config,
         }
     }
 
     /// create a new cpu, with states that match the ones the CPU would have
     /// if the boot-rom would run (default values for registers)
-    pub fn new_without_boot_rom() -> Self {
-        let mut cpu = Self::new();
+    pub fn new_without_boot_rom(config: GameboyConfig) -> Self {
+        let mut cpu = Self::new(config);
 
-        // initial values of the registers (DMG)
-        cpu.reg_af_write(0x1180);
-        cpu.reg_bc_write(0x0000);
-        cpu.reg_de_write(0xFF56);
-        cpu.reg_hl_write(0x000D);
+        if cpu.config.is_dmg {
+            // initial values of the registers (DMG)
+            cpu.reg_af_write(0x01B0);
+            cpu.reg_bc_write(0x0013);
+            cpu.reg_de_write(0x00D8);
+            cpu.reg_hl_write(0x014D);
+        } else {
+            // initial values of the registers (CGB)
+            cpu.reg_af_write(0x1180);
+            cpu.reg_bc_write(0x0000);
+            cpu.reg_de_write(0xFF56);
+            cpu.reg_hl_write(0x000D);
+        }
         cpu.reg_sp = 0xFFFE;
         cpu.reg_pc = 0x0100;
 
@@ -131,7 +144,10 @@ impl Cpu {
 
             if bus.check_interrupts() {
                 self.halt_mode = HaltMode::NotHalting;
-                self.advance_bus(bus);
+
+                if !self.config.is_dmg {
+                    self.advance_bus(bus);
+                }
             } else {
                 return CpuState::Halting;
             }

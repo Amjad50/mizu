@@ -4,6 +4,7 @@ mod noise_channel;
 mod pulse_channel;
 mod wave_channel;
 
+use crate::GameboyConfig;
 use bitflags::bitflags;
 use channel::{ApuChannel, Dac, LengthCountedChannel};
 use noise_channel::NoiseChannel;
@@ -61,10 +62,12 @@ pub struct Apu {
     // Keep track when to clock the APU, it should be clocked every 4 tcycles
     // this is to keep working normally even in CPU double speed mode
     clocks_counter: u8,
+
+    config: GameboyConfig,
 }
 
-impl Default for Apu {
-    fn default() -> Self {
+impl Apu {
+    pub fn new(config: GameboyConfig) -> Self {
         Self {
             channels_control: ChannelsControl::from_bits_truncate(0),
             channels_selection: ChannelsSelection::from_bits_truncate(0),
@@ -73,17 +76,17 @@ impl Default for Apu {
             sample_counter: 0.,
             pulse1: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
             pulse2: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
-            wave: Dac::new(LengthCountedChannel::new(WaveChannel::default(), 256)),
+            wave: Dac::new(LengthCountedChannel::new(WaveChannel::new(config), 256)),
             noise: Dac::new(LengthCountedChannel::new(NoiseChannel::default(), 64)),
             cycle: 0,
             clocks_counter: 0,
+
+            config,
         }
     }
-}
 
-impl Apu {
-    pub fn new_skip_boot_rom() -> Self {
-        let mut apu = Self::default();
+    pub fn new_skip_boot_rom(config: GameboyConfig) -> Self {
+        let mut apu = Self::new(config);
 
         // after boot_rom state
         apu.pulse1.channel_mut().write_pattern_duty(2);
@@ -446,11 +449,13 @@ impl Apu {
         self.pulse2.channel_mut().reset_sequencer();
         self.wave.channel_mut().reset_buffer_index();
 
-        // reset length counters in CGB
-        self.pulse1.reset_length_counter();
-        self.pulse2.reset_length_counter();
-        self.wave.reset_length_counter();
-        self.noise.reset_length_counter();
+        if !self.config.is_dmg {
+            // reset length counters in CGB
+            self.pulse1.reset_length_counter();
+            self.pulse2.reset_length_counter();
+            self.wave.reset_length_counter();
+            self.noise.reset_length_counter();
+        }
     }
 
     /// determines if the next frame sequencer clock is going to include

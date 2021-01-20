@@ -1,4 +1,5 @@
 use super::ApuChannel;
+use crate::GameboyConfig;
 
 const VOLUME_SHIFT_TABLE: [u8; 4] = [4, 0, 1, 2];
 
@@ -17,9 +18,18 @@ pub struct WaveChannel {
     channel_enable: bool,
 
     dac_enable: bool,
+
+    config: GameboyConfig,
 }
 
 impl WaveChannel {
+    pub fn new(config: GameboyConfig) -> Self {
+        Self {
+            config,
+            ..Self::default()
+        }
+    }
+
     pub fn write_volume(&mut self, vol: u8) {
         self.volume = vol;
         self.volume_shift = VOLUME_SHIFT_TABLE[vol as usize & 3];
@@ -80,8 +90,10 @@ impl WaveChannel {
     /// returns `Some` if the wave is accessable, `None` otherwise (for DMG)
     fn wave_buffer_index(&self, offset: u8) -> Option<usize> {
         let index = if self.dac_enable && self.channel_enable {
-            // TODO: when there is support for DMG, change this to return None
-            //  if appropriate
+            if self.config.is_dmg && !self.buffer_position_just_clocked {
+                return None;
+            }
+
             self.buffer_position / 2
         } else {
             offset

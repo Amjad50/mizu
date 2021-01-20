@@ -24,8 +24,11 @@ gb_tests!(
 #[test]
 #[allow(dead_code)]
 fn statcount_auto() {
-    let mut gb =
-        TestingGameBoy::new("../test_roms/scribbltests/statcount/statcount-auto.gb").unwrap();
+    let mut gb = TestingGameBoy::new(
+        "../test_roms/scribbltests/statcount/statcount-auto.gb",
+        false,
+    )
+    .unwrap();
 
     let regs = gb.clock_until_breakpoint();
 
