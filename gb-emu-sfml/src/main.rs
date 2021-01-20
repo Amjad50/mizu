@@ -1,14 +1,15 @@
 mod audio;
 use audio::AudioPlayer;
 
-use gb_emu_core::{GameBoy, JoypadButton};
-use std::env::args;
+use gb_emu_core::{GameBoy, GameboyConfig, JoypadButton};
 
 use sfml::{
     graphics::{Color, FloatRect, Image, RenderTarget, RenderWindow, Sprite, Texture, View},
     system::{SfBox, Vector2f},
     window::{Event, Key, Style},
 };
+
+use clap::{App, Arg};
 
 const TV_WIDTH: u32 = 160;
 const TV_HEIGHT: u32 = 144;
@@ -43,14 +44,22 @@ fn get_view(
 }
 
 fn main() {
-    let args = args().collect::<Vec<String>>();
+    let matches = App::new("GB-emu")
+        .version("1.0")
+        .author("Amjad Alsharafi")
+        .about("Gameboy DMG and Gameboy Color emulator")
+        .arg(Arg::with_name("rom").required(true))
+        .arg(Arg::with_name("boot_rom"))
+        .arg(Arg::with_name("dmg").long("dmg").short("d"))
+        .get_matches();
 
-    if args.len() < 2 {
-        eprintln!("USAGE: {} <rom-file> <boot-rom-file>", args[0]);
-        return;
-    }
+    let is_dmg = matches.is_present("dmg");
+    let rom_file = matches.value_of("rom").expect("rom file argument");
+    let boot_rom_file = matches.value_of("boot_rom");
 
-    let mut gameboy = GameBoy::new(&args[1], args.get(2)).unwrap();
+    let config = GameboyConfig { is_dmg };
+
+    let mut gameboy = GameBoy::new(rom_file, boot_rom_file, config).unwrap();
 
     let mut audio_player = AudioPlayer::new(44100);
     audio_player.play();
@@ -103,6 +112,13 @@ fn main() {
                     Key::A => gameboy.press_joypad(JoypadButton::Left),
                     Key::D => gameboy.press_joypad(JoypadButton::Right),
 
+                    Key::Return => {
+                        gameboy.press_joypad(JoypadButton::A);
+                        gameboy.press_joypad(JoypadButton::B);
+                        gameboy.press_joypad(JoypadButton::Start);
+                        gameboy.press_joypad(JoypadButton::Select);
+                    }
+
                     // change FPS
                     Key::Equal => {
                         fps += 5;
@@ -123,6 +139,13 @@ fn main() {
                     Key::S => gameboy.release_joypad(JoypadButton::Down),
                     Key::A => gameboy.release_joypad(JoypadButton::Left),
                     Key::D => gameboy.release_joypad(JoypadButton::Right),
+
+                    Key::Return => {
+                        gameboy.release_joypad(JoypadButton::A);
+                        gameboy.release_joypad(JoypadButton::B);
+                        gameboy.release_joypad(JoypadButton::Start);
+                        gameboy.release_joypad(JoypadButton::Select);
+                    }
                     _ => {}
                 },
                 Event::Resized { width, height } => {
@@ -153,10 +176,10 @@ fn main() {
 }
 
 fn convert_to_rgba(data: &[u8], output: &mut [u8]) {
-    for (pixel_chunk, &pixel_color) in output.chunks_mut(4).zip(data.iter()) {
-        let reduced = (pixel_color as f32 * 0.8) as u8;
-        pixel_chunk[0] = reduced;
-        pixel_chunk[1] = pixel_color;
-        pixel_chunk[2] = reduced;
+    for (dest, src) in output.chunks_mut(4).zip(data.chunks(3)) {
+        dest[0] = src[0];
+        dest[1] = src[1];
+        dest[2] = src[2];
+        dest[3] = 0xFF;
     }
 }

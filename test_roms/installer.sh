@@ -21,6 +21,19 @@ handle_installation() {
         git)
             git clone $link $dest_rename
             ;;
+        git_make)
+            git clone $link $dest_rename
+            cd $dest_rename
+            make
+            cd ..
+            ;;
+        git_make_install)
+            git clone $link $dest_rename
+            cd $dest_rename
+            make
+            sudo make install
+            cd ..
+            ;;
         none)
             wget -O $dest_rename $link
             ;;

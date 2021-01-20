@@ -4,6 +4,7 @@ mod noise_channel;
 mod pulse_channel;
 mod wave_channel;
 
+use crate::GameboyConfig;
 use bitflags::bitflags;
 use channel::{ApuChannel, Dac, LengthCountedChannel};
 use noise_channel::NoiseChannel;
@@ -57,10 +58,16 @@ pub struct Apu {
     buffer: Vec<f32>,
 
     cycle: u16,
+
+    // Keep track when to clock the APU, it should be clocked every 4 tcycles
+    // this is to keep working normally even in CPU double speed mode
+    clocks_counter: u8,
+
+    config: GameboyConfig,
 }
 
-impl Default for Apu {
-    fn default() -> Self {
+impl Apu {
+    pub fn new(config: GameboyConfig) -> Self {
         Self {
             channels_control: ChannelsControl::from_bits_truncate(0),
             channels_selection: ChannelsSelection::from_bits_truncate(0),
@@ -69,16 +76,17 @@ impl Default for Apu {
             sample_counter: 0.,
             pulse1: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
             pulse2: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
-            wave: Dac::new(LengthCountedChannel::new(WaveChannel::default(), 256)),
+            wave: Dac::new(LengthCountedChannel::new(WaveChannel::new(config), 256)),
             noise: Dac::new(LengthCountedChannel::new(NoiseChannel::default(), 64)),
             cycle: 0,
+            clocks_counter: 0,
+
+            config,
         }
     }
-}
 
-impl Apu {
-    pub fn new_skip_boot_rom() -> Self {
-        let mut apu = Self::default();
+    pub fn new_skip_boot_rom(config: GameboyConfig) -> Self {
+        let mut apu = Self::new(config);
 
         // after boot_rom state
         apu.pulse1.channel_mut().write_pattern_duty(2);
@@ -292,7 +300,15 @@ impl Apu {
         std::mem::replace(&mut self.buffer, Vec::new())
     }
 
-    pub fn clock(&mut self) {
+    pub fn clock(&mut self, clocks: u8) {
+        self.clocks_counter += clocks;
+        if self.clocks_counter >= 4 {
+            self.clocks_counter -= 4;
+        } else {
+            // don't do anything, wait for the next cycle
+            return;
+        }
+
         const SAMPLE_RATE: f64 = 44100.;
         const SAMPLE_EVERY_N_CLOCKS: f64 = (((16384 * 256) / 4) as f64) / SAMPLE_RATE;
 
@@ -432,6 +448,14 @@ impl Apu {
         self.pulse1.channel_mut().reset_sequencer();
         self.pulse2.channel_mut().reset_sequencer();
         self.wave.channel_mut().reset_buffer_index();
+
+        if !self.config.is_dmg {
+            // reset length counters in CGB
+            self.pulse1.reset_length_counter();
+            self.pulse2.reset_length_counter();
+            self.wave.reset_length_counter();
+            self.noise.reset_length_counter();
+        }
     }
 
     /// determines if the next frame sequencer clock is going to include

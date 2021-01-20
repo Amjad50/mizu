@@ -1,12 +1,18 @@
+#[macro_use]
+mod colors;
+mod bg_attribs;
 mod fifo;
 mod lcd;
 mod sprite;
 
 use crate::memory::{InterruptManager, InterruptType};
+use crate::GameboyConfig;
+use bg_attribs::BgAttribute;
 use bitflags::bitflags;
-use fifo::{Fifo, PaletteType};
+use colors::{Color, ColorPalette, ColorPalettesCollection};
+use fifo::{Fifo, FifoPixel, PixelType, SpritePriorityMode};
 use lcd::Lcd;
-use sprite::Sprite;
+use sprite::{SelectedSprite, Sprite};
 
 bitflags! {
     struct LcdControl: u8 {
@@ -124,7 +130,7 @@ impl LcdStatus {
 #[derive(Default)]
 struct Fetcher {
     delay_counter: u8,
-    data: Option<[u8; 8]>,
+    data: Option<([u8; 8], BgAttribute)>,
     x: u8,
 }
 
@@ -139,12 +145,12 @@ impl Fetcher {
         }
     }
 
-    fn push(&mut self, data: [u8; 8]) {
+    fn push(&mut self, data: [u8; 8], attribs: BgAttribute) {
         self.x += 1;
-        self.data = Some(data);
+        self.data = Some((data, attribs));
     }
 
-    fn pop(&mut self) -> Option<[u8; 8]> {
+    fn pop(&mut self) -> Option<([u8; 8], BgAttribute)> {
         self.data.take()
     }
 
@@ -164,16 +170,20 @@ pub struct Ppu {
     ly: u8,
     lyc: u8,
     stat_interrupt_line: bool,
-    bg_palette: u8,
-    sprite_palette: [u8; 2],
+    dmg_bg_palette: u8,
+    dmg_sprite_palettes: [u8; 2],
     windows_y: u8,
     windows_x: u8,
 
-    vram: [u8; 0x2000],
+    vram: [u8; 0x4000],
+    vram_bank: u8,
     oam: [Sprite; 40],
     // the sprites that got selected
-    selected_oam: [Sprite; 10],
+    selected_oam: [SelectedSprite; 10],
     selected_oam_size: u8,
+
+    cgb_bg_palettes: ColorPalettesCollection,
+    cgb_sprite_palettes: ColorPalettesCollection,
 
     fine_scroll_x_discard: u8,
     fetcher: Fetcher,
@@ -189,10 +199,51 @@ pub struct Ppu {
 
     /// track if the next frame is LCD still turning on
     lcd_turned_on: bool,
+
+    sprite_priority_mode: SpritePriorityMode,
+
+    is_cgb_mode: bool,
+
+    config: GameboyConfig,
 }
 
-impl Default for Ppu {
-    fn default() -> Self {
+impl Ppu {
+    pub fn new(config: GameboyConfig) -> Self {
+        let mut cgb_bg_palettes = ColorPalettesCollection::default();
+        let mut cgb_sprite_palettes = ColorPalettesCollection::default();
+
+        if config.is_dmg {
+            cgb_bg_palettes.set_palette(
+                0,
+                ColorPalette::new([
+                    color!(21, 31, 21),
+                    color!(13, 21, 13),
+                    color!(6, 10, 6),
+                    color!(0, 0, 0),
+                ]),
+            );
+
+            cgb_sprite_palettes.set_palette(
+                0,
+                ColorPalette::new([
+                    color!(21, 31, 21),
+                    color!(13, 21, 13),
+                    color!(6, 10, 6),
+                    color!(0, 0, 0),
+                ]),
+            );
+
+            cgb_sprite_palettes.set_palette(
+                1,
+                ColorPalette::new([
+                    color!(21, 31, 21),
+                    color!(13, 21, 13),
+                    color!(6, 10, 6),
+                    color!(0, 0, 0),
+                ]),
+            );
+        }
+
         Self {
             lcd_control: LcdControl::from_bits_truncate(0),
             // COINCIDENCE_FLAG flag set because LYC and LY are 0 at the beginning
@@ -202,14 +253,17 @@ impl Default for Ppu {
             ly: 0,
             lyc: 0,
             stat_interrupt_line: false,
-            bg_palette: 0xFC,
-            sprite_palette: [0xFF; 2],
+            dmg_bg_palette: 0xFC,
+            dmg_sprite_palettes: [0xFF; 2],
             windows_y: 0,
             windows_x: 0,
-            vram: [0; 0x2000],
+            vram: [0; 0x4000],
+            vram_bank: 0,
             oam: [Sprite::default(); 40],
-            selected_oam: [Sprite::default(); 10],
+            selected_oam: [SelectedSprite::default(); 10],
             selected_oam_size: 0,
+            cgb_bg_palettes,
+            cgb_sprite_palettes,
             fine_scroll_x_discard: 0,
             fetcher: Fetcher::default(),
             is_drawing_window: false,
@@ -219,25 +273,73 @@ impl Default for Ppu {
             cycle: 4,
             scanline: 0,
             lcd_turned_on: false,
+            // CGB by default, the bootrom of the CGB will change
+            // it if it detected the rom is DMG
+            sprite_priority_mode: if config.is_dmg {
+                SpritePriorityMode::ByCoord
+            } else {
+                SpritePriorityMode::ByIndex
+            },
+
+            is_cgb_mode: !config.is_dmg,
+
+            config,
         }
     }
-}
-
-impl Ppu {
     /// create a ppu instance that match the one the ppu would have when the
     /// boot_rom finishes execution
-    pub fn new_skip_boot_rom() -> Self {
-        let mut s = Self::default();
+    pub fn new_skip_boot_rom(mut cgb_mode: bool, config: GameboyConfig) -> Self {
+        let mut s = Self::new(config);
         // set I/O registers to the value which would have if boot_rom ran
-        s.write_register(0xFF40, 0x91);
-        s.write_register(0xFF42, 0x00);
-        s.write_register(0xFF43, 0x00);
-        s.write_register(0xFF45, 0x00);
-        s.write_register(0xFF47, 0xFC);
-        s.write_register(0xFF48, 0xFF);
-        s.write_register(0xFF49, 0xFF);
-        s.write_register(0xFF4A, 0x00);
-        s.write_register(0xFF4B, 0x00);
+        s.write_lcd_control(0x91);
+        s.write_scroll_y(0x00);
+        s.write_scroll_x(0x00);
+        s.write_lyc(0x00);
+        s.write_dmg_bg_palette(0xFC);
+        s.write_dmg_sprite_palettes(0, 0xFF);
+        s.write_dmg_sprite_palettes(1, 0xFF);
+        s.write_window_y(0x00);
+        s.write_window_x(0x00);
+
+        if config.is_dmg {
+            cgb_mode = false;
+        }
+
+        // palettes for DMG only
+        if !cgb_mode {
+            s.cgb_bg_palettes.set_palette(
+                0,
+                ColorPalette::new([
+                    color!(21, 31, 21),
+                    color!(13, 21, 13),
+                    color!(6, 10, 6),
+                    color!(0, 0, 0),
+                ]),
+            );
+
+            s.cgb_sprite_palettes.set_palette(
+                0,
+                ColorPalette::new([
+                    color!(21, 31, 21),
+                    color!(13, 21, 13),
+                    color!(6, 10, 6),
+                    color!(0, 0, 0),
+                ]),
+            );
+
+            s.cgb_sprite_palettes.set_palette(
+                1,
+                ColorPalette::new([
+                    color!(21, 31, 21),
+                    color!(13, 21, 13),
+                    color!(6, 10, 6),
+                    color!(0, 0, 0),
+                ]),
+            );
+            s.sprite_priority_mode = SpritePriorityMode::ByCoord;
+        }
+
+        s.is_cgb_mode = cgb_mode;
 
         s.scanline = 153;
         s.cycle = 400;
@@ -248,11 +350,15 @@ impl Ppu {
     }
 
     pub fn read_vram(&self, addr: u16) -> u8 {
-        self.vram[addr as usize & 0x1FFF]
+        self.read_vram_banked(self.vram_bank, addr)
     }
 
     pub fn write_vram(&mut self, addr: u16, data: u8) {
-        self.vram[addr as usize & 0x1FFF] = data;
+        // here since this is the only place vram is written to, no need
+        // to make another function `write_vram_banked`
+        let offset = addr as usize & 0x1FFF;
+        let bank_start = self.vram_bank as usize * 0x2000;
+        self.vram[bank_start + offset] = data;
     }
 
     pub fn read_oam(&self, addr: u16) -> u8 {
@@ -265,74 +371,180 @@ impl Ppu {
         self.oam[addr as usize / 4].set_at_offset(addr as u8 % 4, data);
     }
 
-    pub fn read_register(&mut self, addr: u16) -> u8 {
-        match addr {
-            0xFF40 => self.lcd_control.bits(),
-            0xFF41 => 0x80 | self.lcd_status.bits(),
-            0xFF42 => self.scroll_y,
-            0xFF43 => self.scroll_x,
-            0xFF44 => self.ly,
-            0xFF45 => self.lyc,
-            0xFF47 => self.bg_palette,
-            0xFF48 => self.sprite_palette[0],
-            0xFF49 => self.sprite_palette[1],
-            0xFF4A => self.windows_y,
-            0xFF4B => self.windows_x,
-            _ => unreachable!(),
+    pub fn read_lcd_control(&self) -> u8 {
+        self.lcd_control.bits()
+    }
+
+    pub fn write_lcd_control(&mut self, data: u8) {
+        let old_disply_enable = self.lcd_control.display_enable();
+
+        self.lcd_control
+            .clone_from(&LcdControl::from_bits_truncate(data));
+
+        if !self.lcd_control.display_enable() && old_disply_enable {
+            if self.scanline < 144 {
+                println!(
+                    "[WARN] Tried to turn off display outside VBLANK, hardware may get corrupted"
+                );
+            }
+
+            self.ly = 0;
+            self.cycle = 4;
+            self.scanline = 0;
+            self.lcd_status.current_mode_set(0);
+            self.lcd.clear();
+
+            // to function as soon as lcd is turned on
+            self.lcd_turned_on = true;
         }
     }
 
-    pub fn write_register(&mut self, addr: u16, data: u8) {
-        match addr {
-            0xFF40 => {
-                let old_disply_enable = self.lcd_control.display_enable();
+    pub fn read_lcd_status(&self) -> u8 {
+        0x80 | self.lcd_status.bits()
+    }
 
-                self.lcd_control
-                    .clone_from(&LcdControl::from_bits_truncate(data));
+    pub fn write_lcd_status(&mut self, data: u8) {
+        self.lcd_status.clone_from(&LcdStatus::from_bits_truncate(
+            (self.lcd_status.bits() & !0x78) | (data & 0x78),
+        ));
+    }
 
-                if !self.lcd_control.display_enable() && old_disply_enable {
-                    if self.scanline < 144 {
-                        println!(
-                            "[WARN] Tried to turn off display outside VBLANK, hardware may get corrupted"
-                        );
-                    }
+    pub fn read_scroll_y(&self) -> u8 {
+        self.scroll_y
+    }
 
-                    self.ly = 0;
-                    self.cycle = 4;
-                    self.scanline = 0;
-                    self.lcd_status.current_mode_set(0);
-                    self.lcd.clear();
+    pub fn write_scroll_y(&mut self, data: u8) {
+        self.scroll_y = data;
+    }
 
-                    // to function as soon as lcd is turned on
-                    self.lcd_turned_on = true;
-                }
-            }
-            0xFF41 => {
-                self.lcd_status.clone_from(&LcdStatus::from_bits_truncate(
-                    (self.lcd_status.bits() & !0x78) | (data & 0x78),
-                ));
-            }
-            0xFF42 => self.scroll_y = data,
-            0xFF43 => self.scroll_x = data,
-            0xFF44 => {
-                // not writable??
-            }
-            0xFF45 => self.lyc = data,
-            0xFF47 => self.bg_palette = data,
-            0xFF48 => self.sprite_palette[0] = data,
-            0xFF49 => self.sprite_palette[1] = data,
-            0xFF4A => self.windows_y = data,
-            0xFF4B => self.windows_x = data,
-            _ => unreachable!(),
+    pub fn read_scroll_x(&self) -> u8 {
+        self.scroll_x
+    }
+
+    pub fn write_scroll_x(&mut self, data: u8) {
+        self.scroll_x = data;
+    }
+
+    pub fn read_ly(&self) -> u8 {
+        self.ly
+    }
+
+    pub fn write_ly(&mut self, _data: u8) {}
+
+    pub fn read_lyc(&self) -> u8 {
+        self.lyc
+    }
+
+    pub fn write_lyc(&mut self, data: u8) {
+        self.lyc = data;
+    }
+
+    pub fn read_dmg_bg_palette(&self) -> u8 {
+        self.dmg_bg_palette
+    }
+
+    pub fn write_dmg_bg_palette(&mut self, data: u8) {
+        self.dmg_bg_palette = data;
+    }
+
+    pub fn read_dmg_sprite_palettes(&self, index: u8) -> u8 {
+        self.dmg_sprite_palettes[index as usize & 1]
+    }
+
+    pub fn write_dmg_sprite_palettes(&mut self, index: u8, data: u8) {
+        self.dmg_sprite_palettes[index as usize & 1] = data;
+    }
+
+    pub fn read_window_y(&self) -> u8 {
+        self.windows_y
+    }
+
+    pub fn write_window_y(&mut self, data: u8) {
+        self.windows_y = data;
+    }
+
+    pub fn read_window_x(&self) -> u8 {
+        self.windows_x
+    }
+
+    pub fn write_window_x(&mut self, data: u8) {
+        self.windows_x = data;
+    }
+
+    pub fn read_vram_bank(&self) -> u8 {
+        0xFE | self.vram_bank
+    }
+
+    pub fn write_vram_bank(&mut self, data: u8) {
+        self.vram_bank = data & 1;
+    }
+
+    pub fn read_cgb_bg_palettes_index(&self) -> u8 {
+        self.cgb_bg_palettes.read_index()
+    }
+
+    pub fn write_cgb_bg_palettes_index(&mut self, data: u8) {
+        self.cgb_bg_palettes.write_index(data);
+    }
+
+    pub fn read_cgb_bg_palettes_data(&self) -> u8 {
+        self.cgb_bg_palettes.read_color_data()
+    }
+
+    pub fn write_cgb_bg_palettes_data(&mut self, data: u8) {
+        self.cgb_bg_palettes.write_color_data(data);
+    }
+
+    pub fn read_cgb_sprite_palettes_index(&self) -> u8 {
+        self.cgb_sprite_palettes.read_index()
+    }
+
+    pub fn write_cgb_sprite_palettes_index(&mut self, data: u8) {
+        self.cgb_sprite_palettes.write_index(data);
+    }
+
+    pub fn read_cgb_sprite_palettes_data(&self) -> u8 {
+        self.cgb_sprite_palettes.read_color_data()
+    }
+
+    pub fn write_cgb_sprite_palettes_data(&mut self, data: u8) {
+        self.cgb_sprite_palettes.write_color_data(data);
+    }
+
+    pub fn write_sprite_priority_mode(&mut self, data: u8) {
+        self.sprite_priority_mode = if data & 1 == 0 {
+            SpritePriorityMode::ByIndex
+        } else {
+            SpritePriorityMode::ByCoord
+        };
+    }
+
+    pub fn read_sprite_priority_mode(&self) -> u8 {
+        0xFE | if let SpritePriorityMode::ByIndex = self.sprite_priority_mode {
+            1
+        } else {
+            0
         }
+    }
+
+    pub fn update_cgb_mode(&mut self, cgb_mode: bool) {
+        self.is_cgb_mode = cgb_mode && !self.config.is_dmg;
+    }
+
+    pub fn get_current_mode(&self) -> u8 {
+        self.lcd_status.current_mode()
     }
 
     pub fn screen_buffer(&self) -> &[u8] {
         self.lcd.screen_buffer()
     }
 
-    // clocks the PPU 4 times in a row
-    pub fn clock_4_times<I: InterruptManager>(&mut self, interrupt_manager: &mut I) {
+    #[cfg(test)]
+    pub fn raw_screen_buffer(&self) -> &[u8] {
+        self.lcd.raw_screen_buffer()
+    }
+
+    pub fn clock<I: InterruptManager>(&mut self, interrupt_manager: &mut I, clocks: u8) {
         let mut new_stat_int_happened = false;
 
         if !self.lcd_control.display_enable() {
@@ -401,7 +613,7 @@ impl Ppu {
                 }
             }
             3 => {
-                for _ in 0..4 {
+                for _ in 0..clocks {
                     if self.draw() {
                         // change mode to 0 from 3
                         self.lcd_status.current_mode_set(0);
@@ -430,9 +642,9 @@ impl Ppu {
         }
 
         // increment cycle
-        self.cycle += 4;
-        if self.cycle == 456 {
-            self.cycle = 0;
+        self.cycle += clocks as u16;
+        if self.cycle >= 456 {
+            self.cycle -= 456;
             self.scanline += 1;
             if self.scanline == 154 {
                 self.scanline = 0;
@@ -446,32 +658,42 @@ impl Ppu {
 }
 
 impl Ppu {
+    fn read_vram_banked(&self, bank: u8, addr: u16) -> u8 {
+        let offset = addr as usize & 0x1FFF;
+        let bank_start = bank as usize * 0x2000;
+        self.vram[bank_start + offset]
+    }
+
     /// return true, if this is the last draw in the current scanline, and
     /// mode 0 is being activated
     fn draw(&mut self) -> bool {
         self.try_enter_window();
 
         if self.fetcher.cycle() {
-            let bg = self.fetch_bg();
-            self.fetcher.push(bg);
+            let (bg, attribs) = self.fetch_bg();
+            self.fetcher.push(bg, attribs);
         }
 
         if self.fifo.len() <= 8 {
-            if let Some(data) = self.fetcher.pop() {
-                self.fifo.push_bg(data);
+            if let Some((pixels, attribs)) = self.fetcher.pop() {
+                self.fifo.push_bg(
+                    pixels,
+                    self.cgb_bg_palettes.get_palette(attribs.palette()),
+                    attribs.priority(),
+                );
             }
         }
 
         if self.fifo.len() > 8 {
-            self.try_add_sprite();
-
             if self.fine_scroll_x_discard > 0 {
                 self.fine_scroll_x_discard -= 1;
                 self.fifo.pop();
             } else {
-                let (color, palette) = self.fifo.pop();
+                self.try_add_sprite();
 
-                self.lcd.push(self.get_color(color, palette), self.scanline);
+                let pixel = self.fifo.pop();
+
+                self.lcd.push(self.get_color(pixel), self.scanline);
 
                 if self.lcd.x() == 160 {
                     return true;
@@ -482,16 +704,27 @@ impl Ppu {
         false
     }
 
-    fn get_color(&self, color: u8, palette_type: PaletteType) -> u8 {
-        let palette = match palette_type {
-            PaletteType::Sprite(index) => self.sprite_palette[index as usize],
-            PaletteType::Background => self.bg_palette,
-        };
+    fn get_color(&self, pixel: FifoPixel) -> Color {
+        let mut color_index = pixel.color;
 
-        (palette >> (2 * color)) & 0b11
+        if !self.is_cgb_mode {
+            let dmg_palette = match pixel.pixel_type {
+                PixelType::Background(_) => self.dmg_bg_palette,
+                PixelType::Sprite { dmg_palette, .. } => {
+                    self.dmg_sprite_palettes[dmg_palette as usize]
+                }
+            };
+
+            color_index = (dmg_palette >> (2 * color_index)) & 0b11;
+        }
+
+        pixel.palette.get_color(color_index)
     }
 
-    fn get_bg_window_tile_and_y(&mut self) -> (u8, u8) {
+    /// Gets the tile number, BgAttribute for that tile, and its y position
+    /// because the y position is different if we are drawing a window or
+    /// normal background
+    fn fetch_bg_tile_meta(&mut self) -> (u8, BgAttribute, u8) {
         let tile_x;
         let tile_y;
         let tile_map;
@@ -508,16 +741,19 @@ impl Ppu {
             tile_map = self.lcd_control.bg_tilemap();
         }
 
-        (self.get_tile(tile_map, tile_x, tile_y / 8), tile_y)
+        let tile_index = self.get_tile_index(tile_x, tile_y / 8);
+        let vram_index = tile_map + tile_index;
+        let tile = self.read_vram_banked(0, vram_index);
+        let tile_attribs = BgAttribute::new(self.read_vram_banked(1, vram_index));
+
+        (tile, tile_attribs, tile_y)
     }
 
-    fn get_tile(&self, tile_map: u16, tile_x: u8, tile_y: u8) -> u8 {
-        let index = tile_y as usize * 32 + tile_x as usize;
-
-        self.vram[tile_map as usize + index]
+    fn get_tile_index(&self, tile_x: u8, tile_y: u8) -> u16 {
+        tile_y as u16 * 32 + tile_x as u16
     }
 
-    fn get_bg_pattern(&self, tile: u8, y: u8) -> [u8; 8] {
+    fn get_bg_pattern(&self, tile: u8, y: u8, bank: u8) -> [u8; 8] {
         let pattern_table = self.lcd_control.bg_window_pattern_table_base();
 
         let index = if self.lcd_control.bg_window_pattern_table_block_1() {
@@ -527,24 +763,22 @@ impl Ppu {
             pattern_table + (tile as u16) * 16
         };
 
-        self.get_tile_pattern_from_index(index, y)
+        self.get_tile_pattern_from_index(index, y, bank)
     }
 
-    fn get_sprite_pattern(&self, mut tile: u8, y: u8) -> [u8; 8] {
+    fn get_sprite_pattern(&self, mut tile: u8, y: u8, bank: u8) -> [u8; 8] {
         if self.lcd_control.sprite_size() == 16 {
             tile &= 0xFE;
         }
 
         let index = tile as u16 * 16;
 
-        self.get_tile_pattern_from_index(index, y)
+        self.get_tile_pattern_from_index(index, y, bank)
     }
 
-    fn get_tile_pattern_from_index(&self, index: u16, y: u8) -> [u8; 8] {
-        let index = index as usize;
-
-        let low = self.vram[index + (y as usize) * 2];
-        let high = self.vram[index + (y as usize) * 2 + 1];
+    fn get_tile_pattern_from_index(&self, index: u16, y: u8, bank: u8) -> [u8; 8] {
+        let low = self.read_vram_banked(bank, index + ((y as u16) * 2));
+        let high = self.read_vram_banked(bank, index + ((y as u16) * 2 + 1));
 
         let mut result = [0; 8];
 
@@ -556,22 +790,34 @@ impl Ppu {
         result
     }
 
-    fn fetch_bg(&mut self) -> [u8; 8] {
-        if self.lcd_control.bg_window_priority() {
-            let (tile, y) = self.get_bg_window_tile_and_y();
-
-            self.get_bg_pattern(tile, y % 8)
+    fn fetch_bg(&mut self) -> ([u8; 8], BgAttribute) {
+        if !self.is_cgb_mode && !self.lcd_control.bg_window_priority() {
+            ([0; 8], BgAttribute::new(0))
         } else {
-            [0; 8]
+            let (tile, attribs, y) = self.fetch_bg_tile_meta();
+
+            let y = if attribs.is_vertical_flip() {
+                7 - (y % 8)
+            } else {
+                y % 8
+            };
+
+            let mut pattern = self.get_bg_pattern(tile, y, attribs.bank());
+
+            if attribs.is_horizontal_flip() {
+                pattern.reverse();
+            }
+
+            (pattern, attribs)
         }
     }
 
     fn load_selected_sprites_oam(&mut self) {
         let mut count = 0;
-        for &sprite in self.oam.iter() {
+        for (i, &sprite) in self.oam.iter().enumerate() {
             // in range
             if self.scanline.wrapping_sub(sprite.screen_y()) < self.lcd_control.sprite_size() {
-                self.selected_oam[count] = sprite;
+                self.selected_oam[count] = SelectedSprite::new(sprite, i as u8);
                 count += 1;
 
                 if count == 10 {
@@ -584,21 +830,27 @@ impl Ppu {
 
     fn try_add_sprite(&mut self) {
         if self.lcd_control.sprite_enable() {
-            for sprite in self
+            for selected_sprite in self
                 .selected_oam
                 .iter()
                 .take(self.selected_oam_size as usize)
             {
+                let sprite = selected_sprite.sprite();
+                let index = selected_sprite.index();
+
                 // the x index of the sprite is of the left of the display
                 let left_out_of_bounds = self.lcd.x() == 0 && sprite.x() < 8;
 
                 if self.lcd.x() == sprite.screen_x() || left_out_of_bounds {
                     let mut y = self.scanline.wrapping_sub(sprite.screen_y());
                     if sprite.y_flipped() {
+                        // FIXME: one time while playing game, crashed here
+                        //  subtract with overflow (possibly sprite size changed
+                        //  between sprite selection and drawing?)
                         y = (self.lcd_control.sprite_size() - 1) - y;
                     }
 
-                    let mut colors = self.get_sprite_pattern(sprite.tile(), y);
+                    let mut colors = self.get_sprite_pattern(sprite.tile(), y, sprite.bank());
 
                     if sprite.x_flipped() {
                         colors.reverse();
@@ -613,8 +865,23 @@ impl Ppu {
                         }
                     }
 
-                    self.fifo
-                        .mix_sprite(colors, sprite.palette_selector(), sprite.bg_priority())
+                    // `cgb_sprite_palettes` 0, 1 will be used in DMG mode
+                    // together with `dmg_sprite_palettes`
+                    let palette_selector = if self.is_cgb_mode {
+                        sprite.cgb_palette()
+                    } else {
+                        sprite.dmg_palette()
+                    };
+
+                    // TODO: fix all these parameters
+                    self.fifo.mix_sprite(
+                        colors,
+                        index,
+                        sprite,
+                        self.cgb_sprite_palettes.get_palette(palette_selector),
+                        self.sprite_priority_mode,
+                        self.is_cgb_mode && !self.lcd_control.bg_window_priority(),
+                    )
                 }
             }
         }

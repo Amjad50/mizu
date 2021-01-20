@@ -4,8 +4,9 @@ use bitflags::bitflags;
 bitflags! {
     #[derive(Default)]
     struct SerialControl: u8 {
-        const IN_TRANSFERE = 1 << 7;
-        const CLOCK_SOURCE    = 1 << 0;
+        const IN_TRANSFER  = 1 << 7;
+        const CLOCK_SPEED  = 1 << 1;
+        const CLOCK_SOURCE = 1 << 0;
     }
 }
 
@@ -15,17 +16,25 @@ impl SerialControl {
         self.contains(Self::CLOCK_SOURCE)
     }
 
-    fn in_transfere(&self) -> bool {
-        self.contains(Self::IN_TRANSFERE)
+    fn in_transfer(&self) -> bool {
+        self.contains(Self::IN_TRANSFER)
     }
 
     fn end_transfere(&mut self) {
-        self.set(Self::IN_TRANSFERE, false);
+        self.set(Self::IN_TRANSFER, false);
+    }
+
+    /// Number of cycles to wait before 1-bit transfere
+    fn clock_reload(&self) -> u8 {
+        if self.contains(Self::CLOCK_SPEED) {
+            // Fast
+            4
+        } else {
+            // Normal
+            128
+        }
     }
 }
-
-/// Number of cycles to wait before 1-bit transfere (DMG only)
-const SERIAL_TIMER_RELOAD: u8 = 128;
 
 #[derive(Default)]
 pub struct Serial {
@@ -36,27 +45,25 @@ pub struct Serial {
 }
 
 impl Serial {
-    pub fn read_register(&mut self, addr: u16) -> u8 {
-        match addr {
-            0xFF01 => 0,
-            0xFF02 => 0x7E | self.serial_control.bits(),
-            _ => unreachable!(),
-        }
+    pub fn read_data(&self) -> u8 {
+        0
     }
 
-    pub fn write_register(&mut self, addr: u16, data: u8) {
-        match addr {
-            0xFF01 => self.transfere_data = data,
-            0xFF02 => {
-                self.serial_control
-                    .clone_from(&SerialControl::from_bits_truncate(data));
-                // should start transfere
-                if self.serial_control.in_transfere() {
-                    self.transfere_timer = SERIAL_TIMER_RELOAD;
-                    self.bits_remaining = 8;
-                }
-            }
-            _ => unreachable!(),
+    pub fn write_data(&mut self, data: u8) {
+        self.transfere_data = data
+    }
+
+    pub fn read_control(&self) -> u8 {
+        0x7E | self.serial_control.bits()
+    }
+
+    pub fn write_control(&mut self, data: u8) {
+        self.serial_control
+            .clone_from(&SerialControl::from_bits_truncate(data));
+        // should start transfere
+        if self.serial_control.in_transfer() {
+            self.transfere_timer = self.serial_control.clock_reload();
+            self.bits_remaining = 8;
         }
     }
 

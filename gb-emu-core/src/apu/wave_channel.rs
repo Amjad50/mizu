@@ -1,4 +1,5 @@
 use super::ApuChannel;
+use crate::GameboyConfig;
 
 const VOLUME_SHIFT_TABLE: [u8; 4] = [4, 0, 1, 2];
 
@@ -10,15 +11,25 @@ pub struct WaveChannel {
 
     buffer: [u8; 16],
     buffer_position: u8,
+    buffer_position_just_clocked: bool,
 
     frequency_timer: u16,
 
     channel_enable: bool,
 
     dac_enable: bool,
+
+    config: GameboyConfig,
 }
 
 impl WaveChannel {
+    pub fn new(config: GameboyConfig) -> Self {
+        Self {
+            config,
+            ..Self::default()
+        }
+    }
+
     pub fn write_volume(&mut self, vol: u8) {
         self.volume = vol;
         self.volume_shift = VOLUME_SHIFT_TABLE[vol as usize & 3];
@@ -37,21 +48,32 @@ impl WaveChannel {
     }
 
     pub fn write_buffer(&mut self, offset: u8, data: u8) {
-        self.buffer[offset as usize & 0xF] = data;
+        if let Some(index) = self.wave_buffer_index(offset) {
+            self.buffer[index] = data;
+        }
     }
 
     pub fn read_buffer(&self, offset: u8) -> u8 {
-        self.buffer[offset as usize & 0xF]
+        if let Some(index) = self.wave_buffer_index(offset) {
+            self.buffer[index]
+        } else {
+            0xFF
+        }
     }
 
     pub fn clock(&mut self) {
-        if self.frequency_timer == 0 {
-            self.clock_position();
+        // wave is clocked two times
+        for _ in 0..2 {
+            self.buffer_position_just_clocked = false;
+            if self.frequency_timer == 0 {
+                self.clock_position();
+                self.buffer_position_just_clocked = true;
 
-            // reload timer
-            self.frequency_timer = (0x7FF - self.frequency) / 2;
-        } else {
-            self.frequency_timer -= 1;
+                // reload timer
+                self.frequency_timer = 0x7FF - self.frequency;
+            } else {
+                self.frequency_timer -= 1;
+            }
         }
     }
 
@@ -63,6 +85,22 @@ impl WaveChannel {
 impl WaveChannel {
     fn clock_position(&mut self) {
         self.buffer_position = (self.buffer_position + 1) & 0x1F;
+    }
+
+    /// returns `Some` if the wave is accessable, `None` otherwise (for DMG)
+    fn wave_buffer_index(&self, offset: u8) -> Option<usize> {
+        let index = if self.dac_enable && self.channel_enable {
+            if self.config.is_dmg && !self.buffer_position_just_clocked {
+                return None;
+            }
+
+            self.buffer_position / 2
+        } else {
+            offset
+        } as usize
+            & 0xF;
+
+        Some(index)
     }
 }
 
@@ -89,7 +127,28 @@ impl ApuChannel for WaveChannel {
     }
 
     fn trigger(&mut self) {
+        // if its DMG and will clock next, meaning that it is reading buffer now,
+        // then activate the wave-ram rewrite bug
+        //
+        // Some bytes from wave-ram are rewritten based on the current index
+        if self.config.is_dmg && self.frequency_timer == 0 {
+            // get the next index that will be incremented to in the next clock
+            let index = ((self.buffer_position + 1) & 0x1F) / 2;
+
+            if index < 4 {
+                self.buffer[0] = self.buffer[index as usize];
+            } else {
+                let four_bytes_align_start = ((index / 4) * 4) as usize;
+                for i in 0..4 {
+                    self.buffer[i] = self.buffer[four_bytes_align_start + i];
+                }
+            }
+        }
+
         self.buffer_position = 0;
+        // no idea why `3` works here, but with this tests pass and found it
+        // in other emulators
+        self.frequency_timer = 0x7FF - self.frequency + 3;
     }
 
     fn set_dac_enable(&mut self, enabled: bool) {

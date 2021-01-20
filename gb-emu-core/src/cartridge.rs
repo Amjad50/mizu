@@ -9,10 +9,11 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 
-#[derive(Debug)]
-enum GameBoyType {
-    NonColor,
-    Color,
+#[derive(Debug, PartialEq)]
+enum TargetDevice {
+    DMGOnly,
+    ColorOnly,
+    ColorAndDMG,
 }
 
 #[derive(Debug)]
@@ -186,6 +187,7 @@ pub struct Cartridge {
     file_path: Box<Path>,
     game_title: String,
     cartridge_type: CartridgeType,
+    target_device: TargetDevice,
     mapper: Box<dyn Mapper>,
     rom: Vec<u8>,
     ram: Vec<u8>,
@@ -198,7 +200,7 @@ impl Cartridge {
             .extension()
             .ok_or(CartridgeError::ExtensionError)?;
 
-        if extension != "gb" {
+        if extension != "gbc" && extension != "gb" {
             return Err(CartridgeError::ExtensionError);
         }
 
@@ -235,13 +237,15 @@ impl Cartridge {
         )
         .map_err(|_| CartridgeError::InvalidGameTitle)?;
 
-        let gameboy_type = if data[0x143] == 0x80 {
-            GameBoyType::Color
+        let target_device = if data[0x143] & 0x80 != 0 {
+            TargetDevice::ColorOnly
+        } else if data[0x143] & 0xC0 != 0 {
+            TargetDevice::ColorAndDMG
         } else {
-            GameBoyType::NonColor
+            TargetDevice::DMGOnly
         };
 
-        println!("gameboy type {:?}", gameboy_type);
+        println!("target gameboy {:?}", target_device);
 
         let mut cartridge_type =
             CartridgeType::from_byte(data[0x147]).ok_or(CartridgeError::InvalidCartridgeType)?;
@@ -317,6 +321,7 @@ impl Cartridge {
             file_path: file_path.as_ref().to_path_buf().into_boxed_path(),
             game_title,
             cartridge_type,
+            target_device,
             mapper,
             rom: data,
             ram,
@@ -358,6 +363,10 @@ impl Cartridge {
             MappingResult::Addr(addr) => self.ram[addr] = data,
             MappingResult::NotMapped | MappingResult::Value(_) => {}
         }
+    }
+
+    pub fn is_cartridge_color(&self) -> bool {
+        self.target_device == TargetDevice::ColorOnly
     }
 }
 

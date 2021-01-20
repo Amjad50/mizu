@@ -304,7 +304,7 @@ impl Mapper for Mbc3 {
                     self.rtc_registers.set_latch(data & 1 == 1);
                 }
             }
-            _ => unreachable!(),
+            _ => {}
         }
     }
 
