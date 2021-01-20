@@ -647,6 +647,7 @@ impl Ppu {
             self.cycle -= 456;
             self.scanline += 1;
             if self.scanline == 154 {
+                self.lcd.switch_buffers();
                 self.scanline = 0;
                 self.lcd.next_line();
             }

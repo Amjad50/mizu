@@ -5,7 +5,8 @@ pub const LCD_HEIGHT: usize = 144;
 
 pub struct Lcd {
     x: u8,
-    buf: [u8; LCD_WIDTH * LCD_HEIGHT * 3],
+    buf: [[u8; LCD_WIDTH * LCD_HEIGHT * 3]; 2],
+    selected_buffer: usize,
     raw_buf: [u8; LCD_WIDTH * LCD_HEIGHT * 3],
 }
 
@@ -13,7 +14,8 @@ impl Default for Lcd {
     fn default() -> Self {
         Self {
             x: 0,
-            buf: [0xFF; LCD_WIDTH * LCD_HEIGHT * 3],
+            buf: [[0xFF; LCD_WIDTH * LCD_HEIGHT * 3]; 2],
+            selected_buffer: 0,
             raw_buf: [0x1F; LCD_WIDTH * LCD_HEIGHT * 3],
         }
     }
@@ -35,9 +37,10 @@ impl Lcd {
         let gg = gg.min(960) >> 2;
         let bb = bb.min(960) >> 2;
 
-        self.buf[index + 0] = rr as u8;
-        self.buf[index + 1] = gg as u8;
-        self.buf[index + 2] = bb as u8;
+        let i = self.next_buffer_index();
+        self.buf[i][index + 0] = rr as u8;
+        self.buf[i][index + 1] = gg as u8;
+        self.buf[i][index + 2] = bb as u8;
 
         // used for testing
         self.raw_buf[index + 0] = color.r & 0x1F;
@@ -55,8 +58,12 @@ impl Lcd {
         self.x = 0;
     }
 
+    pub fn switch_buffers(&mut self) {
+        self.selected_buffer = self.next_buffer_index();
+    }
+
     pub fn screen_buffer(&self) -> &[u8] {
-        &self.buf
+        &self.buf[self.selected_buffer as usize]
     }
 
     #[cfg(test)]
@@ -65,10 +72,18 @@ impl Lcd {
     }
 
     pub fn clear(&mut self) {
-        for (byte, raw_byte) in self.buf.iter_mut().zip(self.raw_buf.iter_mut()) {
-            // fill with white
-            *byte = 0xFF;
-            *raw_byte = 0x1F;
+        for buf in self.buf.iter_mut() {
+            for (byte, raw_byte) in buf.iter_mut().zip(self.raw_buf.iter_mut()) {
+                // fill with white
+                *byte = 0xFF;
+                *raw_byte = 0x1F;
+            }
         }
+    }
+}
+
+impl Lcd {
+    fn next_buffer_index(&self) -> usize {
+        self.selected_buffer ^ 1
     }
 }
