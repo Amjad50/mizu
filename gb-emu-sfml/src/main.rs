@@ -93,7 +93,8 @@ fn main() {
 
     'main: loop {
         window.set_title(&format!(
-            "GB-emu - FPS: {}",
+            "GB-emu - {} - FPS: {}",
+            gameboy.game_title(),
             (1. / t.elapsed().as_secs_f64()).round()
         ));
 

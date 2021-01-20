@@ -39,6 +39,7 @@ impl GameboyConfig {
 pub struct GameBoy {
     cpu: Cpu,
     bus: Bus,
+    game_title: String,
 }
 
 impl GameBoy {
@@ -48,6 +49,8 @@ impl GameBoy {
         config: GameboyConfig,
     ) -> Result<Self, CartridgeError> {
         let cartridge = Cartridge::from_file(file_path)?;
+
+        let game_title = cartridge.game_title().to_string();
 
         let (bus, cpu) = if let Some(boot_rom_file) = boot_rom_file {
             let mut boot_rom_file = File::open(boot_rom_file)?;
@@ -73,7 +76,11 @@ impl GameBoy {
             )
         };
 
-        Ok(Self { bus, cpu })
+        Ok(Self {
+            bus,
+            cpu,
+            game_title,
+        })
     }
 
     /// Synced to PPU
@@ -89,6 +96,10 @@ impl GameBoy {
             self.cpu.next_instruction(&mut self.bus);
             cycles += self.bus.elapsed_ppu_cycles() as u32;
         }
+    }
+
+    pub fn game_title(&self) -> &str {
+        &self.game_title
     }
 
     pub fn screen_buffer(&self) -> &[u8] {

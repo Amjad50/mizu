@@ -368,6 +368,10 @@ impl Cartridge {
     pub fn is_cartridge_color(&self) -> bool {
         self.target_device == TargetDevice::ColorOnly
     }
+
+    pub fn game_title(&self) -> &str {
+        &self.game_title
+    }
 }
 
 impl Cartridge {
