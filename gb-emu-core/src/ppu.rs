@@ -845,10 +845,14 @@ impl Ppu {
                 if self.lcd.x() == sprite.screen_x() || left_out_of_bounds {
                     let mut y = self.scanline.wrapping_sub(sprite.screen_y());
                     if sprite.y_flipped() {
-                        // FIXME: one time while playing game, crashed here
-                        //  subtract with overflow (possibly sprite size changed
-                        //  between sprite selection and drawing?)
-                        y = (self.lcd_control.sprite_size() - 1) - y;
+                        // sometimes `sprite_size` is smaller than `y`, which result in
+                        //  overflowing sub, and it might be due to changing the
+                        //  `sprite_size` in the middle of the scanline.
+                        //
+                        //  FIXME: Not sure if this works, but for now at least stay
+                        //   in the range
+                        y = (self.lcd_control.sprite_size() - 1).wrapping_sub(y)
+                            % self.lcd_control.sprite_size();
                     }
 
                     let mut colors = self.get_sprite_pattern(sprite.tile(), y, sprite.bank());
