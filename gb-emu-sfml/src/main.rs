@@ -13,6 +13,7 @@ use clap::{App, Arg};
 
 const TV_WIDTH: u32 = 160;
 const TV_HEIGHT: u32 = 144;
+const DEFAULT_SCALE: u32 = 5;
 
 fn get_view(
     window_width: u32,
@@ -44,6 +45,8 @@ fn get_view(
 }
 
 fn main() {
+    let default_scale_str = format!("{}", DEFAULT_SCALE);
+
     let matches = App::new("GB-emu")
         .version("1.0")
         .author("Amjad Alsharafi")
@@ -51,11 +54,19 @@ fn main() {
         .arg(Arg::with_name("rom").required(true))
         .arg(Arg::with_name("boot_rom"))
         .arg(Arg::with_name("dmg").long("dmg").short("d"))
+        .arg(
+            Arg::with_name("scale")
+                .long("scale")
+                .short("s")
+                .default_value(&default_scale_str)
+                .takes_value(true),
+        )
         .get_matches();
 
     let is_dmg = matches.is_present("dmg");
     let rom_file = matches.value_of("rom").expect("rom file argument");
     let boot_rom_file = matches.value_of("boot_rom");
+    let scale = matches.value_of("scale");
 
     let config = GameboyConfig { is_dmg };
 
@@ -64,8 +75,21 @@ fn main() {
     let mut audio_player = AudioPlayer::new(44100);
     audio_player.play();
 
+    let scale = scale
+        .and_then(|s| {
+            let s = s.parse::<u32>().ok();
+            if s.is_none() {
+                eprintln!(
+                    "[WARN] scale must be a positive integer, using default value ({})...",
+                    DEFAULT_SCALE
+                )
+            }
+            s
+        })
+        .unwrap_or(DEFAULT_SCALE);
+
     let mut window = RenderWindow::new(
-        (TV_WIDTH * 5, TV_HEIGHT * 5),
+        (TV_WIDTH * scale, TV_HEIGHT * scale),
         "",
         Style::CLOSE | Style::RESIZE,
         &Default::default(),
