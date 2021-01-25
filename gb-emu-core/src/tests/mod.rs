@@ -61,9 +61,10 @@ impl TestingGameBoy {
 
         let config = GameboyConfig { is_dmg };
 
+        let is_cartridge_color = cartridge.is_cartridge_color();
         Ok(Self {
             bus: Bus::new_without_boot_rom(cartridge, config),
-            cpu: Cpu::new_without_boot_rom(config),
+            cpu: Cpu::new_without_boot_rom(config, is_cartridge_color),
         })
     }
 

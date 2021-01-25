@@ -1,6 +1,8 @@
 pub mod instruction;
 mod instructions_table;
 
+use std::borrow::Borrow;
+
 use bitflags::bitflags;
 
 use crate::memory::InterruptType;
@@ -113,7 +115,7 @@ impl Cpu {
 
     /// create a new cpu, with states that match the ones the CPU would have
     /// if the boot-rom would run (default values for registers)
-    pub fn new_without_boot_rom(config: GameboyConfig) -> Self {
+    pub fn new_without_boot_rom(config: GameboyConfig, is_cart_cgb: bool) -> Self {
         let mut cpu = Self::new(config);
 
         if cpu.config.is_dmg {
@@ -123,11 +125,19 @@ impl Cpu {
             cpu.reg_de_write(0x00D8);
             cpu.reg_hl_write(0x014D);
         } else {
-            // initial values of the registers (CGB)
-            cpu.reg_af_write(0x1180);
-            cpu.reg_bc_write(0x0000);
-            cpu.reg_de_write(0xFF56);
-            cpu.reg_hl_write(0x000D);
+            // initial values of the registers (CGB) for CGB games
+            if is_cart_cgb {
+                cpu.reg_af_write(0x1180);
+                cpu.reg_bc_write(0x0000);
+                cpu.reg_de_write(0xFF56);
+                cpu.reg_hl_write(0x000D);
+            } else {
+                // initial values of the registers (CGB) for DMG games
+                cpu.reg_af_write(0x1180);
+                cpu.reg_bc_write(0x0000);
+                cpu.reg_de_write(0x0008);
+                cpu.reg_hl_write(0x007C);
+            }
         }
         cpu.reg_sp = 0xFFFE;
         cpu.reg_pc = 0x0100;

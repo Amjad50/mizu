@@ -70,9 +70,10 @@ impl GameBoy {
                 Cpu::new(config),
             )
         } else {
+            let is_cartridge_color = cartridge.is_cartridge_color();
             (
                 Bus::new_without_boot_rom(cartridge, config),
-                Cpu::new_without_boot_rom(config),
+                Cpu::new_without_boot_rom(config, is_cartridge_color),
             )
         };
 
