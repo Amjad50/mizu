@@ -53,13 +53,19 @@ fn main() {
         .about("Gameboy DMG and Gameboy Color emulator")
         .arg(Arg::with_name("rom").required(true))
         .arg(Arg::with_name("boot_rom"))
-        .arg(Arg::with_name("dmg").long("dmg").short("d"))
+        .arg(
+            Arg::with_name("dmg")
+                .long("dmg")
+                .short("d")
+                .help("Operate the emulator in DMG mode"),
+        )
         .arg(
             Arg::with_name("scale")
                 .long("scale")
                 .short("s")
                 .default_value(&default_scale_str)
-                .takes_value(true),
+                .takes_value(true).
+                help("Specify the amount to scale the initial display from the gameboy size of 160x144"),
         )
         .get_matches();
 
