@@ -23,35 +23,35 @@ gb_tests!(
     // the full one
     blargg_dmg_sound_01_registers,
     "blargg-gb-tests/dmg_sound/rom_singles/01-registers.gb",
-    14537940686373650876;
+    17440332955472206150;
 
     blargg_dmg_sound_02_len_ctr,
     "blargg-gb-tests/dmg_sound/rom_singles/02-len ctr.gb",
-    11076959017028213871;
+    4060957075670844583;
 
     blargg_dmg_sound_03_trigger,
     "blargg-gb-tests/dmg_sound/rom_singles/03-trigger.gb",
-    14177237474296683138;
+    7262377342751395856;
 
     blargg_dmg_sound_04_sweep,
     "blargg-gb-tests/dmg_sound/rom_singles/04-sweep.gb",
-    9687063080497492333;
+    13946185113601916246;
 
     blargg_dmg_sound_05_sweep_details,
     "blargg-gb-tests/dmg_sound/rom_singles/05-sweep details.gb",
-    12233984480315533249;
+    11178214727532716427;
 
     blargg_dmg_sound_06_overflow_on_trigger,
     "blargg-gb-tests/dmg_sound/rom_singles/06-overflow on trigger.gb",
-    2741900054980679919;
+    2121820975398441942;
 
     blargg_dmg_sound_07_len_sweep_period_sync,
     "blargg-gb-tests/dmg_sound/rom_singles/07-len sweep period sync.gb",
-    1423221729427222721;
+    10534885036225965023;
 
     blargg_dmg_sound_all for "dmg",
     "blargg-gb-tests/dmg_sound/dmg_sound.gb",
-    1594458519587061298;
+    9608420910100250529;
 
     blargg_cgb_sound_all,
     "blargg-gb-tests/cgb_sound/cgb_sound.gb",

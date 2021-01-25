@@ -5,19 +5,19 @@ gb_tests!(
 
     lycscx,
     "scribbltests/lycscx/lycscx.gb",
-    14138466600053577134;
+    1239459159191104188;
 
     lycscy,
     "scribbltests/lycscy/lycscy.gb",
-    10627942335066809926;
+    9765346434603212938;
 
     palettely,
     "scribbltests/palettely/palettely.gb",
-    3173975241828002923;
+    17545493111125126301;
 
     scxly,
     "scribbltests/scxly/scxly.gb",
-    1708932292293937725;
+    13491206425213749962;
 
 );
 
