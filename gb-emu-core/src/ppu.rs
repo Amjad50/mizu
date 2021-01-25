@@ -539,6 +539,20 @@ impl Ppu {
         self.lcd.screen_buffer()
     }
 
+    pub fn enter_stop_mode(&mut self) {
+        if self.config.is_dmg {
+            self.lcd.clear();
+        } else {
+            // FIXME: the bus is not letting the ppu run during stop mode
+            //  but in CGB, the ppu keeps running but because the vram
+            //  is blocked it reads all black
+            if self.get_current_mode() != 3 {
+                // black
+                self.lcd.fill(color!(0, 0, 0))
+            }
+        }
+    }
+
     #[cfg(test)]
     pub fn raw_screen_buffer(&self) -> &[u8] {
         self.lcd.raw_screen_buffer()

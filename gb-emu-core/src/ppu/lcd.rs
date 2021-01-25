@@ -80,6 +80,24 @@ impl Lcd {
             }
         }
     }
+
+    pub fn fill(&mut self, color: Color) {
+        let saved_x = self.x;
+        let saved_selected_buffer = self.selected_buffer;
+        self.selected_buffer = self.next_buffer_index();
+
+        self.x = 0;
+
+        for i in 0..LCD_HEIGHT {
+            for _j in 0..LCD_WIDTH {
+                self.push(color, i as u8)
+            }
+            self.next_line();
+        }
+
+        self.x = saved_x;
+        self.selected_buffer = saved_selected_buffer;
+    }
 }
 
 impl Lcd {

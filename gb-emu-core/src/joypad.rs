@@ -62,8 +62,22 @@ impl Default for Joypad {
 }
 
 impl Joypad {
+    /// returns the lower 4 bits of P1 (joypad register)
+    pub fn get_keys_pressed(&self) -> u8 {
+        let mut result = 0xF;
+
+        if self.selecting_start {
+            result &= !self.buttons.bits() >> 4;
+        }
+        if self.selecting_directions {
+            result &= !self.buttons.bits();
+        }
+
+        result
+    }
+
     pub fn read_joypad(&self) -> u8 {
-        let result = self.get_p1();
+        let result = self.get_keys_pressed();
 
         0xC0 | (((!self.selecting_start) as u8) << 5)
             | ((!self.selecting_directions as u8) << 4)
@@ -76,7 +90,7 @@ impl Joypad {
     }
 
     pub fn update_interrupts<I: InterruptManager>(&mut self, interrupt: &mut I) {
-        let new_p1 = self.get_p1();
+        let new_p1 = self.get_keys_pressed();
 
         let should_interrupt = (self.old_p1 ^ new_p1) & self.old_p1 != 0;
 
@@ -93,17 +107,5 @@ impl Joypad {
 
     pub fn release_joypad(&mut self, button: JoypadButton) {
         self.buttons.remove(button.into())
-    }
-}
-
-impl Joypad {
-    fn get_p1(&self) -> u8 {
-        if self.selecting_start {
-            (!self.buttons.bits() >> 4) & 0xF
-        } else if self.selecting_directions {
-            (!self.buttons.bits()) & 0xF
-        } else {
-            0xF
-        }
     }
 }

@@ -339,6 +339,7 @@ pub struct Bus {
     boot_rom: BootRom,
     speed_controller: SpeedController,
     lock: Lock,
+    stopped: bool,
 
     /// Used to track how many ppu cycles have elapsed
     /// when the frontend gets the elapsed value, its reset to 0
@@ -376,6 +377,7 @@ impl Bus {
             boot_rom: BootRom::default(),
             speed_controller: SpeedController::default(),
             lock,
+            stopped: false,
 
             elapsed_ppu_cycles: 0,
 
@@ -448,6 +450,16 @@ impl Bus {
         // will be 4 in normal speed and 2 in double speed
         let t_clocks = cpu_clocks_added * 2;
         self.elapsed_ppu_cycles += t_clocks as u32;
+
+        // we return after updating `elapsed_ppu_cycles` because frontend
+        // depend on it
+        if self.stopped {
+            if self.joypad.get_keys_pressed() != 0xF {
+                self.stopped = false;
+            }
+
+            return;
+        }
 
         // APU stays at the same speed even if CPU is in double speed
         self.ppu.clock(&mut self.interrupts, t_clocks);
@@ -680,5 +692,17 @@ impl CpuBusProvider for Bus {
     fn commit_speed_switch(&mut self) {
         assert!(!self.config.is_dmg, "Cannot switch speed in DMG");
         self.speed_controller.commit_speed_switch();
+    }
+
+    fn enter_stop_mode(&mut self) {
+        self.stopped = true;
+        self.ppu.enter_stop_mode();
+        // TODO: is there any special stuff to do with the apu?
+        //  for CGB, sounds still play?
+        // self.apu.enter_stop_mode(); ?
+    }
+
+    fn stopped(&self) -> bool {
+        self.stopped
     }
 }

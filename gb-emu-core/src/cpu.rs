@@ -19,6 +19,9 @@ pub trait CpuBusProvider {
 
     fn is_speed_switch_prepared(&mut self) -> bool;
     fn commit_speed_switch(&mut self);
+
+    fn enter_stop_mode(&mut self);
+    fn stopped(&self) -> bool;
 }
 
 const INTERRUPTS_VECTOR: [u16; 5] = [0x40, 0x48, 0x50, 0x58, 0x60];
@@ -43,6 +46,7 @@ pub enum CpuState {
     InfiniteLoop,
     Halting,
     RunningHDMA,
+    Stopped,
     RunningInterrupt(InterruptType),
     Breakpoint(CpuRegisters),
 }
@@ -132,6 +136,11 @@ impl Cpu {
     }
 
     pub fn next_instruction<P: CpuBusProvider>(&mut self, bus: &mut P) -> CpuState {
+        if bus.stopped() {
+            self.advance_bus(bus);
+            return CpuState::Stopped;
+        }
+
         if bus.is_hdma_running() {
             self.advance_bus(bus);
             return CpuState::RunningHDMA;
@@ -870,7 +879,8 @@ impl Cpu {
                 if bus.is_speed_switch_prepared() {
                     bus.commit_speed_switch();
                 } else {
-                    todo!()
+                    println!("CPU stopped");
+                    bus.enter_stop_mode();
                 }
                 0
             }
