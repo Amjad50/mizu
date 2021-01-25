@@ -519,10 +519,10 @@ impl Bus {
             (0x40..=0x7F, _) => self.cartridge.read_romx(addr),  // romx
             (0x80..=0x9F, Some(BusType::Video)) => dma_value,    // video bus DMA conflict
             (0x80..=0x9F, _) => self.ppu.read_vram(addr),        // ppu vram
-            (0xA0..=0xDF, Some(BusType::External)) => dma_value, // external bus DMA conflict
-            (0xA0..=0xBF, _) => self.cartridge.read_ram(addr),   // sram
-            (0xC0..=0xCF, _) => self.wram.read_wram0(addr),      // wram0
-            (0xD0..=0xDF, _) => self.wram.read_wramx(addr),      // wramx
+            (0xA0..=0xDF, Some(BusType::External)) if self.config.is_dmg => dma_value, // external bus DMA conflict
+            (0xA0..=0xBF, _) => self.cartridge.read_ram(addr),                         // sram
+            (0xC0..=0xCF, _) => self.wram.read_wram0(addr),                            // wram0
+            (0xD0..=0xDF, _) => self.wram.read_wramx(addr),                            // wramx
             (0xE0..=0xFD, _) => self.read_not_ticked(0xC000 | (addr & 0x1FFF), block_for_dma), // echo
             (0xFE, None) if offset <= 0x9F => self.ppu.read_oam(addr), // ppu oam
             (0xFE, _) if offset >= 0xA0 => 0,                          // unused
@@ -540,7 +540,7 @@ impl Bus {
             (0x00..=0x7F, _) => self.cartridge.write_to_bank_controller(addr, data), // cart
             (0x80..=0x9F, Some(BusType::Video)) => {}    // ignore writes
             (0x80..=0x9F, _) => self.ppu.write_vram(addr, data), // ppu vram
-            (0xA0..=0xDF, Some(BusType::External)) => {} // ignore writes
+            (0xA0..=0xDF, Some(BusType::External)) if self.config.is_dmg => {} // ignore writes
             (0xA0..=0xBF, _) => self.cartridge.write_ram(addr, data), // sram
             (0xC0..=0xCF, _) => self.wram.write_wram0(addr, data), // wram0
             (0xD0..=0xDF, _) => self.wram.write_wramx(addr, data), // wramx
