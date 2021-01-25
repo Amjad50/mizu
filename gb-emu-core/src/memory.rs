@@ -692,6 +692,7 @@ impl CpuBusProvider for Bus {
     fn commit_speed_switch(&mut self) {
         assert!(!self.config.is_dmg, "Cannot switch speed in DMG");
         self.speed_controller.commit_speed_switch();
+        self.timer.write_div(0);
     }
 
     fn enter_stop_mode(&mut self) {
