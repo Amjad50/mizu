@@ -7,7 +7,7 @@ use error::SramError;
 use mappers::{Mapper, MapperType, MappingResult};
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, PartialEq)]
 enum TargetDevice {
@@ -384,12 +384,17 @@ impl Cartridge {
 }
 
 impl Cartridge {
+    fn get_save_file<P: AsRef<Path>>(path: P) -> PathBuf {
+        let extension = path.as_ref().extension().unwrap().to_str().unwrap();
+        path.as_ref().with_extension(format!("{}.sav", extension))
+    }
+
     fn load_sram_file<P: AsRef<Path>>(
         path: P,
         sram_size: usize,
         extra_size: usize,
     ) -> Result<(Vec<u8>, Vec<u8>), SramError> {
-        let path = path.as_ref().with_extension("gb.sav");
+        let path = Self::get_save_file(path);
         println!("Loading SRAM file data from {:?}", path);
 
         let mut file = File::open(path)?;
@@ -406,7 +411,7 @@ impl Cartridge {
     }
 
     fn save_sram_file(&self) -> Result<(), SramError> {
-        let path = self.file_path.with_extension("gb.sav");
+        let path = Self::get_save_file(&self.file_path);
         println!("Writing SRAM file data to {:?}", path);
 
         let mut file = File::create(&path)?;
