@@ -10,6 +10,7 @@ pub(super) use mbc3::Mbc3;
 pub(super) use mbc5::Mbc5;
 pub(super) use no_mapper::NoMapper;
 
+/// The number of clocks needed from the bus to complete one second
 pub const ONE_SECOND_MAPPER_CLOCKS: u32 = 4194304 / 2;
 
 #[derive(Debug, Clone, Copy)]
@@ -60,8 +61,7 @@ pub trait Mapper {
     /// Fixed-timed updates from the bus, the main purpose is to be used to
     /// sync the MBC3 RTC clock to emulation in case emulation speed changed
     ///
-    /// the number of clocks for one second is (ONE_SECOND_MAPPER_CLOCKS) 35112,
-    /// which is half of what the PPU needs in a second
+    /// the number of clocks for one second is (ONE_SECOND_MAPPER_CLOCKS) 4194304 / 2
     fn clock(&mut self) {
         // ignore
     }

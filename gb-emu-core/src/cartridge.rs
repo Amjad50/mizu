@@ -366,8 +366,10 @@ impl Cartridge {
     }
 
     /// A way to sync bus/emulator to the mapper, main purpose is to sync
-    /// MBC3's RTC clock, the number of clocks for one second is 35112, which
-    /// is half of what the PPU needs in a second
+    /// MBC3's RTC clock, the number of clocks for one second is 4194304 / 2
+    ///
+    /// The bus should clock this in 4194304 / 2 clocks per second regardless
+    /// of the CPU clock speed (double or normal)
     pub fn clock_mapper(&mut self) {
         self.mapper.clock();
     }
