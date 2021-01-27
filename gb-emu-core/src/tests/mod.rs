@@ -47,6 +47,7 @@ macro_rules! gb_tests {
 mod acid2_test;
 mod blargg_tests;
 mod mooneye_tests;
+mod rtc3;
 mod samesuite_tests;
 mod scribbltests;
 
