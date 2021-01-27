@@ -150,7 +150,7 @@ impl RtcRegister {
     }
 
     fn save_battery_size(&self) -> usize {
-        std::mem::size_of::<u8>() * 3 + std::mem::size_of::<u16>() + std::mem::size_of::<u64>()
+        std::mem::size_of::<u8>() * 3 + std::mem::size_of::<u16>() + std::mem::size_of::<u64>() * 2
     }
 
     fn save_battery(&self) -> Vec<u8> {
@@ -163,6 +163,12 @@ impl RtcRegister {
         cur.write_u16::<LittleEndian>(self.days).unwrap();
         cur.write_u64::<LittleEndian>(self.last_latched_time)
             .unwrap();
+        cur.write_u64::<LittleEndian>(
+            self.current_time_secs
+                .checked_sub(system_time_now())
+                .unwrap_or(0),
+        )
+        .unwrap();
 
         let result = cur.into_inner();
         assert_eq!(result.len(), self.save_battery_size());
@@ -178,7 +184,8 @@ impl RtcRegister {
         self.hours = cur.read_u8().unwrap();
         self.days = cur.read_u16::<LittleEndian>().unwrap();
         self.last_latched_time = cur.read_u64::<LittleEndian>().unwrap();
-        self.current_time_secs = self.last_latched_time;
+        let system_time_diff = cur.read_u64::<LittleEndian>().unwrap();
+        self.current_time_secs += system_time_diff;
     }
 
     fn clock_second_part(&mut self) {
