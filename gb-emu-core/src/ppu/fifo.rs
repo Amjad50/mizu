@@ -1,5 +1,5 @@
 use super::colors::ColorPalette;
-use super::sprite::Sprite;
+use super::sprite::SelectedSprite;
 use fixed_vec_deque::FixedVecDeque;
 
 #[derive(PartialEq, Clone, Copy)]
@@ -8,37 +8,30 @@ pub enum SpritePriorityMode {
     ByCoord, // DMG
 }
 
-// Background store the `bg_priority` of the `bg_attribs` for the pixel data
-// Sprite store the index of the sprite, as in CGB priority is done by index
-//  and not by coordinate
-#[derive(Clone, Copy)]
-pub enum PixelType {
-    Background(bool),
-    Sprite { dmg_palette: u8, index: u8 },
-}
-
-#[derive(Clone, Copy)]
-pub struct FifoPixel {
+/// Background store the `bg_priority` of the `bg_attribs` for the pixel data
+#[derive(Clone, Copy, Default)]
+pub struct BgFifoPixel {
     pub color: u8,
     pub palette: ColorPalette,
-    pub pixel_type: PixelType,
+    pub bg_priority: bool,
 }
 
-impl Default for FifoPixel {
-    fn default() -> Self {
-        Self {
-            color: 0,
-            palette: ColorPalette::default(),
-            pixel_type: PixelType::Background(false),
-        }
-    }
+/// Sprite store the index of the sprite, as in CGB priority is done by index
+///  and not by coordinate
+#[derive(Clone, Copy, Default)]
+pub struct SpriteFifoPixel {
+    pub color: u8,
+    pub palette: ColorPalette,
+    pub dmg_palette: u8,
+    pub index: u8,
+    pub oam_bg_priority: bool,
 }
 
-pub struct Fifo {
-    pixels: FixedVecDeque<[FifoPixel; 16]>,
+pub struct BgFifo {
+    pixels: FixedVecDeque<[BgFifoPixel; 16]>,
 }
 
-impl Default for Fifo {
+impl Default for BgFifo {
     fn default() -> Self {
         Self {
             pixels: FixedVecDeque::new(),
@@ -46,63 +39,84 @@ impl Default for Fifo {
     }
 }
 
-impl Fifo {
-    pub fn pop(&mut self) -> FifoPixel {
+impl BgFifo {
+    pub fn pop(&mut self) -> BgFifoPixel {
         *self.pixels.pop_front().unwrap()
     }
 
-    pub fn push_bg(&mut self, colors: [u8; 8], palette: ColorPalette, bg_priority: bool) {
+    pub fn push(&mut self, colors: [u8; 8], palette: ColorPalette, bg_priority: bool) {
         for &color in colors.iter() {
-            *self.pixels.push_back() = FifoPixel {
-                pixel_type: PixelType::Background(bg_priority),
-                palette,
+            *self.pixels.push_back() = BgFifoPixel {
                 color,
+                palette,
+                bg_priority,
             };
         }
     }
 
-    pub fn mix_sprite(
-        &mut self,
-        colors: [u8; 8],
-        index: u8,
-        sprite_meta: &Sprite,
-        palette: ColorPalette,
-        sprite_priority_mode: SpritePriorityMode,
-        master_priority: bool,
-    ) {
-        assert!(self.len() >= 8);
+    pub fn len(&self) -> usize {
+        self.pixels.len()
+    }
 
-        let oam_bg_priority = sprite_meta.bg_priority();
-        let dmg_palette = sprite_meta.dmg_palette();
+    pub fn clear(&mut self) {
+        self.pixels.clear();
+    }
+}
 
-        for (pixel, &sprite_color) in self.pixels.iter_mut().take(8).zip(colors.iter()) {
-            match pixel.pixel_type {
-                PixelType::Background(bg_priority) => {
-                    // TODO: fix this mess
-                    if (master_priority
-                        || ((!bg_priority || pixel.color == 0)
-                            && (!oam_bg_priority || pixel.color == 0)))
-                        && sprite_color != 0
-                    {
-                        pixel.color = sprite_color;
-                        pixel.palette = palette;
-                        pixel.pixel_type = PixelType::Sprite { index, dmg_palette };
-                    }
+pub struct SpriteFifo {
+    pixels: FixedVecDeque<[SpriteFifoPixel; 8]>,
+    sprite_priority_mode: SpritePriorityMode,
+}
+
+impl SpriteFifo {
+    pub fn new(sprite_priority_mode: SpritePriorityMode) -> Self {
+        Self {
+            pixels: FixedVecDeque::new(),
+            sprite_priority_mode,
+        }
+    }
+
+    pub fn update_sprite_priority_mode(&mut self, sprite_priority_mode: SpritePriorityMode) {
+        self.sprite_priority_mode = sprite_priority_mode;
+    }
+
+    pub fn pop(&mut self) -> Option<SpriteFifoPixel> {
+        self.pixels.pop_front().map(|x| *x)
+    }
+
+    pub fn push(&mut self, colors: [u8; 8], sprite: &SelectedSprite, palette: ColorPalette) {
+        let dmg_palette = sprite.sprite().dmg_palette();
+        let index = sprite.index();
+        let oam_bg_priority = sprite.sprite().bg_priority();
+
+        // If there are still elements in the fifo, then mix the two sprites
+        // together, meaning, check priorities and replace sprite pixel if needed
+        let mut to_mix = self.len();
+
+        for (i, &new_color) in colors.iter().enumerate() {
+            let new_sprite_pixel = SpriteFifoPixel {
+                color: new_color,
+                palette,
+                dmg_palette,
+                index,
+                oam_bg_priority,
+            };
+
+            // replace or mix
+            if to_mix > 0 {
+                to_mix -= 1;
+
+                let old_pixel = &mut self.pixels[i];
+
+                if ((self.sprite_priority_mode == SpritePriorityMode::ByIndex
+                    && index < old_pixel.index)
+                    || old_pixel.color == 0)
+                    && new_color != 0
+                {
+                    *old_pixel = new_sprite_pixel;
                 }
-                PixelType::Sprite {
-                    index: sprite_index,
-                    ..
-                } => {
-                    if ((sprite_priority_mode == SpritePriorityMode::ByIndex
-                        && sprite_index > index)
-                        || pixel.color == 0)
-                        && sprite_color != 0
-                    {
-                        pixel.color = sprite_color;
-                        pixel.palette = palette;
-                        pixel.pixel_type = PixelType::Sprite { index, dmg_palette };
-                    }
-                }
+            } else {
+                *self.pixels.push_back() = new_sprite_pixel;
             }
         }
     }

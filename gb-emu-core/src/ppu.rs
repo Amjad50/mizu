@@ -10,7 +10,7 @@ use crate::GameboyConfig;
 use bg_attribs::BgAttribute;
 use bitflags::bitflags;
 use colors::{Color, ColorPalette, ColorPalettesCollection};
-use fifo::{Fifo, FifoPixel, PixelType, SpritePriorityMode};
+use fifo::{BgFifo, SpriteFifo, SpritePriorityMode};
 use lcd::Lcd;
 use sprite::{SelectedSprite, Sprite};
 
@@ -190,7 +190,8 @@ pub struct Ppu {
     is_drawing_window: bool,
     window_y_counter: u8,
 
-    fifo: Fifo,
+    bg_fifo: BgFifo,
+    sprite_fifo: SpriteFifo,
 
     lcd: Lcd,
 
@@ -244,6 +245,12 @@ impl Ppu {
             );
         }
 
+        let sprite_priority_mode = if config.is_dmg {
+            SpritePriorityMode::ByCoord
+        } else {
+            SpritePriorityMode::ByIndex
+        };
+
         Self {
             lcd_control: LcdControl::from_bits_truncate(0),
             // COINCIDENCE_FLAG flag set because LYC and LY are 0 at the beginning
@@ -268,19 +275,15 @@ impl Ppu {
             fetcher: Fetcher::default(),
             is_drawing_window: false,
             window_y_counter: 0,
-            fifo: Fifo::default(),
+            bg_fifo: BgFifo::default(),
+            sprite_fifo: SpriteFifo::new(sprite_priority_mode),
             lcd: Lcd::default(),
             cycle: 4,
             scanline: 0,
             lcd_turned_on: false,
             // CGB by default, the bootrom of the CGB will change
             // it if it detected the rom is DMG
-            sprite_priority_mode: if config.is_dmg {
-                SpritePriorityMode::ByCoord
-            } else {
-                SpritePriorityMode::ByIndex
-            },
-
+            sprite_priority_mode,
             is_cgb_mode: !config.is_dmg,
 
             config,
@@ -338,6 +341,9 @@ impl Ppu {
             );
             s.sprite_priority_mode = SpritePriorityMode::ByCoord;
         }
+
+        s.sprite_fifo
+            .update_sprite_priority_mode(s.sprite_priority_mode);
 
         s.is_cgb_mode = cgb_mode;
 
@@ -517,6 +523,9 @@ impl Ppu {
         } else {
             SpritePriorityMode::ByCoord
         };
+
+        self.sprite_fifo
+            .update_sprite_priority_mode(self.sprite_priority_mode);
     }
 
     pub fn read_sprite_priority_mode(&self) -> u8 {
@@ -689,9 +698,9 @@ impl Ppu {
             self.fetcher.push(bg, attribs);
         }
 
-        if self.fifo.len() <= 8 {
+        if self.bg_fifo.len() <= 8 {
             if let Some((pixels, attribs)) = self.fetcher.pop() {
-                self.fifo.push_bg(
+                self.bg_fifo.push(
                     pixels,
                     self.cgb_bg_palettes.get_palette(attribs.palette()),
                     attribs.priority(),
@@ -699,16 +708,16 @@ impl Ppu {
             }
         }
 
-        if self.fifo.len() > 8 {
+        if self.bg_fifo.len() > 8 {
             if self.fine_scroll_x_discard > 0 {
                 self.fine_scroll_x_discard -= 1;
-                self.fifo.pop();
+                self.bg_fifo.pop();
+                self.sprite_fifo.pop();
             } else {
                 self.try_add_sprite();
 
-                let pixel = self.fifo.pop();
-
-                self.lcd.push(self.get_color(pixel), self.scanline);
+                let color = self.get_next_color();
+                self.lcd.push(color, self.scanline);
 
                 if self.lcd.x() == 160 {
                     return true;
@@ -719,21 +728,45 @@ impl Ppu {
         false
     }
 
-    fn get_color(&self, pixel: FifoPixel) -> Color {
-        let mut color_index = pixel.color;
+    /// Mixes the two pixels (sprite and background) and outputs the correct color,
+    /// mixing here does not mean using the two pixels and output something in the middle
+    /// mixing just means check priorities and all stuff and pick which should be
+    /// rendered, the other is just discarded
+    fn get_next_color(&mut self) -> Color {
+        let bg_pixel = self.bg_fifo.pop();
+        let sprite_pixel = self.sprite_fifo.pop();
+
+        // If we have a sprite, then mix, else just use the background
+        let (mut color_index, palette, dmg_palette) = if let Some(sprite_pixel) = sprite_pixel {
+            let master_priority = self.is_cgb_mode && !self.lcd_control.bg_window_priority();
+            let bg_priority = bg_pixel.bg_priority;
+            let oam_bg_priority = sprite_pixel.oam_bg_priority;
+
+            if (master_priority
+                || ((!bg_priority || bg_pixel.color == 0)
+                    && (!oam_bg_priority || bg_pixel.color == 0)))
+                && sprite_pixel.color != 0
+            {
+                // sprite wins
+                (
+                    sprite_pixel.color,
+                    sprite_pixel.palette,
+                    self.dmg_sprite_palettes[sprite_pixel.dmg_palette as usize],
+                )
+            } else {
+                // background wins
+                (bg_pixel.color, bg_pixel.palette, self.dmg_bg_palette)
+            }
+        } else {
+            // there is no sprite pixel, so we just use the background pixel
+            (bg_pixel.color, bg_pixel.palette, self.dmg_bg_palette)
+        };
 
         if !self.is_cgb_mode {
-            let dmg_palette = match pixel.pixel_type {
-                PixelType::Background(_) => self.dmg_bg_palette,
-                PixelType::Sprite { dmg_palette, .. } => {
-                    self.dmg_sprite_palettes[dmg_palette as usize]
-                }
-            };
-
             color_index = (dmg_palette >> (2 * color_index)) & 0b11;
         }
 
-        pixel.palette.get_color(color_index)
+        palette.get_color(color_index)
     }
 
     /// Gets the tile number, BgAttribute for that tile, and its y position
@@ -840,6 +873,7 @@ impl Ppu {
                 }
             }
         }
+
         self.selected_oam_size = count as u8;
     }
 
@@ -851,7 +885,6 @@ impl Ppu {
                 .take(self.selected_oam_size as usize)
             {
                 let sprite = selected_sprite.sprite();
-                let index = selected_sprite.index();
 
                 // the x index of the sprite is of the left of the display
                 let left_out_of_bounds = self.lcd.x() == 0 && sprite.x() < 8;
@@ -892,15 +925,11 @@ impl Ppu {
                         sprite.dmg_palette()
                     };
 
-                    // TODO: fix all these parameters
-                    self.fifo.mix_sprite(
+                    self.sprite_fifo.push(
                         colors,
-                        index,
-                        sprite,
+                        selected_sprite,
                         self.cgb_sprite_palettes.get_palette(palette_selector),
-                        self.sprite_priority_mode,
-                        self.is_cgb_mode && !self.lcd_control.bg_window_priority(),
-                    )
+                    );
                 }
             }
         }
@@ -921,7 +950,8 @@ impl Ppu {
                 self.fine_scroll_x_discard = 7 - self.windows_x;
             }
             // start window drawing
-            self.fifo.clear();
+            self.bg_fifo.clear();
+            self.sprite_fifo.clear();
             self.fetcher.x = 0;
             self.is_drawing_window = true;
         }
@@ -931,7 +961,8 @@ impl Ppu {
     fn enter_hblank(&mut self) {
         self.lcd.next_line();
         // clear for the next line
-        self.fifo.clear();
+        self.bg_fifo.clear();
+        self.sprite_fifo.clear();
         self.fetcher.x = 0;
         if self.is_drawing_window {
             self.window_y_counter += 1;
