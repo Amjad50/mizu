@@ -1,15 +1,19 @@
-use super::{Mapper, MappingResult};
+use super::{Mapper, MappingResult, ONE_SECOND_MAPPER_CLOCKS};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::Cursor;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-fn time_now() -> u64 {
+fn system_time_now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_else(|e| e.duration())
         .as_secs()
 }
+
 struct RtcRegister {
+    /// A full second is ONE_SECOND_MAPPER_CLOCKS, which is synced to the bus
+    sub_second: u32,
+
     seconds: u8,
     minutes: u8,
     hours: u8,
@@ -20,10 +24,13 @@ struct RtcRegister {
 
     last_latched_time: u64,
     latched: bool,
+
+    current_time_secs: u64,
 }
 
 impl Default for RtcRegister {
     fn default() -> Self {
+        let system_time = system_time_now();
         Self {
             seconds: 0,
             minutes: 0,
@@ -31,8 +38,11 @@ impl Default for RtcRegister {
             days: 0,
             halt: false,
             day_counter_carry: false,
-            last_latched_time: time_now(),
+            last_latched_time: system_time,
             latched: false,
+
+            sub_second: 0,
+            current_time_secs: system_time,
         }
     }
 }
@@ -61,7 +71,10 @@ impl RtcRegister {
         let old_halt = self.halt;
 
         match index {
-            0 => self.seconds = data & 0x3F,
+            0 => {
+                self.seconds = data & 0x3F;
+                self.sub_second = 0;
+            }
             1 => self.minutes = data & 0x3F,
             2 => self.hours = data & 0x1F,
             3 => {
@@ -78,7 +91,7 @@ impl RtcRegister {
         }
 
         if old_halt && !self.halt {
-            self.last_latched_time = time_now();
+            self.last_latched_time = self.current_time_secs;
         }
     }
 
@@ -94,7 +107,7 @@ impl RtcRegister {
             return;
         }
 
-        let new_time = time_now();
+        let new_time = self.current_time_secs;
 
         if let Some(diff) = new_time.checked_sub(self.last_latched_time) {
             if diff != 0 {
@@ -165,6 +178,18 @@ impl RtcRegister {
         self.hours = cur.read_u8().unwrap();
         self.days = cur.read_u16::<LittleEndian>().unwrap();
         self.last_latched_time = cur.read_u64::<LittleEndian>().unwrap();
+        self.current_time_secs = self.last_latched_time;
+    }
+
+    fn clock_second_part(&mut self) {
+        if !self.halt {
+            self.sub_second += 1;
+
+            if self.sub_second == ONE_SECOND_MAPPER_CLOCKS {
+                self.sub_second = 0;
+                self.current_time_secs += 1;
+            }
+        }
     }
 }
 
@@ -181,7 +206,7 @@ pub struct Mbc3 {
 
     current_rtc_register: u8,
 
-    rtc_registers: RtcRegister,
+    rtc_register: RtcRegister,
 
     ram_block_enable: bool,
     is_reading_ram: bool,
@@ -216,11 +241,11 @@ impl Mbc3 {
     }
 
     fn rtc_read(&mut self) -> u8 {
-        self.rtc_registers.read_register(self.current_rtc_register)
+        self.rtc_register.read_register(self.current_rtc_register)
     }
 
     fn rtc_write(&mut self, data: u8) {
-        self.rtc_registers
+        self.rtc_register
             .write_register(self.current_rtc_register, data);
     }
 }
@@ -301,7 +326,7 @@ impl Mapper for Mbc3 {
             }
             0x6000..=0x7FFF => {
                 if self.rtc_present {
-                    self.rtc_registers.set_latch(data & 1 == 1);
+                    self.rtc_register.set_latch(data & 1 == 1);
                 }
             }
             _ => {}
@@ -310,7 +335,7 @@ impl Mapper for Mbc3 {
 
     fn save_battery_size(&self) -> usize {
         if self.rtc_present {
-            self.rtc_registers.save_battery_size()
+            self.rtc_register.save_battery_size()
         } else {
             0
         }
@@ -318,7 +343,7 @@ impl Mapper for Mbc3 {
 
     fn save_battery(&self) -> Vec<u8> {
         if self.rtc_present {
-            self.rtc_registers.save_battery()
+            self.rtc_register.save_battery()
         } else {
             Vec::new()
         }
@@ -326,7 +351,11 @@ impl Mapper for Mbc3 {
 
     fn load_battery(&mut self, data: &[u8]) {
         if self.rtc_present {
-            self.rtc_registers.load_battery(data)
+            self.rtc_register.load_battery(data)
         }
+    }
+
+    fn clock(&mut self) {
+        self.rtc_register.clock_second_part();
     }
 }

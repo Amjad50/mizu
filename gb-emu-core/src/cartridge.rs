@@ -365,6 +365,13 @@ impl Cartridge {
         }
     }
 
+    /// A way to sync bus/emulator to the mapper, main purpose is to sync
+    /// MBC3's RTC clock, the number of clocks for one second is 35112, which
+    /// is half of what the PPU needs in a second
+    pub fn clock_mapper(&mut self) {
+        self.mapper.clock();
+    }
+
     pub fn is_cartridge_color(&self) -> bool {
         self.target_device == TargetDevice::ColorOnly
     }

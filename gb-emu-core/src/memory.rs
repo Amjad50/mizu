@@ -461,6 +461,12 @@ impl Bus {
             return;
         }
 
+        // The mapper is independent of CPU clock speed, and a full second
+        // for the mapper is 4194304/2 clocks
+        for _ in 0..t_clocks / 2 {
+            self.cartridge.clock_mapper();
+        }
+
         // APU stays at the same speed even if CPU is in double speed
         self.ppu.clock(&mut self.interrupts, t_clocks);
 
