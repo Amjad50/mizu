@@ -1,8 +1,6 @@
 pub mod instruction;
 mod instructions_table;
 
-use std::borrow::Borrow;
-
 use bitflags::bitflags;
 
 use crate::memory::InterruptType;
