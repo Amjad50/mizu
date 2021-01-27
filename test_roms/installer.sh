@@ -30,6 +30,9 @@ handle_installation() {
         git_make_install)
             git clone $link $dest_rename
             cd $dest_rename
+            if [[ $4 ]]; then
+                git checkout $4
+            fi
             make
             sudo make install
             cd ..
@@ -46,7 +49,7 @@ handle_installation() {
 for line in `cat $1`; do
     if ! [[ $line =~ ^#.* ]]; then
         line=($(echo "$line" | tr ',' '\n'))
-        if [ ${#line[@]} -ne 3 ];then
+        if [ ${#line[@]} -lt 3 ];then
             exit 1
         fi
         handle_installation ${line[@]}

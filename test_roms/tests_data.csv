@@ -1,10 +1,10 @@
-#url,installation_type,destination_folder
+#url,installation_type,destination_folder,[branch]
 https://gekkio.fi/files/mooneye-gb/latest/mooneye-gb_hwtests.zip,unzip_make_folder,mooneye-gb_hwtests
 https://github.com/Hacktix/scribbltests,git,scribbltests
 https://github.com/mattcurrie/dmg-acid2/releases/latest/download/dmg-acid2.gb,none,dmg-acid2.gb
 https://github.com/mattcurrie/cgb-acid2/releases/download/v1.1/cgb-acid2.gbc,none,cgb-acid2.gbc
 https://github.com/retrio/gb-test-roms,git,blargg-gb-tests
 #dependancy_for_SameSuite_and_rtc3tests
-https://github.com/gbdev/rgbds,git_make_install,rgbds
+https://github.com/gbdev/rgbds,git_make_install,rgbds,release
 https://github.com/LIJI32/SameSuite,git_make,SameSuite
 https://github.com/Amjad50/rtc3test,git_make,rtc3test
