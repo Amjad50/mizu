@@ -20,4 +20,12 @@ gb_tests!(
     ppu_blocking_bgpi_increase,
     "SameSuite/ppu/blocking_bgpi_increase.gb",
     8677756512934466165;
+
+    apu_div_write_trigger_10,
+    "SameSuite/apu/div_write_trigger_10.gb",
+    15470169245269049758;
+
+    apu_div_write_trigger,
+    "SameSuite/apu/div_write_trigger.gb",
+    5536075953610796630;
 );

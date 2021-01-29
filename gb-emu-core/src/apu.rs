@@ -57,7 +57,17 @@ pub struct Apu {
     sample_counter: f64,
     buffer: Vec<f32>,
 
-    cycle: u16,
+    /// A copy of the `timer` divider register, as the divider is supplying the
+    /// APU sequencer clock
+    saved_divider: u8,
+
+    /// The frame sequencer position, the frame sequencer has 8 positions
+    /// from 1 to 8 in this emulator (as it is incremented before use)
+    /// In each position some components are clocked.
+    /// Length counters are clocked in positions 1, 3, 5, 7
+    /// Volume Envelops are clocked in positions 8
+    /// Sweeps          are clocked in positions 3, 7
+    sequencer_position: u8,
 
     // Keep track when to clock the APU, it should be clocked every 4 tcycles
     // this is to keep working normally even in CPU double speed mode
@@ -78,7 +88,8 @@ impl Apu {
             pulse2: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
             wave: Dac::new(LengthCountedChannel::new(WaveChannel::new(config), 256)),
             noise: Dac::new(LengthCountedChannel::new(NoiseChannel::default(), 64)),
-            cycle: 0,
+            saved_divider: 0,
+            sequencer_position: 0,
             clocks_counter: 0,
 
             config,
@@ -300,7 +311,10 @@ impl Apu {
         std::mem::replace(&mut self.buffer, Vec::new())
     }
 
-    pub fn clock(&mut self, clocks: u8) {
+    /// The APU is clocked by the divider, on the falling edge of the bit 12
+    /// of the divider, this is needed since the divider can be clocked manually
+    /// by resetting it to 0 on write
+    pub fn clock(&mut self, clocks: u8, divider: u8) {
         self.clocks_counter += clocks;
         if self.clocks_counter >= 4 {
             self.clocks_counter -= 4;
@@ -326,15 +340,20 @@ impl Apu {
         if !self.power {
             return;
         }
-        self.cycle += 1;
 
         self.pulse1.channel_mut().clock();
         self.pulse2.channel_mut().clock();
         self.wave.channel_mut().clock();
         self.noise.channel_mut().clock();
 
-        if self.cycle % 2048 == 0 {
-            match self.cycle / 2048 {
+        let old_div_bit4 = (self.saved_divider >> 4) & 1 == 1;
+        let new_div_bit4 = (divider >> 4) & 1 == 1;
+
+        self.saved_divider = divider;
+
+        if old_div_bit4 && !new_div_bit4 {
+            self.sequencer_position += 1;
+            match self.sequencer_position {
                 1 | 5 => {
                     self.pulse1.clock_length_counter();
                     self.pulse2.clock_length_counter();
@@ -352,7 +371,7 @@ impl Apu {
                     self.pulse1.channel_mut().envelope_mut().clock();
                     self.pulse2.channel_mut().envelope_mut().clock();
                     self.noise.channel_mut().envelope_mut().clock();
-                    self.cycle = 0;
+                    self.sequencer_position = 0;
                 }
                 _ => {}
             }
@@ -444,7 +463,16 @@ impl Apu {
     }
 
     fn power_on(&mut self) {
-        self.cycle = 0;
+        self.sequencer_position = 0;
+
+        // Special case where if the APU is turned on and bit 4 of the divider
+        // is set, the APU will skip the next clock
+        // See: SameSuite test apu/div_write_trigger_10
+        let div_bit4 = (self.saved_divider >> 4) & 1 == 1;
+        if div_bit4 {
+            self.sequencer_position += 1;
+        }
+
         self.pulse1.channel_mut().reset_sequencer();
         self.pulse2.channel_mut().reset_sequencer();
         self.wave.channel_mut().reset_buffer_index();
@@ -461,7 +489,7 @@ impl Apu {
     /// determines if the next frame sequencer clock is going to include
     /// clocking the length counter
     fn is_length_clock_next(&self) -> bool {
-        (self.cycle as f32 / 2048_f32).ceil() as u16 % 2 != 0
+        (self.sequencer_position + 1) % 2 != 0
     }
 
     /// write the top 2 bits of NRx4 registers and runs the obsecure
