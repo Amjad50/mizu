@@ -57,9 +57,9 @@ pub struct Apu {
     sample_counter: f64,
     buffer: Vec<f32>,
 
-    /// A copy of the `timer` divider register, as the divider is supplying the
-    /// APU sequencer clock
-    saved_divider: u8,
+    /// Stores the value of the 4th bit (5th in double speed mode) of the divider
+    /// as sequencer clocks are controlled by the divider
+    divider_sequencer_clock_bit: bool,
 
     /// The frame sequencer position, the frame sequencer has 8 positions
     /// from 1 to 8 in this emulator (as it is incremented before use)
@@ -88,7 +88,7 @@ impl Apu {
             pulse2: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
             wave: Dac::new(LengthCountedChannel::new(WaveChannel::new(config), 256)),
             noise: Dac::new(LengthCountedChannel::new(NoiseChannel::default(), 64)),
-            saved_divider: 0,
+            divider_sequencer_clock_bit: false,
             sequencer_position: 0,
             clocks_counter: 0,
 
@@ -314,10 +314,13 @@ impl Apu {
     /// The APU is clocked by the divider, on the falling edge of the bit 12
     /// of the divider, this is needed since the divider can be clocked manually
     /// by resetting it to 0 on write
-    pub fn clock(&mut self, clocks: u8, divider: u8) {
+    pub fn clock(&mut self, double_speed: bool, divider: u8) {
+        // 2 in normal speed, 1 in double speed
+        let clocks = (!double_speed) as u8 + 1;
+
         self.clocks_counter += clocks;
-        if self.clocks_counter >= 4 {
-            self.clocks_counter -= 4;
+        if self.clocks_counter >= 2 {
+            self.clocks_counter -= 2;
         } else {
             // don't do anything, wait for the next cycle
             return;
@@ -346,12 +349,13 @@ impl Apu {
         self.wave.channel_mut().clock();
         self.noise.channel_mut().clock();
 
-        let old_div_bit4 = (self.saved_divider >> 4) & 1 == 1;
-        let new_div_bit4 = (divider >> 4) & 1 == 1;
+        let old_div_sequencer_bit = self.divider_sequencer_clock_bit;
+        let bit = if double_speed { 5 } else { 4 };
+        let new_div_sequencer_bit = (divider >> bit) & 1 == 1;
 
-        self.saved_divider = divider;
+        self.divider_sequencer_clock_bit = new_div_sequencer_bit;
 
-        if old_div_bit4 && !new_div_bit4 {
+        if old_div_sequencer_bit && !new_div_sequencer_bit {
             self.sequencer_position += 1;
             match self.sequencer_position {
                 1 | 5 => {
@@ -465,11 +469,10 @@ impl Apu {
     fn power_on(&mut self) {
         self.sequencer_position = 0;
 
-        // Special case where if the APU is turned on and bit 4 of the divider
-        // is set, the APU will skip the next clock
+        // Special case where if the APU is turned on and bit 4 (5 in double speed)
+        // of the divider is set, the APU will skip the next clock
         // See: SameSuite test apu/div_write_trigger_10
-        let div_bit4 = (self.saved_divider >> 4) & 1 == 1;
-        if div_bit4 {
+        if self.divider_sequencer_clock_bit {
             self.sequencer_position += 1;
         }
 

@@ -471,8 +471,10 @@ impl Bus {
         // APU stays at the same speed even if CPU is in double speed
         self.ppu.clock(&mut self.interrupts, t_clocks);
 
-        // APU stays at the same speed even if CPU is in double speed
-        self.apu.clock(t_clocks, self.timer.read_div());
+        // APU stays at the same speed even if CPU is in double speed,
+        // the APU will handle clocking to stay in the same speed regardless
+        // of the CPU speed
+        self.apu.clock(double_speed, self.timer.read_div());
 
         // HDMA stays at the same speed even if CPU is in double speed
         if self.hdma.is_transferreing(&self.ppu) {
