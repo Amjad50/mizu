@@ -121,6 +121,10 @@ mod acceptance {
         mooneye_tests!("acceptance/bits"; mem_oam, reg_f, unused_hwio-GS for "dmg");
     }
 
+    mod serial {
+        mooneye_tests!("acceptance/serial"; boot_sclk_align-dmgABCmgb for "dmg");
+    }
+
     mod instr {
         mooneye_tests!("acceptance/instr"; daa);
     }

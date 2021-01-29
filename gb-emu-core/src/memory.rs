@@ -369,7 +369,7 @@ impl Bus {
             interrupts: Interrupts::default(),
             timer: Timer::new_skip_boot_rom(config),
             joypad: Joypad::default(),
-            serial: Serial::default(),
+            serial: Serial::new_skip_boot_rom(config),
             dma: DMA::default(),
             hdma: HDMA::default(),
             apu: Apu::new_skip_boot_rom(config),
@@ -394,6 +394,7 @@ impl Bus {
         s.timer = Timer::default();
         s.ppu = Ppu::new(config);
         s.apu = Apu::new(config);
+        s.serial = Serial::new(config);
         s.lock = Lock::default();
 
         if config.is_dmg {
