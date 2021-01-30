@@ -187,7 +187,7 @@ impl PulseChannel {
 }
 
 impl ApuChannel for PulseChannel {
-    fn output(&mut self) -> u8 {
+    fn output(&self) -> u8 {
         self.sequencer_data[self.sequencer_position] * self.envelope.current_volume()
     }
 

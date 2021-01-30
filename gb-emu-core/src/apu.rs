@@ -67,7 +67,7 @@ pub struct Apu {
     /// Length counters are clocked in positions 1, 3, 5, 7
     /// Volume Envelops are clocked in positions 8
     /// Sweeps          are clocked in positions 3, 7
-    sequencer_position: u8,
+    sequencer_position: i8,
 
     // Keep track when to clock the APU, it should be clocked every 4 tcycles
     // this is to keep working normally even in CPU double speed mode
@@ -307,6 +307,20 @@ impl Apu {
         }
     }
 
+    pub fn read_pcm12(&self) -> u8 {
+        let p1 = self.pulse1.output() & 0xF;
+        let p2 = self.pulse2.output() & 0xF;
+
+        (p2 << 4) | p1
+    }
+
+    pub fn read_pcm34(&self) -> u8 {
+        let p1 = self.wave.output() & 0xF;
+        let p2 = self.noise.output() & 0xF;
+
+        (p2 << 4) | p1
+    }
+
     pub fn get_buffer(&mut self) -> Vec<f32> {
         std::mem::replace(&mut self.buffer, Vec::new())
     }
@@ -357,6 +371,7 @@ impl Apu {
 
         if old_div_sequencer_bit && !new_div_sequencer_bit {
             self.sequencer_position += 1;
+
             match self.sequencer_position {
                 1 | 5 => {
                     self.pulse1.clock_length_counter();
@@ -377,7 +392,8 @@ impl Apu {
                     self.noise.channel_mut().envelope_mut().clock();
                     self.sequencer_position = 0;
                 }
-                _ => {}
+                0 | 2 | 4 | 6 => {}
+                _ => unreachable!(),
             }
         }
     }
@@ -470,10 +486,13 @@ impl Apu {
         self.sequencer_position = 0;
 
         // Special case where if the APU is turned on and bit 4 (5 in double speed)
-        // of the divider is set, the APU will skip the next clock
-        // See: SameSuite test apu/div_write_trigger_10
+        // of the divider is set, the APU will delay the next clock, so it will take
+        // 2 clocks to reach the first event in the sequencer instead of 1
+        //
+        // See: SameSuite test apu/div_write_trigger_10, Note: In the test it describes
+        // that the APU `skips` the first event and not delay it which is wrong
         if self.divider_sequencer_clock_bit {
-            self.sequencer_position += 1;
+            self.sequencer_position = -1;
         }
 
         self.pulse1.channel_mut().reset_sequencer();

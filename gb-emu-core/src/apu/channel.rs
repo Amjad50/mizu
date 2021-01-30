@@ -1,5 +1,5 @@
 pub trait ApuChannel {
-    fn output(&mut self) -> u8;
+    fn output(&self) -> u8;
     fn muted(&self) -> bool;
     fn set_enable(&mut self, enabled: bool);
     fn enabled(&self) -> bool;
@@ -83,7 +83,7 @@ impl<C: ApuChannel> LengthCountedChannel<C> {
 }
 
 impl<C: ApuChannel> ApuChannel for LengthCountedChannel<C> {
-    fn output(&mut self) -> u8 {
+    fn output(&self) -> u8 {
         if !self.channel.enabled() {
             0
         } else {

@@ -432,6 +432,8 @@ impl Bus {
             0x6B if self.lock.is_cgb_mode() => self.ppu.read_cgb_sprite_palettes_data(), // ppu
             0x6C if !self.config.is_dmg => self.ppu.read_sprite_priority_mode(),
             0x70 if self.lock.is_cgb_mode() => self.wram.get_wram_bank(), // wram bank
+            0x76 if self.lock.is_cgb_mode() => self.apu.read_pcm12(),     // apu pcm 12
+            0x77 if self.lock.is_cgb_mode() => self.apu.read_pcm34(),     // apu pcm 34
             0x80..=0xFE => self.hram[addr as usize & 0x7F],               // hram
             0xFF => self.interrupts.read_interrupt_enable(),              //interrupts enable
             _ => 0xFF,

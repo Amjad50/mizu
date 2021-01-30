@@ -105,7 +105,7 @@ impl WaveChannel {
 }
 
 impl ApuChannel for WaveChannel {
-    fn output(&mut self) -> u8 {
+    fn output(&self) -> u8 {
         let byte = self.buffer[self.buffer_position as usize / 2];
         // the shift will be 4 if buffer_position is even, and 0 if its odd
         let shift = 4 * ((self.buffer_position & 1) ^ 1);

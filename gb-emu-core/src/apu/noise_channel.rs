@@ -78,7 +78,7 @@ impl NoiseChannel {
 }
 
 impl ApuChannel for NoiseChannel {
-    fn output(&mut self) -> u8 {
+    fn output(&self) -> u8 {
         ((self.feedback_shift_register & 1) ^ 1) as u8 * self.envelope.current_volume()
     }
 
