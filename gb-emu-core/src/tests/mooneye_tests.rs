@@ -1,5 +1,5 @@
 macro_rules! mooneye_tests {
-    ($prefix:expr; $($test_name:ident $(- $suffix_name:ident)? $(for $dmg:expr)* $(,)?),*) => {
+    ($prefix:expr; $($test_name:ident $(- $suffix_name:ident)? $(for $dmg:expr)? $(,)?),*) => {
         $(
             /// Run the test and check registers values (take from mooneye)
             #[test]
@@ -174,5 +174,17 @@ mod acceptance {
             tima_write_reloading,
             tma_write_reloading
         );
+    }
+
+    mod misc_cgb {
+        mooneye_tests!("misc";
+            boot_div-cgbABCDE,
+            // FIXME: pass but require bootrom
+            //boot_hwio-C,
+            boot_regs-cgb,
+        );
+
+        // FIXME: pass but require bootrom
+        mooneye_tests!("misc/bits"; /*unused_hwio-C*/);
     }
 }

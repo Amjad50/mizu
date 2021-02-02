@@ -154,6 +154,25 @@ impl Lock {
     }
 }
 
+struct UnknownRegister {
+    data: u8,
+    mask: u8,
+}
+
+impl UnknownRegister {
+    fn new(mask: u8) -> Self {
+        Self { data: 0, mask }
+    }
+
+    fn read(&self) -> u8 {
+        (self.data & self.mask) | !self.mask
+    }
+
+    fn write(&mut self, data: u8) {
+        self.data = data & self.mask
+    }
+}
+
 pub struct Bus {
     cartridge: Cartridge,
     ppu: Ppu,
@@ -169,6 +188,8 @@ pub struct Bus {
     boot_rom: BootRom,
     speed_controller: SpeedController,
     lock: Lock,
+    unknown_registers: [UnknownRegister; 4],
+
     stopped: bool,
 
     /// Used to track how many ppu cycles have elapsed
@@ -207,6 +228,12 @@ impl Bus {
             boot_rom: BootRom::default(),
             speed_controller: SpeedController::default(),
             lock,
+            unknown_registers: [
+                UnknownRegister::new(0xFF),
+                UnknownRegister::new(0xFF),
+                UnknownRegister::new(0xFF),
+                UnknownRegister::new(0x70),
+            ],
             stopped: false,
 
             elapsed_ppu_cycles: 0,
@@ -419,21 +446,25 @@ impl Bus {
             0x4A => self.ppu.read_window_y(),               // ppu
             0x4B => self.ppu.read_window_x(),               // ppu
             0x4D if self.lock.is_cgb_mode() => self.speed_controller.read_key1(), // speed
-            0x4F if self.lock.is_cgb_mode() => self.ppu.read_vram_bank(), // vram bank
+            0x4F if !self.config.is_dmg => self.ppu.read_vram_bank(), // vram bank
             0x50 => 0xFF,                                   // boot rom stop
             0x51..=0x55 if self.lock.is_cgb_mode() => self.hdma.read_register(addr), // hdma
             0x56 if self.lock.is_cgb_mode() => {
                 // TODO: implement RP port
                 0xFF
             }
-            0x68 if self.lock.is_cgb_mode() => self.ppu.read_cgb_bg_palettes_index(), // ppu
-            0x69 if self.lock.is_cgb_mode() => self.ppu.read_cgb_bg_palettes_data(),  // ppu
-            0x6A if self.lock.is_cgb_mode() => self.ppu.read_cgb_sprite_palettes_index(), // ppu
+            0x68 if !self.config.is_dmg => self.ppu.read_cgb_bg_palettes_index(), // ppu
+            0x69 if !self.config.is_dmg => self.ppu.read_cgb_bg_palettes_data(),  // ppu
+            0x6A if !self.config.is_dmg => self.ppu.read_cgb_sprite_palettes_index(), // ppu
             0x6B if self.lock.is_cgb_mode() => self.ppu.read_cgb_sprite_palettes_data(), // ppu
             0x6C if !self.config.is_dmg => self.ppu.read_sprite_priority_mode(),
             0x70 if self.lock.is_cgb_mode() => self.wram.get_wram_bank(), // wram bank
-            0x76 if self.lock.is_cgb_mode() => self.apu.read_pcm12(),     // apu pcm 12
-            0x77 if self.lock.is_cgb_mode() => self.apu.read_pcm34(),     // apu pcm 34
+            0x72 if !self.config.is_dmg => self.unknown_registers[0].read(), // unknown
+            0x73 if !self.config.is_dmg => self.unknown_registers[1].read(), // unknown
+            0x74 if self.lock.is_cgb_mode() => self.unknown_registers[2].read(), // unknown
+            0x75 if !self.config.is_dmg => self.unknown_registers[3].read(), // unknown
+            0x76 if !self.config.is_dmg => self.apu.read_pcm12(),         // apu pcm 12
+            0x77 if !self.config.is_dmg => self.apu.read_pcm34(),         // apu pcm 34
             0x80..=0xFE => self.hram[addr as usize & 0x7F],               // hram
             0xFF => self.interrupts.read_interrupt_enable(),              //interrupts enable
             _ => 0xFF,
@@ -482,8 +513,12 @@ impl Bus {
             0x69 if self.lock.is_cgb_mode() => self.ppu.write_cgb_bg_palettes_data(data),  // ppu
             0x6A if self.lock.is_cgb_mode() => self.ppu.write_cgb_sprite_palettes_index(data), // ppu
             0x6B if self.lock.is_cgb_mode() => self.ppu.write_cgb_sprite_palettes_data(data), // ppu
-            0x6C if !self.config.is_dmg => self.ppu.write_sprite_priority_mode(data),
+            0x6C if self.lock.is_cgb_mode() => self.ppu.write_sprite_priority_mode(data),
             0x70 if self.lock.is_cgb_mode() => self.wram.set_wram_bank(data), // wram bank
+            0x72 if !self.config.is_dmg => self.unknown_registers[0].write(data), // unknown
+            0x73 if !self.config.is_dmg => self.unknown_registers[1].write(data), // unknown
+            0x74 if self.lock.is_cgb_mode() => self.unknown_registers[2].write(data), // unknown
+            0x75 if !self.config.is_dmg => self.unknown_registers[3].write(data), // unknown
             0x80..=0xFE => self.hram[addr as usize & 0x7F] = data,            // hram
             0xFF => self.interrupts.write_interrupt_enable(data),             // interrupts enable
             _ => {}

@@ -530,9 +530,9 @@ impl Ppu {
 
     pub fn read_sprite_priority_mode(&self) -> u8 {
         0xFE | if let SpritePriorityMode::ByIndex = self.sprite_priority_mode {
-            1
-        } else {
             0
+        } else {
+            1
         }
     }
 
