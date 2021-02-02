@@ -154,7 +154,7 @@ mod acceptance {
             //lcdon_write_timing-GS,
             stat_irq_blocking,
             stat_lyc_onoff,
-            vblank_stat_intr-GS, // should fail
+            vblank_stat_intr-GS for "dmg",
         );
     }
 
@@ -186,5 +186,7 @@ mod acceptance {
 
         // FIXME: pass but require bootrom
         mooneye_tests!("misc/bits"; /*unused_hwio-C*/);
+
+        mooneye_tests!("misc/ppu"; vblank_stat_intr-C);
     }
 }

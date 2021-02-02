@@ -611,7 +611,7 @@ impl Ppu {
                     new_stat_int_happened || self.lcd_status.mode_0_hblank_interrupt();
             }
             // TODO: check if apply to 144 or to 144-153
-            1 if self.cycle == 4 && self.scanline == 144 => {
+            1 if self.cycle == 4 && self.scanline == 144 && self.config.is_dmg => {
                 // special: also mode 2 interrupt if enabled
                 new_stat_int_happened = new_stat_int_happened
                     || self.lcd_status.mode_1_vblank_interrupt()
@@ -646,6 +646,14 @@ impl Ppu {
                 }
             }
             _ => {}
+        }
+
+        // In CGB, the mode2 interrupt happens before the vblank interrupt
+        if self.cycle == 0 && self.scanline == 144 && !self.config.is_dmg {
+            // special: also mode 2 interrupt if enabled
+            new_stat_int_happened = new_stat_int_happened
+                || self.lcd_status.mode_1_vblank_interrupt()
+                || self.lcd_status.mode_2_oam_interrupt();
         }
 
         let new_coincidence = self.ly == self.lyc;
