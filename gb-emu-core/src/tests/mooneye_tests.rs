@@ -1,5 +1,5 @@
 macro_rules! mooneye_tests {
-    ($prefix:expr; $($test_name:ident $(- $suffix_name:ident)? $(for $dmg:expr)? $(,)?),*) => {
+    ($prefix: expr; $($test_name: ident $(- $suffix_name: ident)? $(for $dmg: ident)? $(,)?),*) => {
         $(
             /// Run the test and check registers values (take from mooneye)
             #[test]
@@ -9,7 +9,7 @@ macro_rules! mooneye_tests {
                     $prefix, "/",
                     stringify!($test_name), $('-', stringify!($suffix_name),)? ".gb");
 
-                let is_dmg = false $(|| $dmg == "dmg")?;
+                let is_dmg = false $(|| stringify!($dmg) == "dmg")?;
                 let mut gb = crate::tests::TestingGameBoy::new(
                     file_path,
                     is_dmg
@@ -84,20 +84,20 @@ mod mbc5 {
 mod acceptance {
     mooneye_tests!("acceptance";
         add_sp_e_timing,
-        boot_div-dmgABCmgb for "dmg",
-        boot_hwio-dmgABCmgb for "dmg",
-        boot_regs-dmgABC for "dmg",
+        boot_div-dmgABCmgb for dmg,
+        boot_hwio-dmgABCmgb for dmg,
+        boot_regs-dmgABC for dmg,
         call_cc_timing2,
         call_cc_timing,
         call_timing2,
         call_timing,
-        di_timing-GS for "dmg",
+        di_timing-GS for dmg,
         div_timing,
         ei_sequence,
         ei_timing,
         halt_ime0_ei,
         halt_ime0_nointr_timing,
-        halt_ime1_timing2-GS for "dmg",
+        halt_ime1_timing2-GS for dmg,
         halt_ime1_timing,
         if_ie_registers,
         intr_timing,
@@ -118,11 +118,11 @@ mod acceptance {
     );
 
     mod bits {
-        mooneye_tests!("acceptance/bits"; mem_oam, reg_f, unused_hwio-GS for "dmg");
+        mooneye_tests!("acceptance/bits"; mem_oam, reg_f, unused_hwio-GS for dmg);
     }
 
     mod serial {
-        mooneye_tests!("acceptance/serial"; boot_sclk_align-dmgABCmgb for "dmg");
+        mooneye_tests!("acceptance/serial"; boot_sclk_align-dmgABCmgb for dmg);
     }
 
     mod instr {
@@ -154,7 +154,7 @@ mod acceptance {
             //lcdon_write_timing-GS,
             stat_irq_blocking,
             stat_lyc_onoff,
-            vblank_stat_intr-GS for "dmg",
+            vblank_stat_intr-GS for dmg,
         );
     }
 

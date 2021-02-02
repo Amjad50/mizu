@@ -9,12 +9,12 @@ use std::path::Path;
 
 macro_rules! gb_tests {
     // clock until infinite loop
-    (inf; $($test_name: ident $(for $dmg: expr)?, $file_path: expr, $crc_checksome: expr;)*) => {
+    (inf; $($test_name: ident $(for $dmg: ident)?, $file_path: expr, $crc_checksome: expr;)*) => {
         gb_tests!($($test_name $(for $dmg)?, $file_path, $crc_checksome;)*, clock_until_infinte_loop);
     };
 
     // clock until breakpoint
-    (brk; $($test_name: ident $(for $dmg: expr)?, $file_path: expr, $crc_checksome: expr;)*) => {
+    (brk; $($test_name: ident $(for $dmg: ident)?, $file_path: expr, $crc_checksome: expr;)*) => {
         gb_tests!($($test_name $(for $dmg)?, $file_path, $crc_checksome;)*, clock_until_breakpoint);
     };
 
@@ -23,7 +23,7 @@ macro_rules! gb_tests {
             /// Run the test and check the checksum of the screen buffer
             #[test]
             fn $test_name() {
-                let is_dmg = false $(|| $dmg == "dmg")?;
+                let is_dmg = false $(|| stringify!($dmg) == "dmg")?;
                 let mut gb = crate::tests::TestingGameBoy::new(
                     concat!("../test_roms/", $file_path),
                     is_dmg

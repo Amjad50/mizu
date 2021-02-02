@@ -49,7 +49,7 @@ gb_tests!(
     "blargg-gb-tests/dmg_sound/rom_singles/07-len sweep period sync.gb",
     10534885036225965023;
 
-    blargg_dmg_sound_all for "dmg",
+    blargg_dmg_sound_all for dmg,
     "blargg-gb-tests/dmg_sound/dmg_sound.gb",
     9608420910100250529;
 
