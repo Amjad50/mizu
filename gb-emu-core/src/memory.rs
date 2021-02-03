@@ -307,7 +307,10 @@ impl Bus {
 
         // will be 4 in normal speed and 2 in double speed
         let t_clocks = cpu_clocks_added * 2;
-        self.elapsed_ppu_cycles += t_clocks as u32;
+
+        // In order to not crash if overflowed (in case the user is not taking the value
+        // after every cpu exeution)
+        self.elapsed_ppu_cycles = self.elapsed_ppu_cycles.saturating_add(t_clocks as u32);
 
         // we return after updating `elapsed_ppu_cycles` because frontend
         // depend on it
@@ -529,8 +532,12 @@ impl Bus {
 impl CpuBusProvider for Bus {
     /// each time the cpu reads, clock the components on the bus
     fn read(&mut self, addr: u16) -> u8 {
-        let result = self.read_not_ticked(addr, self.oam_dma.conflicting_bus());
-        self.on_cpu_machine_cycle();
+        let result = self.read_no_oam_bug(addr);
+
+        if self.config.is_dmg && addr & 0xFF00 == 0xFE00 {
+            self.ppu.oam_bug_read();
+        }
+
         result
     }
 
@@ -538,6 +545,10 @@ impl CpuBusProvider for Bus {
     fn write(&mut self, addr: u16, data: u8) {
         self.write_not_ticked(addr, data, self.oam_dma.conflicting_bus());
         self.on_cpu_machine_cycle();
+
+        if self.config.is_dmg && addr & 0xFF00 == 0xFE00 {
+            self.ppu.oam_bug_write();
+        }
     }
 
     // gets the interrupt type and remove it
@@ -577,5 +588,23 @@ impl CpuBusProvider for Bus {
 
     fn stopped(&self) -> bool {
         self.stopped
+    }
+
+    fn trigger_write_oam_bug(&mut self, addr: u16) {
+        if self.config.is_dmg && addr & 0xFF00 == 0xFE00 {
+            self.ppu.oam_bug_write();
+        }
+    }
+
+    fn trigger_read_write_oam_bug(&mut self, addr: u16) {
+        if self.config.is_dmg && addr & 0xFF00 == 0xFE00 {
+            self.ppu.oam_bug_read_write();
+        }
+    }
+
+    fn read_no_oam_bug(&mut self, addr: u16) -> u8 {
+        let result = self.read_not_ticked(addr, self.oam_dma.conflicting_bus());
+        self.on_cpu_machine_cycle();
+        result
     }
 }

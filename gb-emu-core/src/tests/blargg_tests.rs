@@ -57,3 +57,30 @@ gb_tests!(
     "blargg-gb-tests/cgb_sound/cgb_sound.gb",
     4141669196667164762;
 );
+
+#[test]
+fn blargg_oam_bug_all() {
+    let is_dmg = true;
+
+    let mut gb = crate::tests::TestingGameBoy::new(
+        "../test_roms/blargg-gb-tests/oam_bug/oam_bug.gb",
+        is_dmg,
+    )
+    .unwrap();
+
+    gb.clock_until_infinte_loop();
+
+    // When the infinite loop is reached the display is still blank so wait for
+    // a bit before taking a screenshot
+    for _ in 0..10 {
+        gb.clock_for_frame();
+    }
+
+    let screen_buffer = gb.raw_screen_buffer();
+    gb.print_screen_buffer();
+
+    assert_eq!(
+        crc::crc64::checksum_ecma(screen_buffer),
+        15533008004237088224
+    );
+}

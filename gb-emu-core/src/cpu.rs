@@ -19,6 +19,14 @@ pub trait CpuBusProvider {
 
     fn enter_stop_mode(&mut self);
     fn stopped(&self) -> bool;
+
+    /// Triggers oam_bug without clock, this is used for inc/dec instructions
+    fn trigger_write_oam_bug(&mut self, addr: u16);
+    /// Triggers oam_bug special case read_write, this happens when an
+    /// increment/decrement happen in the same cycle as read
+    fn trigger_read_write_oam_bug(&mut self, addr: u16);
+    /// reads data without triggering oam_bug, this is used in pop
+    fn read_no_oam_bug(&mut self, addr: u16) -> u8;
 }
 
 const INTERRUPTS_VECTOR: [u16; 5] = [0x40, 0x48, 0x50, 0x58, 0x60];
@@ -292,6 +300,7 @@ impl Cpu {
 
     fn fetch_next_pc<P: CpuBusProvider>(&mut self, bus: &mut P) -> u8 {
         let result = bus.read(self.reg_pc);
+        bus.trigger_read_write_oam_bug(self.reg_pc);
         self.reg_pc = self.reg_pc.wrapping_add(1);
         result
     }
@@ -309,12 +318,14 @@ impl Cpu {
             OperandType::AddrHLDec => {
                 let hl = self.reg_hl_read();
                 let result = bus.read(hl) as u16;
+                bus.trigger_read_write_oam_bug(hl);
                 self.reg_hl_write(hl.wrapping_sub(1));
                 result
             }
             OperandType::AddrHLInc => {
                 let hl = self.reg_hl_read();
                 let result = bus.read(hl) as u16;
+                bus.trigger_read_write_oam_bug(hl);
                 self.reg_hl_write(hl.wrapping_add(1));
                 result
             }
@@ -399,6 +410,7 @@ impl Cpu {
     }
 
     fn stack_push<P: CpuBusProvider>(&mut self, data: u16, bus: &mut P) {
+        bus.trigger_write_oam_bug(self.reg_sp);
         self.reg_sp = self.reg_sp.wrapping_sub(1);
         bus.write(self.reg_sp, (data >> 8) as u8);
         self.reg_sp = self.reg_sp.wrapping_sub(1);
@@ -406,7 +418,13 @@ impl Cpu {
     }
 
     fn stack_pop<P: CpuBusProvider>(&mut self, bus: &mut P) -> u16 {
-        let low = bus.read(self.reg_sp);
+        let low = bus.read_no_oam_bug(self.reg_sp);
+        // instead of triggering normal read oam bug, a glitch happen and
+        // read and write (because of increment) oam bug happen at the same
+        // cycle which produce a strange behaviour (impleented in read_write
+        // oam bug)
+        bus.trigger_read_write_oam_bug(self.reg_sp);
+
         self.reg_sp = self.reg_sp.wrapping_add(1);
         let high = bus.read(self.reg_sp);
         self.reg_sp = self.reg_sp.wrapping_add(1);
@@ -468,6 +486,7 @@ impl Cpu {
             Opcode::Pop => self.stack_pop(bus),
             Opcode::Inc16 => {
                 self.advance_bus(bus);
+                bus.trigger_write_oam_bug(src);
                 src.wrapping_add(1)
             }
 
@@ -482,6 +501,7 @@ impl Cpu {
             }
             Opcode::Dec16 => {
                 self.advance_bus(bus);
+                bus.trigger_write_oam_bug(src);
                 src.wrapping_sub(1)
             }
             Opcode::Dec => {

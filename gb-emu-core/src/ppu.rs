@@ -372,8 +372,7 @@ impl Ppu {
 
     pub fn read_oam(&self, addr: u16) -> u8 {
         if !self.is_oam_locked() {
-            let addr = addr & 0xFF;
-            self.oam[addr as usize / 4].get_at_offset(addr as u8 % 4)
+            self.read_oam_no_lock(addr)
         } else {
             0xFF
         }
@@ -381,9 +380,93 @@ impl Ppu {
 
     pub fn write_oam(&mut self, addr: u16, data: u8) {
         if !self.is_oam_locked() {
-            let addr = addr & 0xFF;
-            self.oam[addr as usize / 4].set_at_offset(addr as u8 % 4, data);
+            self.write_oam_no_lock(addr, data);
         }
+    }
+
+    /// In OAM bug on write:
+    /// - The first word in the row is replaced with this bitwise expression:
+    ///   `((a ^ c) & (b ^ c)) ^ c`, where a is the original value of that word,
+    ///   b is the first word in the preceding row, and c is the third word
+    ///   in the preceding row.
+    /// - The last three words are copied from the last three words
+    ///   in the preceding row.
+    ///
+    /// If two writes happen in the same M-cycle by inc/dec and a write,
+    /// then only one is considered.
+    pub fn oam_bug_write(&mut self) {
+        let oam_row = self.check_get_oam_bug_row();
+
+        if oam_row > 0 {
+            let a = self.read_oam_word_no_lock(oam_row * 8);
+            let b = self.read_oam_word_no_lock((oam_row - 1) * 8);
+            let c = self.read_oam_word_no_lock((oam_row - 1) * 8 + 4);
+            let result = ((a ^ c) & (b ^ c)) ^ c;
+
+            self.write_oam_word_no_lock(oam_row * 8, result);
+            for i in (2..=6).step_by(2) {
+                let data = self.read_oam_word_no_lock((oam_row - 1) * 8 + i);
+                self.write_oam_word_no_lock(oam_row * 8 + i, data);
+            }
+        }
+    }
+
+    /// In OAM bug on read:
+    /// same as read `[oam_bug_write]`, with just a difference in the binary
+    /// operation, `b | (a & c)` is used here
+    pub fn oam_bug_read(&mut self) {
+        let oam_row = self.check_get_oam_bug_row();
+
+        if oam_row > 0 {
+            let a = self.read_oam_word_no_lock(oam_row * 8);
+            let b = self.read_oam_word_no_lock((oam_row - 1) * 8);
+            let c = self.read_oam_word_no_lock((oam_row - 1) * 8 + 4);
+            let result = b | (a & c);
+
+            self.write_oam_word_no_lock(oam_row * 8, result);
+            for i in (2..=6).step_by(2) {
+                let data = self.read_oam_word_no_lock((oam_row - 1) * 8 + i);
+                self.write_oam_word_no_lock(oam_row * 8 + i, data);
+            }
+        }
+    }
+
+    /// In some cases inc/dec and a read might happen in the same cycle.
+    /// In this case, a strange behaviour occur:
+    /// - This corruption will not happen if the accessed row is one of the
+    ///   first four, as well as if it's the last row:
+    ///     - The first word in the row preceding the currently accessed row
+    ///       is replaced with the following bitwise expression:
+    ///       `(b & (a | c | d)) | (a & c & d)` where a is the first word two
+    ///       rows before the currently accessed row, b is the first word in
+    ///       the preceding row (the word being corrupted), c is the first word
+    ///       in the currently accessed row, and d is the third word in the
+    ///       preceding row.
+    ///     - The contents of the preceding row is copied (after the corruption
+    ///       of the first word in it) both to the currently accessed row and to
+    ///       two rows before the currently accessed row
+    /// - Regardless of wether the previous corruption occurred or not,
+    ///   a normal read corruption is then applied.
+    pub fn oam_bug_read_write(&mut self) {
+        let oam_row = self.check_get_oam_bug_row();
+
+        if oam_row > 3 && oam_row < 19 {
+            let a = self.read_oam_word_no_lock((oam_row - 2) * 8);
+            let b = self.read_oam_word_no_lock((oam_row - 1) * 8);
+            let c = self.read_oam_word_no_lock(oam_row * 8);
+            let d = self.read_oam_word_no_lock((oam_row - 1) * 8 + 4);
+            let result = (b & (a | c | d)) | (a & c & d);
+
+            self.write_oam_word_no_lock((oam_row - 1) * 8, result);
+
+            for i in (0..=6).step_by(2) {
+                let data = self.read_oam_word_no_lock((oam_row - 1) * 8 + i);
+                self.write_oam_word_no_lock(oam_row * 8 + i, data);
+                self.write_oam_word_no_lock((oam_row - 2) * 8 + i, data);
+            }
+        }
+
+        self.oam_bug_read();
     }
 
     pub fn read_lcd_control(&self) -> u8 {
@@ -711,6 +794,54 @@ impl Ppu {
             // OAM is locked in mode 2 and 3 with an extend of 8 clocks afterwards
             && ((2..=3).contains(&self.get_current_mode())
                 || (self.mode_3_end_cycle != 0 && self.mode_3_end_cycle + 8 > self.cycle))
+    }
+
+    fn read_oam_no_lock(&self, addr: u16) -> u8 {
+        let addr = addr & 0xFF;
+        self.oam[addr as usize / 4].get_at_offset(addr as u8 % 4)
+    }
+
+    fn write_oam_no_lock(&mut self, addr: u16, data: u8) {
+        let addr = addr & 0xFF;
+        self.oam[addr as usize / 4].set_at_offset(addr as u8 % 4, data);
+    }
+
+    fn read_oam_word_no_lock(&self, offset: u8) -> u16 {
+        assert!(offset < 0x9F);
+
+        let addr = 0xFE00 | offset as u16;
+        // Note: order of high and low does not matter
+        // because these are used in oam_bug only which involve bitwise
+        // operations and not normal arithmetic operations
+        let low = self.read_oam_no_lock(addr) as u16;
+        let high = self.read_oam_no_lock(addr + 1) as u16;
+
+        (high << 8) | low
+    }
+
+    fn write_oam_word_no_lock(&mut self, offset: u8, data: u16) {
+        assert!(offset < 0x9F);
+
+        let addr = 0xFE00 | offset as u16;
+        // Note: order does not matter, but it must follow `read_oam_word_no_lock`
+        let low = data as u8;
+        let high = (data >> 8) as u8;
+
+        self.write_oam_no_lock(addr, low);
+        self.write_oam_no_lock(addr + 1, high);
+    }
+
+    fn check_get_oam_bug_row(&self) -> u8 {
+        if self.get_current_mode() == 2 {
+            assert!(self.cycle > 0);
+
+            let cycle = self.cycle - 4;
+            let oam_row = (cycle / 4) as u8;
+
+            oam_row
+        } else {
+            0
+        }
     }
 
     fn read_vram_banked(&self, bank: u8, addr: u16) -> u8 {

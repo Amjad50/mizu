@@ -118,4 +118,13 @@ impl TestingGameBoy {
             }
         }
     }
+
+    pub fn clock_for_frame(&mut self) {
+        const PPU_CYCLES_PER_FRAME: u32 = 456 * 154;
+        let mut cycles = 0u32;
+        while cycles < PPU_CYCLES_PER_FRAME {
+            self.cpu.next_instruction(&mut self.bus);
+            cycles += self.bus.elapsed_ppu_cycles() as u32;
+        }
+    }
 }
