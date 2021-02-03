@@ -14,6 +14,7 @@ use clap::{App, Arg};
 const TV_WIDTH: u32 = 160;
 const TV_HEIGHT: u32 = 144;
 const DEFAULT_SCALE: u32 = 5;
+const DEFAULT_FPS: u32 = 60;
 
 fn get_view(
     window_width: u32,
@@ -46,6 +47,7 @@ fn get_view(
 
 fn main() {
     let default_scale_str = format!("{}", DEFAULT_SCALE);
+    let default_fps_str = format!("{}", DEFAULT_FPS);
 
     let matches = App::new("GB-emu")
         .version("1.0")
@@ -67,12 +69,21 @@ fn main() {
                 .takes_value(true).
                 help("Specify the amount to scale the initial display from the gameboy size of 160x144"),
         )
+        .arg(
+            Arg::with_name("fps")
+                .long("fps")
+                .short("f")
+                .default_value(&default_fps_str)
+                .takes_value(true).
+                help("Specify the starting emulation speed in FPS, 0 for unlimited"),
+        )
         .get_matches();
 
     let is_dmg = matches.is_present("dmg");
     let rom_file = matches.value_of("rom").expect("rom file argument");
     let boot_rom_file = matches.value_of("boot_rom");
     let scale = matches.value_of("scale");
+    let fps = matches.value_of("fps");
 
     let config = GameboyConfig { is_dmg };
 
@@ -94,6 +105,19 @@ fn main() {
         })
         .unwrap_or(DEFAULT_SCALE);
 
+    let mut fps = fps
+        .and_then(|s| {
+            let s = s.parse::<u32>().ok();
+            if s.is_none() {
+                eprintln!(
+                    "[WARN] FPS must be a positive integer, using default value ({})...",
+                    DEFAULT_FPS
+                )
+            }
+            s
+        })
+        .unwrap_or(DEFAULT_FPS);
+
     let mut window = RenderWindow::new(
         (TV_WIDTH * scale, TV_HEIGHT * scale),
         "",
@@ -102,8 +126,6 @@ fn main() {
     );
 
     let mut pixels_buffer = [0xFF; TV_HEIGHT as usize * TV_WIDTH as usize * 4];
-
-    let mut fps = 60;
 
     window.set_framerate_limit(fps);
 
