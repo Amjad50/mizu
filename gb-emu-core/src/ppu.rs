@@ -198,6 +198,8 @@ pub struct Ppu {
     cycle: u16,
     scanline: u8,
 
+    mode_3_end_cycle: u16,
+
     /// track if the next frame is LCD still turning on
     lcd_turned_on: bool,
 
@@ -280,6 +282,7 @@ impl Ppu {
             lcd: Lcd::default(),
             cycle: 4,
             scanline: 0,
+            mode_3_end_cycle: 0,
             lcd_turned_on: false,
             // CGB by default, the bootrom of the CGB will change
             // it if it detected the rom is DMG
@@ -368,13 +371,19 @@ impl Ppu {
     }
 
     pub fn read_oam(&self, addr: u16) -> u8 {
-        let addr = addr & 0xFF;
-        self.oam[addr as usize / 4].get_at_offset(addr as u8 % 4)
+        if !self.is_oam_locked() {
+            let addr = addr & 0xFF;
+            self.oam[addr as usize / 4].get_at_offset(addr as u8 % 4)
+        } else {
+            0xFF
+        }
     }
 
     pub fn write_oam(&mut self, addr: u16, data: u8) {
-        let addr = addr & 0xFF;
-        self.oam[addr as usize / 4].set_at_offset(addr as u8 % 4, data);
+        if !self.is_oam_locked() {
+            let addr = addr & 0xFF;
+            self.oam[addr as usize / 4].set_at_offset(addr as u8 % 4, data);
+        }
     }
 
     pub fn read_lcd_control(&self) -> u8 {
@@ -582,11 +591,13 @@ impl Ppu {
                 // mode 0
                 if !self.lcd_turned_on {
                     // change to mode 2 from mode 1
+                    self.mode_3_end_cycle = 0;
                     self.lcd_status.current_mode_set(2);
                 }
             }
             (1..=143, 0) => {
                 // change to mode 2 from mode 0
+                self.mode_3_end_cycle = 0;
                 self.lcd_status.current_mode_set(2);
             }
             (0..=143, 80) => {
@@ -599,6 +610,7 @@ impl Ppu {
                 // change to mode 1 from mode 0
                 self.lcd_status.current_mode_set(1);
                 self.enter_vblank();
+                self.mode_3_end_cycle = 0;
 
                 interrupt_manager.request_interrupt(InterruptType::Vblank);
             }
@@ -640,6 +652,7 @@ impl Ppu {
                     if self.draw() {
                         // change mode to 0 from 3
                         self.lcd_status.current_mode_set(0);
+                        self.mode_3_end_cycle = self.cycle;
                         self.enter_hblank();
                         break;
                     }
@@ -690,6 +703,16 @@ impl Ppu {
 }
 
 impl Ppu {
+    /// The OAM is locked during mode 2 (OAM Scan), mode 3 (Rendering)
+    /// The lock is extended until 8 dots after the mode 3 is over
+    fn is_oam_locked(&self) -> bool {
+        // OAM is not locked in VBlank
+        self.get_current_mode() != 1
+            // OAM is locked in mode 2 and 3 with an extend of 8 clocks afterwards
+            && ((2..=3).contains(&self.get_current_mode())
+                || (self.mode_3_end_cycle != 0 && self.mode_3_end_cycle + 8 > self.cycle))
+    }
+
     fn read_vram_banked(&self, bank: u8, addr: u16) -> u8 {
         let offset = addr as usize & 0x1FFF;
         let bank_start = bank as usize * 0x2000;
