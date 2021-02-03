@@ -17,9 +17,6 @@ pub trait CpuBusProvider {
 
     fn is_hdma_running(&mut self) -> bool;
 
-    fn is_speed_switch_prepared(&mut self) -> bool;
-    fn commit_speed_switch(&mut self);
-
     fn enter_stop_mode(&mut self);
     fn stopped(&self) -> bool;
 }
@@ -884,12 +881,7 @@ impl Cpu {
             }
             Opcode::Stop => {
                 // TODO: respect wait time for speed switch
-                if bus.is_speed_switch_prepared() {
-                    bus.commit_speed_switch();
-                } else {
-                    println!("CPU stopped");
-                    bus.enter_stop_mode();
-                }
+                bus.enter_stop_mode();
                 0
             }
             Opcode::Illegal => todo!(),

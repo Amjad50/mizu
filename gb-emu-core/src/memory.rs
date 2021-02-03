@@ -561,22 +561,18 @@ impl CpuBusProvider for Bus {
         self.hdma.is_transferreing(&self.ppu)
     }
 
-    fn is_speed_switch_prepared(&mut self) -> bool {
-        self.speed_controller.preparing_switch()
-    }
-
-    fn commit_speed_switch(&mut self) {
-        assert!(!self.config.is_dmg, "Cannot switch speed in DMG");
-        self.speed_controller.commit_speed_switch();
-        self.timer.write_div(0);
-    }
-
     fn enter_stop_mode(&mut self) {
-        self.stopped = true;
-        self.ppu.enter_stop_mode();
-        // TODO: is there any special stuff to do with the apu?
-        //  for CGB, sounds still play?
-        // self.apu.enter_stop_mode(); ?
+        if self.speed_controller.preparing_switch() {
+            assert!(!self.config.is_dmg, "Cannot switch speed in DMG");
+            self.speed_controller.commit_speed_switch();
+            self.timer.write_div(0);
+        } else {
+            self.stopped = true;
+            self.ppu.enter_stop_mode();
+            // TODO: is there any special stuff to do with the apu?
+            //  for CGB, sounds still play?
+            // self.apu.enter_stop_mode(); ?
+        }
     }
 
     fn stopped(&self) -> bool {
