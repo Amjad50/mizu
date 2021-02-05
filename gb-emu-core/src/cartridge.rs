@@ -11,9 +11,8 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, PartialEq)]
 enum TargetDevice {
-    DMGOnly,
-    ColorOnly,
-    ColorAndDMG,
+    DMG,
+    Color,
 }
 
 #[derive(Debug)]
@@ -238,11 +237,9 @@ impl Cartridge {
         .map_err(|_| CartridgeError::InvalidGameTitle)?;
 
         let target_device = if data[0x143] & 0x80 != 0 {
-            TargetDevice::ColorOnly
-        } else if data[0x143] & 0xC0 != 0 {
-            TargetDevice::ColorAndDMG
+            TargetDevice::Color
         } else {
-            TargetDevice::DMGOnly
+            TargetDevice::DMG
         };
 
         println!("target gameboy {:?}", target_device);
@@ -375,7 +372,7 @@ impl Cartridge {
     }
 
     pub fn is_cartridge_color(&self) -> bool {
-        self.target_device == TargetDevice::ColorOnly
+        self.target_device == TargetDevice::Color
     }
 
     pub fn game_title(&self) -> &str {
