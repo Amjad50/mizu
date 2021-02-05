@@ -564,10 +564,6 @@ impl CpuBusProvider for Bus {
         self.interrupts.get_highest_interrupt()
     }
 
-    fn check_interrupts(&self) -> bool {
-        self.interrupts.is_interrupts_available()
-    }
-
     fn is_hdma_running(&mut self) -> bool {
         self.hdma.is_transferreing(&self.ppu)
     }

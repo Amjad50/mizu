@@ -13,7 +13,6 @@ pub trait CpuBusProvider {
 
     fn take_next_interrupt(&mut self) -> Option<InterruptType>;
     fn peek_next_interrupt(&mut self) -> Option<InterruptType>;
-    fn check_interrupts(&self) -> bool;
 
     fn is_hdma_running(&mut self) -> bool;
 
@@ -164,7 +163,7 @@ impl Cpu {
         {
             self.advance_bus(bus);
 
-            if bus.check_interrupts() {
+            if bus.peek_next_interrupt().is_some() {
                 self.halt_mode = HaltMode::NotHalting;
 
                 if !self.config.is_dmg {
@@ -175,7 +174,7 @@ impl Cpu {
             }
         }
 
-        if self.ime && bus.check_interrupts() {
+        if self.ime && bus.peek_next_interrupt().is_some() {
             let mut cpu_state = CpuState::Normal;
 
             let pc = self.reg_pc;
@@ -893,7 +892,7 @@ impl Cpu {
                 if self.ime {
                     self.halt_mode = HaltMode::HaltRunInterrupt;
                 } else {
-                    if !bus.check_interrupts() {
+                    if !bus.peek_next_interrupt().is_some() {
                         self.halt_mode = HaltMode::HaltNoRunInterrupt;
                     } else {
                         self.halt_mode = HaltMode::HaltBug;

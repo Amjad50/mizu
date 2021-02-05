@@ -86,10 +86,6 @@ impl Interrupts {
         0xE0 | self.requested.bits()
     }
 
-    pub fn is_interrupts_available(&self) -> bool {
-        self.requested.bits() & self.enabled.bits() & 0x1F != 0
-    }
-
     pub fn acknowledge_interrupt(&mut self, interrupt: InterruptType) {
         assert!(self.requested.contains(interrupt.into()));
 
@@ -97,19 +93,21 @@ impl Interrupts {
     }
 
     pub fn get_highest_interrupt(&mut self) -> Option<InterruptType> {
-        if self.requested.bits() & 0x1F == 0 {
+        let interrupts_to_take_bits = self.requested.bits() & self.enabled.bits() & 0x1F;
+
+        if interrupts_to_take_bits == 0 {
             None
         } else {
-            let mut bits = self.requested.bits() & self.enabled.bits() & 0x1F;
+            let mut bits = interrupts_to_take_bits;
             let mut counter = 0;
-            while bits != 0 {
+            while bits != 0 && counter < 5 {
                 if bits & 1 == 1 {
                     return Some(InterruptType::try_from(counter).unwrap());
                 }
                 counter += 1;
                 bits >>= 1;
             }
-            None
+            unreachable!();
         }
     }
 }
