@@ -10,6 +10,7 @@ edition = "2018"
 bitflags = "1.2.1"
 fixed-vec-deque = "0.1.9"
 byteorder = "1.3.4"
+thiserror = "1.0.23"
 
 [dev-dependencies]
 crc = "1.8.1"
