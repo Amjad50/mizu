@@ -9,35 +9,51 @@ use std::path::Path;
 
 macro_rules! gb_tests {
     // clock until infinite loop
-    (inf; $($test_name: ident $(for $dmg: ident)?, $file_path: expr, $crc_checksome: expr;)*) => {
-        gb_tests!($($test_name $(for $dmg)?, $file_path, $crc_checksome;)*, clock_until_infinte_loop);
+    (inf; $($test_name: ident $(for $emu: ident)?, $file_path: expr, $dmg_crc: expr, $cgb_crc: expr;)*) => {
+        gb_tests!($($test_name $(for $emu)?, $file_path, $dmg_crc, $cgb_crc;)*, clock_until_infinte_loop);
     };
 
     // clock until breakpoint
-    (brk; $($test_name: ident $(for $dmg: ident)?, $file_path: expr, $crc_checksome: expr;)*) => {
-        gb_tests!($($test_name $(for $dmg)?, $file_path, $crc_checksome;)*, clock_until_breakpoint);
+    (brk; $($test_name: ident $(for $emu: ident)?, $file_path: expr, $dmg_crc: expr, $cgb_crc: expr;)*) => {
+        gb_tests!($($test_name $(for $emu)?, $file_path, $dmg_crc, $cgb_crc;)*, clock_until_breakpoint);
     };
 
-    ($($test_name: ident $(for $dmg: expr)?, $file_path: expr, $crc_checksome: expr;)*, $looping_statement: tt) => {
+    ($($test_name: ident $(for $emu: ident)?, $file_path: expr, $dmg_crc: expr, $cgb_crc: expr;)*, $looping_statement: tt) => {
         $(
             /// Run the test and check the checksum of the screen buffer
             #[test]
+            #[allow(unused_mut)]
             fn $test_name() {
-                let is_dmg = false $(|| stringify!($dmg) == "dmg")?;
-                let mut gb = crate::tests::TestingGameBoy::new(
-                    concat!("../test_roms/", $file_path),
-                    is_dmg
-                ).unwrap();
+                // inner tester to test DMG and CGB separately
+                fn test(file_path: &str, is_dmg: bool, crc_checksum: u64) {
+                    let mut gb = crate::tests::TestingGameBoy::new(file_path, is_dmg).unwrap();
 
-                gb.$looping_statement();
+                    gb.$looping_statement();
 
-                let screen_buffer = gb.raw_screen_buffer();
-                gb.print_screen_buffer();
+                    let screen_buffer = gb.raw_screen_buffer();
+                    gb.print_screen_buffer();
 
-                assert_eq!(
-                    crc::crc64::checksum_ecma(screen_buffer),
-                    $crc_checksome
-                );
+                    assert_eq!(crc::crc64::checksum_ecma(screen_buffer), crc_checksum);
+                }
+
+
+                let file_path = concat!("../test_roms/", $file_path);
+
+                let mut emu = String::new();
+                $(emu += stringify!($emu);)?
+
+                assert!(emu == "" || emu == "dmg" || emu == "cgb",
+                    "emu parameter can only be \"dmg\" or \"cgb\"");
+
+                let is_dmg = true && emu != "cgb";
+                let is_cgb = true && emu != "dmg";
+
+                if is_dmg {
+                    test(file_path, true, $dmg_crc);
+                }
+                if is_cgb {
+                    test(file_path, false, $cgb_crc);
+                }
             }
         )*
     };

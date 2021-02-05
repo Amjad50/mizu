@@ -35,10 +35,10 @@ macro_rules! mooneye_tests {
                 let is_dmg = true && emu != "cgb";
                 let is_cgb = true && emu != "dmg";
 
-                if is_dmg{
+                if is_dmg {
                     crate::tests::mooneye_tests::mooneye_test(file_path, true);
                 }
-                if is_cgb{
+                if is_cgb {
                     crate::tests::mooneye_tests::mooneye_test(file_path, false);
                 }
 

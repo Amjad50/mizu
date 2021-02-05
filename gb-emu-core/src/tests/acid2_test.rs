@@ -3,15 +3,11 @@ gb_tests!(
 
     dmg_acid2_test,
     "dmg-acid2.gb",
+    13523824884037480967,
     13523824884037480967;
 
-    // since we are not running the CGB boot_rom/bios, the colors when using
-    // DMG or CGB emulation is the same
-    dmg_acid2_test_dmg for dmg,
-    "dmg-acid2.gb",
-    13523824884037480967;
-
-    cgb_acid2_test,
+    cgb_acid2_test for cgb,
     "cgb-acid2.gbc",
+    0,
     4378550468433865064;
 );
