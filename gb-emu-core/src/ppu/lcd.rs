@@ -22,6 +22,7 @@ impl Default for Lcd {
 }
 
 impl Lcd {
+    #[allow(clippy::many_single_char_names, clippy::identity_op)]
     pub fn push(&mut self, color: Color, y: u8) {
         let index = (y as usize * LCD_WIDTH + self.x as usize) * 3;
 

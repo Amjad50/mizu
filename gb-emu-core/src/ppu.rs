@@ -845,9 +845,8 @@ impl Ppu {
             assert!(self.cycle > 0);
 
             let cycle = self.cycle - 4;
-            let oam_row = (cycle / 4) as u8;
 
-            oam_row
+            (cycle / 4) as u8
         } else {
             0
         }

@@ -59,10 +59,6 @@ impl AudioPlayer {
     pub fn queue(&mut self, data: &[f32]) {
         self.buffer_producer.push_slice(data);
     }
-
-    pub fn len(&self) -> usize {
-        self.buffer_producer.len()
-    }
 }
 
 impl AudioPlayer {

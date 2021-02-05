@@ -722,7 +722,7 @@ impl Cpu {
                         correction |= 0x6;
                     }
 
-                    if carry || (self.reg_a & 0xff > 0x99) {
+                    if carry || (self.reg_a > 0x99) {
                         correction |= 0x60;
                         self.flag_set(CpuFlags::C, true);
                     }
@@ -892,10 +892,10 @@ impl Cpu {
                 if self.ime {
                     self.halt_mode = HaltMode::HaltRunInterrupt;
                 } else {
-                    if !bus.peek_next_interrupt().is_some() {
-                        self.halt_mode = HaltMode::HaltNoRunInterrupt;
-                    } else {
+                    if bus.peek_next_interrupt().is_some() {
                         self.halt_mode = HaltMode::HaltBug;
+                    } else {
+                        self.halt_mode = HaltMode::HaltNoRunInterrupt;
                     }
                 }
                 0

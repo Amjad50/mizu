@@ -163,12 +163,8 @@ impl RtcRegister {
         cur.write_u16::<LittleEndian>(self.days).unwrap();
         cur.write_u64::<LittleEndian>(self.last_latched_time)
             .unwrap();
-        cur.write_u64::<LittleEndian>(
-            self.current_time_secs
-                .checked_sub(system_time_now())
-                .unwrap_or(0),
-        )
-        .unwrap();
+        cur.write_u64::<LittleEndian>(self.current_time_secs.saturating_sub(system_time_now()))
+            .unwrap();
 
         let result = cur.into_inner();
         assert_eq!(result.len(), self.save_battery_size());
