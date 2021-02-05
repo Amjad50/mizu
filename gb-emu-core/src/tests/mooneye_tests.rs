@@ -1,34 +1,47 @@
+fn mooneye_test(file_path: &str, is_dmg: bool) {
+    let mut gb = crate::tests::TestingGameBoy::new(file_path, is_dmg).unwrap();
+
+    let regs = gb.clock_until_breakpoint();
+
+    gb.print_screen_buffer();
+
+    // These checks are taken from mooneye emulator
+    if regs.a != 0 {
+        panic!("mooneye test failed with A = {}", regs.a);
+    }
+    if regs.b != 3 || regs.c != 5 || regs.d != 8 || regs.e != 13 || regs.h != 21 || regs.l != 34 {
+        panic!("mooneye test failed regs = {:?}", regs);
+    }
+}
+
 macro_rules! mooneye_tests {
-    ($prefix: expr; $($test_name: ident $(- $suffix_name: ident)? $(for $dmg: ident)? $(,)?),*) => {
+    ($prefix: expr; $($test_name: ident $(- $suffix_name: ident)? $(for $emu: ident)? $(,)?),*) => {
         $(
             /// Run the test and check registers values (take from mooneye)
             #[test]
+            #[allow(unused_mut)]
             fn $test_name() {
                 let file_path = concat!(
                     "../test_roms/mooneye-gb_hwtests/",
                     $prefix, "/",
                     stringify!($test_name), $('-', stringify!($suffix_name),)? ".gb");
 
-                let is_dmg = false $(|| stringify!($dmg) == "dmg")?;
-                let mut gb = crate::tests::TestingGameBoy::new(
-                    file_path,
-                    is_dmg
-                ).unwrap();
+                let mut emu = String::new();
+                $(emu += stringify!($emu);)?
 
-                let regs = gb.clock_until_breakpoint();
+                assert!(emu == "" || emu == "dmg" || emu == "cgb",
+                    "emu parameter can only be \"dmg\" or \"cgb\"");
 
-                gb.print_screen_buffer();
+                let is_dmg = true && emu != "cgb";
+                let is_cgb = true && emu != "dmg";
 
-                // These checks are taken from mooneye emulator
-                if regs.a != 0 {
-                    panic!(
-                      "mooneye test failed with A = {}",
-                      regs.a
-                    );
+                if is_dmg{
+                    crate::tests::mooneye_tests::mooneye_test(file_path, true);
                 }
-                if regs.b != 3 || regs.c != 5 || regs.d != 8 || regs.e != 13 || regs.h != 21 || regs.l != 34 {
-                    panic!("mooneye test failed regs = {:?}", regs);
+                if is_cgb{
+                    crate::tests::mooneye_tests::mooneye_test(file_path, false);
                 }
+
             }
         )*
     };
@@ -178,15 +191,15 @@ mod acceptance {
 
     mod misc_cgb {
         mooneye_tests!("misc";
-            boot_div-cgbABCDE,
+            boot_div-cgbABCDE for cgb,
             // FIXME: pass but require bootrom
             //boot_hwio-C,
-            boot_regs-cgb,
+            boot_regs-cgb for cgb,
         );
 
         // FIXME: pass but require bootrom
         mooneye_tests!("misc/bits"; /*unused_hwio-C*/);
 
-        mooneye_tests!("misc/ppu"; vblank_stat_intr-C);
+        mooneye_tests!("misc/ppu"; vblank_stat_intr-C for cgb);
     }
 }

@@ -717,11 +717,20 @@ impl Ppu {
                     new_stat_int_happened || self.lcd_status.mode_1_vblank_interrupt();
             }
             2 if self.cycle == 0 => {
-                new_stat_int_happened =
-                    new_stat_int_happened || self.lcd_status.mode_2_oam_interrupt();
+                // FIXME: check mode 2 interrupt timing for DMG and CGB
+                if !self.config.is_dmg {
+                    new_stat_int_happened =
+                        new_stat_int_happened || self.lcd_status.mode_2_oam_interrupt();
+                }
             }
             2 if self.cycle == 4 => {
                 self.load_selected_sprites_oam();
+
+                // FIXME: check mode 2 interrupt timing for DMG and CGB
+                if self.config.is_dmg {
+                    new_stat_int_happened =
+                        new_stat_int_happened || self.lcd_status.mode_2_oam_interrupt();
+                }
 
                 // execluded from the spcial case where mode2 interrupt happen
                 // at cycle 0, here it happens at cycle 4
