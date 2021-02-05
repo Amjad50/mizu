@@ -181,6 +181,8 @@ impl Cpu {
             let pc = self.reg_pc;
 
             // Push PC part 1
+            // trigger write oam bug because of the increment
+            bus.trigger_write_oam_bug(self.reg_sp);
             self.reg_sp = self.reg_sp.wrapping_sub(1);
             bus.write(self.reg_sp, (pc >> 8) as u8);
 
