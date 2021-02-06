@@ -96,28 +96,27 @@ impl Serial {
         let old_bit = (self.internal_timer >> self.serial_control.clock_bit()) & 1 == 1;
         self.internal_timer = self.internal_timer.wrapping_add(1);
         let new_bit = (self.internal_timer >> self.serial_control.clock_bit()) & 1 == 1;
+        let can_clock = old_bit && !new_bit;
 
-        if old_bit && !new_bit {
-            if self.bits_remaining > 0 {
-                if self.serial_control.is_internal_clock() {
-                    self.transfere_data = self.transfere_data.wrapping_shl(1);
+        if can_clock && self.bits_remaining > 0 {
+            if self.serial_control.is_internal_clock() {
+                self.transfere_data = self.transfere_data.wrapping_shl(1);
 
-                    // data received from the other side, 1 for now meaning its
-                    // disconnected
-                    self.transfere_data |= 1;
+                // data received from the other side, 1 for now meaning its
+                // disconnected
+                self.transfere_data |= 1;
 
-                    self.bits_remaining -= 1;
+                self.bits_remaining -= 1;
 
-                    if self.bits_remaining == 0 {
-                        self.serial_control.end_transfere();
-                        interrupt.request_interrupt(InterruptType::Serial);
-                    }
-                } else {
-                    // transfere should not complete as there is no external clock
-                    // support for now
-                    //
-                    // TODO: implement external transfere using interet or something
+                if self.bits_remaining == 0 {
+                    self.serial_control.end_transfere();
+                    interrupt.request_interrupt(InterruptType::Serial);
                 }
+            } else {
+                // transfere should not complete as there is no external clock
+                // support for now
+                //
+                // TODO: implement external transfere using interet or something
             }
         }
     }
