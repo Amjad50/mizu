@@ -97,10 +97,12 @@ impl Hdma {
     pub fn is_transferreing(&mut self, ppu: &Ppu) -> bool {
         let new_ppu_hblank_mode = ppu.get_current_mode() == 0;
 
-        if self.hblank_dma && !self.hblank_dma_active {
-            if !self.cached_ppu_hblank && new_ppu_hblank_mode {
-                self.hblank_dma_active = true;
-            }
+        // Hblank DMA will be activated for transfer only when:
+        // - bit 8 of register `0xFF55` is 1 (`self.hblank_dma`).
+        // - we entered hblank by `cached_ppu_hblank == false` and `new_ppu_hblank_mode == true`
+        //   meaning that the mode change from mode 3 to mode 1 (hblank)
+        if self.hblank_dma && !self.cached_ppu_hblank && new_ppu_hblank_mode {
+            self.hblank_dma_active = true;
         }
         self.cached_ppu_hblank = new_ppu_hblank_mode;
 
