@@ -889,15 +889,31 @@ impl Cpu {
             Opcode::Res(bit) => src & !((1 << bit) as u16),
             Opcode::Set(bit) => src | ((1 << bit) as u16),
             Opcode::Halt => {
-                if self.ime {
-                    self.halt_mode = HaltMode::HaltRunInterrupt;
+                // When halt instruction is executed several outcomes might occur:
+                // - When IME = 1:
+                //      In this case, the halt instruction works normally. It will
+                //      stop exection and wait until an interrupt occure (`IF & IE & 0x1F != 0`),
+                //      then it will exit halt mode and execute the interrupt normally.
+                // - When IME = 0:
+                //      - If an interrupt is waiting (`IF & IE & 0x1F != 0`), it
+                //        will enter a `Halt bug` state, in this state, the halt
+                //        mode is not entered and the PC register is not incremented
+                //        on the next instruction.
+                //      - If an interrupt is not waiting (`IF & IE & 0x1F == 0`),
+                //        the cpu will enter halt mode normally and wait for an interrupt
+                //        to occur like in *IME = 1* case but if an interrupt is
+                //        requested it will not just to the interrupt vector
+                //        and it will continue executing normally, we can think
+                //        of it as being stuck in a large array of NOP instructions
+                //        until an interrupt is requested.
+                self.halt_mode = if self.ime {
+                    HaltMode::HaltRunInterrupt
+                } else if bus.peek_next_interrupt().is_some() {
+                    HaltMode::HaltBug
                 } else {
-                    if bus.peek_next_interrupt().is_some() {
-                        self.halt_mode = HaltMode::HaltBug;
-                    } else {
-                        self.halt_mode = HaltMode::HaltNoRunInterrupt;
-                    }
-                }
+                    HaltMode::HaltNoRunInterrupt
+                };
+
                 0
             }
             Opcode::Stop => {
