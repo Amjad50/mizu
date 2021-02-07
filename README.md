@@ -1,6 +1,7 @@
 # Mizu
 [![Build status](https://github.com/Amjad50/mizu/workflows/Rust/badge.svg)](https://github.com/Amjad50/mizu/actions?query=workflow%3ARust)
 [![codecov](https://codecov.io/gh/Amjad50/mizu/branch/master/graph/badge.svg)](https://codecov.io/gh/Amjad50/mizu)
+[![crate.io](https://img.shields.io/crates/v/mizu)](https://crates.io/crates/mizu)
 
 Mizu is a Gameboy emulator built in Rust.
 
