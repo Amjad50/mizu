@@ -3,3 +3,10 @@
 
 *.sav
 *.gb.sav
+
+test_roms/
+!test_roms/tests_data.csv
+!test_roms/installer.sh
+
+# A todo list for me to track what tests to work on next
+testing_left.txt
