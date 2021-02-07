@@ -3,16 +3,77 @@
 [![codecov](https://codecov.io/gh/Amjad50/mizu/branch/master/graph/badge.svg)](https://codecov.io/gh/Amjad50/mizu)
 [![crate.io](https://img.shields.io/crates/v/mizu)](https://crates.io/crates/mizu)
 
-Mizu is a Gameboy emulator built in Rust.
+Mizu is an accurate Gameboy emulator built in Rust.
 
-## progress
-- [x] fully functional CPU (passes blargg `cpu_instr` test)
-- [x] functional PPU (not time accurate)
-- [x] functional Mbc1 mapper (still without saving battery cartridge)
-- [x] Timer
-- [ ] Serial (not sure if its important, since we don't have more than one GB, but maybe we can use the internet? An idea...)
-- [x] Audio
-- [x] Automatic testing, and with easy interface
+
+## Features
+- Emulating The original gameboy (DMG) and gameboy color hardware.
+- Passing most hardware tests (see [TESTING.md](./TESTING.md)).
+- Bettery save support.
+- Accurate RTC emulation for MBC3 mapper.
+- Accurate APU emulation with 48KHz audio.
+- SFML gui front-end.
+- Robust testing framework for continous testing.
+- Easily change emulation speed.
+- Functional mappers:
+    - NoMapper
+    - MBC1
+    - MBC2
+    - MBC3
+    - MBC5
+
+# Controls
+The SFML front-end provide these keyboard bindings:
+
+## Gameboy
+
+| Key | Gameboy |
+| --- | ------- |
+| J   | B       |
+| K   | A       |
+| U   | Select  |
+| I   | Start   |
+| W   | Up      |
+| S   | Down    |
+| A   | Left    |
+| D   | Right   |
+
+## Extra
+
+| Key   | Function              |
+| ----- | --------------------- |
+| Enter | A+B+Select+Start\*    |
+| +     | Increase 5 to FPS\*\* |
+| -     | Recude 5 from FPS\*\* |
+
+> \* I made this because in `Zelda: Link's awakening` you need to press
+> all of these buttons on the same frame to bring the save menu, which is annoying.
+
+> \*\* FPS here is not the same with normal games FPS, where low FPS just makes the game
+> laggy, here FPS control the emulation speed. Normally it will run on `60` FPS.
+> If the user set FPS to `30` it will emulate in half the speed, this include audio,
+> and CPU emulation.
+
+# Building and Installation
+For installing or building `mizu` we would use `cargo`.
+
+## Building
+If you want to use the development version of `mizu` you can build the project
+yourself. After downloading/cloning the repository, it can be build with:
+```
+$ cargo build
+```
+With release option:
+```
+$ cargo build --release
+```
+
+## Installing
+If you want to use the latest stable version from `crates.io`:
+```
+$ cargo install mizu
+```
+
 
 # Yet another gameboy emulator?
 Why not?. it is fun and educational, but even though I'm planning to make it as accurate as I can. If you want to see cool emulators, check my previous work [Plastic].
