@@ -1,7 +1,25 @@
+[package]
+name = "mizu"
+version = "0.1.0"
+authors = ["Amjad Alsharafi <amjadsharafi10@gmail.com>"]
+edition = "2018"
+description = "An accurate gameboy(DMG) and gameboy color emulator. Front-end for mizu-core"
+readme = "README.md"
+repository = "https://github.com/Amjad50/mizu"
+license = "MIT"
+keywords = ["gameboy", "emulator"]
+categories = ["emulators"]
+
+[dependencies]
+mizu-core = { version = "^0.1.0", path = "mizu-core" }
+sfml = "^0.15.1"
+ringbuf = "0.2.2"
+cpal = "0.13.1"
+clap = "2.33.3"
+
 [workspace]
 members = [
-    "gb-emu-core",
-    "gb-emu-sfml"
+    "mizu-core"
 ]
 
 [profile.dev]

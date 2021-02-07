@@ -1,8 +1,8 @@
-# GB-emu
-[![Build status](https://github.com/Amjad50/GB-emu/workflows/Rust/badge.svg)](https://github.com/Amjad50/GB-emu/actions?query=workflow%3ARust)
-[![codecov](https://codecov.io/gh/Amjad50/GB-emu/branch/master/graph/badge.svg)](https://codecov.io/gh/Amjad50/GB-emu)
+# Mizu
+[![Build status](https://github.com/Amjad50/mizu/workflows/Rust/badge.svg)](https://github.com/Amjad50/mizu/actions?query=workflow%3ARust)
+[![codecov](https://codecov.io/gh/Amjad50/mizu/branch/master/graph/badge.svg)](https://codecov.io/gh/Amjad50/mizu)
 
-GB-emu (maybe I'll change the name) is a Gameboy emulator built in Rust.
+Mizu is a Gameboy emulator built in Rust.
 
 ## progress
 - [x] fully functional CPU (passes blargg `cpu_instr` test)

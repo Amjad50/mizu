@@ -468,28 +468,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gb-emu-core"
-version = "0.1.0"
-dependencies = [
- "bitflags",
- "byteorder",
- "crc",
- "fixed-vec-deque",
- "thiserror",
-]
-
-[[package]]
-name = "gb-emu-sfml"
-version = "0.1.0"
-dependencies = [
- "clap",
- "cpal",
- "gb-emu-core",
- "ringbuf",
- "sfml",
-]
-
-[[package]]
 name = "gimli"
 version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -677,6 +655,28 @@ checksum = "0f2d26ec3309788e423cfbf68ad1800f061638098d76a83681af979dc4eda19d"
 dependencies = [
  "adler",
  "autocfg",
+]
+
+[[package]]
+name = "mizu"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "cpal",
+ "mizu-core",
+ "ringbuf",
+ "sfml",
+]
+
+[[package]]
+name = "mizu-core"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "byteorder",
+ "crc",
+ "fixed-vec-deque",
+ "thiserror",
 ]
 
 [[package]]

@@ -1,7 +1,7 @@
 mod audio;
 use audio::AudioPlayer;
 
-use gb_emu_core::{GameBoy, GameboyConfig, JoypadButton};
+use mizu_core::{GameBoy, GameboyConfig, JoypadButton};
 
 use sfml::{
     graphics::{Color, FloatRect, Image, RenderTarget, RenderWindow, Sprite, Texture, View},
@@ -49,7 +49,7 @@ fn main() {
     let default_scale_str = format!("{}", DEFAULT_SCALE);
     let default_fps_str = format!("{}", DEFAULT_FPS);
 
-    let matches = App::new("GB-emu")
+    let matches = App::new("mizu")
         .version("1.0")
         .author("Amjad Alsharafi")
         .about("Gameboy DMG and Gameboy Color emulator")
@@ -145,7 +145,7 @@ fn main() {
 
     'main: loop {
         window.set_title(&format!(
-            "GB-emu - {} - FPS: {}",
+            "mizu - {} - FPS: {}",
             gameboy.game_title(),
             (1. / t.elapsed().as_secs_f64()).round()
         ));

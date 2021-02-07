@@ -1,5 +1,5 @@
 # Tests
-A documentation of all hardware tests tested on `GB-emu`.
+A documentation of all hardware tests tested on `mizu`.
 
 - [Tests](#tests)
   - [Acid2 tests](#acid2-tests)
@@ -129,7 +129,7 @@ A documentation of all hardware tests tested on `GB-emu`.
 | reg_read   | :+1:      |
 | sources-GS | :+1:/:x:* |
 
-> \* `sources-GS` passes on both CGB and DMG in `GB-emu` but it should
+> \* `sources-GS` passes on both CGB and DMG in `mizu` but it should
 > pass on DMG and fail on CGB.
 
 #### PPU
