@@ -182,7 +182,8 @@ impl OamDma {
         } else {
             self.current_value = value;
 
-            ppu.write_oam(0xFE00 | (self.address & 0xFF), value);
+            // TODO: check and make sure that DMA can write to OAM even if its blocked
+            ppu.write_oam_no_lock(0xFE00 | (self.address & 0xFF), value);
 
             self.address += 1;
             if self.address & 0xFF == 0xA0 {

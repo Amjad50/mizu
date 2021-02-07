@@ -384,6 +384,12 @@ impl Ppu {
         }
     }
 
+    /// This is used for DMA only, as it can write when OAM is normally blocked
+    pub fn write_oam_no_lock(&mut self, addr: u16, data: u8) {
+        let addr = addr & 0xFF;
+        self.oam[addr as usize / 4].set_at_offset(addr as u8 % 4, data);
+    }
+
     /// In OAM bug on write:
     /// - The first word in the row is replaced with this bitwise expression:
     ///   `((a ^ c) & (b ^ c)) ^ c`, where a is the original value of that word,
@@ -808,11 +814,6 @@ impl Ppu {
     fn read_oam_no_lock(&self, addr: u16) -> u8 {
         let addr = addr & 0xFF;
         self.oam[addr as usize / 4].get_at_offset(addr as u8 % 4)
-    }
-
-    fn write_oam_no_lock(&mut self, addr: u16, data: u8) {
-        let addr = addr & 0xFF;
-        self.oam[addr as usize / 4].set_at_offset(addr as u8 % 4, data);
     }
 
     fn read_oam_word_no_lock(&self, offset: u8) -> u16 {
