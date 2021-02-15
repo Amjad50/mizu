@@ -1,7 +1,9 @@
 mod dma;
 mod interrupts;
 
-use dma::{BusType, Hdma, OamDma};
+use std::cell::RefCell;
+use std::rc::Rc;
+
 pub use interrupts::{InterruptManager, InterruptType};
 
 use crate::apu::Apu;
@@ -12,6 +14,7 @@ use crate::ppu::Ppu;
 use crate::serial::{Serial, SerialDevice};
 use crate::timer::Timer;
 use crate::GameboyConfig;
+use dma::{BusType, Hdma, OamDma};
 use interrupts::Interrupts;
 
 struct BootRom {
@@ -190,7 +193,7 @@ pub struct Bus {
     lock: Lock,
     unknown_registers: [UnknownRegister; 4],
 
-    serial_device: Option<Box<dyn SerialDevice>>,
+    serial_device: Option<Rc<RefCell<dyn SerialDevice>>>,
 
     stopped: bool,
 
@@ -296,8 +299,12 @@ impl Bus {
         self.joypad.release_joypad(button);
     }
 
-    pub fn connect_device(&mut self, device: Box<dyn SerialDevice>) {
+    pub fn connect_device(&mut self, device: Rc<RefCell<dyn SerialDevice>>) {
         self.serial_device = Some(device);
+    }
+
+    pub fn disconnect_device(&mut self) {
+        self.serial_device = None;
     }
 
     pub fn elapsed_ppu_cycles(&mut self) -> u32 {
@@ -372,8 +379,10 @@ impl Bus {
         //  Add support for gameboy as slave (maybe another gameboy as master).
         if let Some(bit) = serial_bit {
             if let Some(serial_device) = self.serial_device.as_mut() {
-                let received_bit = serial_device.exchange_bit_external_clock(bit);
-                self.serial.receive_bit(received_bit);
+                if let Ok(mut serial_device) = serial_device.try_borrow_mut() {
+                    let received_bit = serial_device.exchange_bit_external_clock(bit);
+                    self.serial.receive_bit(received_bit);
+                }
             }
         }
 

@@ -11,17 +11,19 @@ mod timer;
 #[cfg(test)]
 mod tests;
 
+use std::cell::RefCell;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+use std::rc::Rc;
+
+pub use joypad::JoypadButton;
+pub use printer::Printer;
+
 use cartridge::{Cartridge, CartridgeError};
 use cpu::Cpu;
 use memory::Bus;
 use serial::SerialDevice;
-use std::fs::File;
-use std::io::Read;
-
-use std::path::Path;
-
-pub use joypad::JoypadButton;
-pub use printer::Printer;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct GameboyConfig {
@@ -122,9 +124,13 @@ impl GameBoy {
         self.bus.release_joypad(button);
     }
 
-    /// FIXME: maybe we should use RefCell, because now, the frontend cannot
-    ///  access the device as it moves it into this `GameBoy`
-    pub fn connect_device(&mut self, device: Box<dyn SerialDevice>) {
+    // TODO: Not sure if using RefCell is the best option here
+    pub fn connect_device(&mut self, device: Rc<RefCell<dyn SerialDevice>>) {
         self.bus.connect_device(device);
+    }
+
+    /// Disconnects the serial device if any is connected, else, nothing is done
+    pub fn disconnect_device(&mut self) {
+        self.bus.disconnect_device();
     }
 }

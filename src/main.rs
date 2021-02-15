@@ -1,8 +1,11 @@
 mod audio;
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use audio::AudioPlayer;
 
-use mizu_core::{GameBoy, GameboyConfig, JoypadButton};
+use mizu_core::{GameBoy, GameboyConfig, JoypadButton, Printer};
 
 use sfml::{
     graphics::{Color, FloatRect, Image, RenderTarget, RenderWindow, Sprite, Texture, View},
@@ -23,6 +26,7 @@ struct GameboyFront {
     fps: u32,
     audio_player: AudioPlayer,
     pixels_buffer: [u8; TV_HEIGHT as usize * TV_WIDTH as usize * 4],
+    printer: Option<Rc<RefCell<Printer>>>,
 }
 
 impl GameboyFront {
@@ -45,6 +49,7 @@ impl GameboyFront {
             window,
             audio_player,
             pixels_buffer,
+            printer: None,
         };
 
         // to scale the view into the window
@@ -56,15 +61,28 @@ impl GameboyFront {
         s
     }
 
+    fn connect_printer(&mut self) {
+        let printer = Rc::new(RefCell::new(Printer::default()));
+        self.gameboy.connect_device(printer.clone());
+        self.printer = Some(printer);
+    }
+
+    fn disconnect_printer(&mut self) {
+        self.gameboy.disconnect_device();
+        self.printer = None;
+    }
+
     fn run_loop(&mut self) {
         let mut texture = Texture::new(TV_WIDTH, TV_HEIGHT).expect("texture");
         let mut t = std::time::Instant::now();
 
         loop {
             self.window.set_title(&format!(
-                "mizu - {} - FPS: {}",
+                "mizu - {} - FPS: {} - printer {}connected",
                 self.gameboy.game_title(),
-                (1. / t.elapsed().as_secs_f64()).round()
+                (1. / t.elapsed().as_secs_f64()).round(),
+                // the format! has "{}connected", so we just fill `"dis"` if needed
+                if self.printer.is_some() { "" } else { "dis" },
             ));
 
             t = std::time::Instant::now();
@@ -127,6 +145,14 @@ impl GameboyFront {
                     Key::Dash => {
                         self.fps -= 5;
                         self.update_fps();
+                    }
+
+                    Key::P => {
+                        if self.printer.is_some() {
+                            self.disconnect_printer();
+                        } else {
+                            self.connect_printer();
+                        }
                     }
                     _ => {}
                 },
