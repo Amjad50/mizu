@@ -1,7 +1,7 @@
 mod audio;
 use audio::AudioPlayer;
 
-use mizu_core::{GameBoy, GameboyConfig, JoypadButton};
+use mizu_core::{GameBoy, GameboyConfig, JoypadButton, Printer};
 
 use sfml::{
     graphics::{Color, FloatRect, Image, RenderTarget, RenderWindow, Sprite, Texture, View},
@@ -88,6 +88,8 @@ fn main() {
     let config = GameboyConfig { is_dmg };
 
     let mut gameboy = GameBoy::new(rom_file, boot_rom_file, config).unwrap();
+
+    gameboy.connect_device(Box::new(Printer::default()));
 
     let mut audio_player = AudioPlayer::new(44100);
     audio_player.play();

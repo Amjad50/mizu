@@ -4,6 +4,7 @@ mod cpu;
 mod joypad;
 mod memory;
 mod ppu;
+mod printer;
 mod serial;
 mod timer;
 
@@ -13,12 +14,14 @@ mod tests;
 use cartridge::{Cartridge, CartridgeError};
 use cpu::Cpu;
 use memory::Bus;
+use serial::SerialDevice;
 use std::fs::File;
 use std::io::Read;
 
 use std::path::Path;
 
 pub use joypad::JoypadButton;
+pub use printer::Printer;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct GameboyConfig {
@@ -117,5 +120,11 @@ impl GameBoy {
 
     pub fn release_joypad(&mut self, button: JoypadButton) {
         self.bus.release_joypad(button);
+    }
+
+    /// FIXME: maybe we should use RefCell, because now, the frontend cannot
+    ///  access the device as it moves it into this `GameBoy`
+    pub fn connect_device(&mut self, device: Box<dyn SerialDevice>) {
+        self.bus.connect_device(device);
     }
 }

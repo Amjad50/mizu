@@ -2,6 +2,12 @@ use crate::memory::{InterruptManager, InterruptType};
 use crate::GameboyConfig;
 use bitflags::bitflags;
 
+pub trait SerialDevice {
+    /// A device implemnts this, when receiving a call from this function will
+    /// send a bit (return) and get a bit from the sender (`bit` argument)
+    fn exchange_bit_external_clock(&mut self, bit: bool) -> bool;
+}
+
 bitflags! {
     #[derive(Default)]
     struct SerialControl: u8 {
@@ -67,7 +73,7 @@ impl Serial {
     }
 
     pub fn read_data(&self) -> u8 {
-        0
+        self.transfere_data
     }
 
     pub fn write_data(&mut self, data: u8) {
@@ -92,32 +98,46 @@ impl Serial {
         }
     }
 
-    pub fn clock<I: InterruptManager>(&mut self, interrupt: &mut I) {
+    /// Clocks the serial and will return `Some` if a bit should be sent,
+    /// the bus must call `receive_bit` afterwards if there is a device.
+    /// 1 is received automatically if `receive_bit` is not called
+    pub fn clock_for_bit<I: InterruptManager>(&mut self, interrupt: &mut I) -> Option<bool> {
         let old_bit = (self.internal_timer >> self.serial_control.clock_bit()) & 1 == 1;
         self.internal_timer = self.internal_timer.wrapping_add(1);
         let new_bit = (self.internal_timer >> self.serial_control.clock_bit()) & 1 == 1;
         let can_clock = old_bit && !new_bit;
 
-        if can_clock && self.bits_remaining > 0 {
-            if self.serial_control.is_internal_clock() {
-                self.transfere_data = self.transfere_data.wrapping_shl(1);
+        if can_clock && self.bits_remaining > 0 && self.serial_control.is_internal_clock() {
+            let out = self.transfere_data & 0x80 != 0;
+            self.transfere_data = self.transfere_data.wrapping_shl(1);
 
-                // data received from the other side, 1 for now meaning its
-                // disconnected
-                self.transfere_data |= 1;
+            // data received from the other side, 1 for now meaning its
+            // disconnected
+            self.transfere_data |= 1;
 
-                self.bits_remaining -= 1;
+            self.bits_remaining -= 1;
 
-                if self.bits_remaining == 0 {
-                    self.serial_control.end_transfere();
-                    interrupt.request_interrupt(InterruptType::Serial);
-                }
-            } else {
-                // transfere should not complete as there is no external clock
-                // support for now
-                //
-                // TODO: implement external transfere using interet or something
+            if self.bits_remaining == 0 {
+                self.serial_control.end_transfere();
+                interrupt.request_interrupt(InterruptType::Serial);
             }
+
+            Some(out)
+        } else {
+            // transfere should not complete as there is no external clock
+            // support for now
+            //
+            // TODO: implement external transfere using interet or something
+            None
         }
+    }
+
+    pub fn receive_bit(&mut self, bit: bool) {
+        // we cannot receive from this method unless we are the master clock
+        assert!(self.serial_control.is_internal_clock());
+
+        // clear lowest bit
+        self.transfere_data &= !1;
+        self.transfere_data |= bit as u8;
     }
 }

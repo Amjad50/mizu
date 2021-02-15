@@ -9,7 +9,7 @@ use crate::cartridge::Cartridge;
 use crate::cpu::CpuBusProvider;
 use crate::joypad::{Joypad, JoypadButton};
 use crate::ppu::Ppu;
-use crate::serial::Serial;
+use crate::serial::{Serial, SerialDevice};
 use crate::timer::Timer;
 use crate::GameboyConfig;
 use interrupts::Interrupts;
@@ -190,6 +190,8 @@ pub struct Bus {
     lock: Lock,
     unknown_registers: [UnknownRegister; 4],
 
+    serial_device: Option<Box<dyn SerialDevice>>,
+
     stopped: bool,
 
     /// Used to track how many ppu cycles have elapsed
@@ -234,6 +236,7 @@ impl Bus {
                 UnknownRegister::new(0xFF),
                 UnknownRegister::new(0x70),
             ],
+            serial_device: None,
             stopped: false,
 
             elapsed_ppu_cycles: 0,
@@ -291,6 +294,10 @@ impl Bus {
 
     pub fn release_joypad(&mut self, button: JoypadButton) {
         self.joypad.release_joypad(button);
+    }
+
+    pub fn connect_device(&mut self, device: Box<dyn SerialDevice>) {
+        self.serial_device = Some(device);
     }
 
     pub fn elapsed_ppu_cycles(&mut self) -> u32 {
@@ -358,7 +365,17 @@ impl Bus {
         // if CPU is in double speed
         self.timer.clock_divider(&mut self.interrupts);
         self.joypad.update_interrupts(&mut self.interrupts);
-        self.serial.clock(&mut self.interrupts);
+
+        let serial_bit = self.serial.clock_for_bit(&mut self.interrupts);
+
+        // TODO: this design only support gameboy sending data as master clock.
+        //  Add support for gameboy as slave (maybe another gameboy as master).
+        if let Some(bit) = serial_bit {
+            if let Some(serial_device) = self.serial_device.as_mut() {
+                let received_bit = serial_device.exchange_bit_external_clock(bit);
+                self.serial.receive_bit(received_bit);
+            }
+        }
 
         if self.oam_dma.in_transfer() {
             let value = self.read_not_ticked(self.oam_dma.get_next_address(), None);
