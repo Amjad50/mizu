@@ -1,11 +1,12 @@
 mod audio;
+
 use audio::AudioPlayer;
 
-use mizu_core::{GameBoy, GameboyConfig, JoypadButton, Printer};
+use mizu_core::{GameBoy, GameboyConfig, JoypadButton};
 
 use sfml::{
     graphics::{Color, FloatRect, Image, RenderTarget, RenderWindow, Sprite, Texture, View},
-    system::{SfBox, Vector2f},
+    system::Vector2f,
     window::{Event, Key, Style},
 };
 
@@ -16,33 +17,175 @@ const TV_HEIGHT: u32 = 144;
 const DEFAULT_SCALE: u32 = 5;
 const DEFAULT_FPS: u32 = 60;
 
-fn get_view(
-    window_width: u32,
-    window_height: u32,
-    target_width: u32,
-    target_height: u32,
-) -> SfBox<View> {
-    let mut viewport = FloatRect::new(0., 0., 1., 1.);
+struct GameboyFront {
+    gameboy: GameBoy,
+    window: RenderWindow,
+    fps: u32,
+    audio_player: AudioPlayer,
+    pixels_buffer: [u8; TV_HEIGHT as usize * TV_WIDTH as usize * 4],
+}
 
-    let screen_width = window_width as f32 / target_width as f32;
-    let screen_height = window_height as f32 / target_height as f32;
+impl GameboyFront {
+    fn new(gameboy: GameBoy, fps: u32, scale: u32) -> Self {
+        let window = RenderWindow::new(
+            (TV_WIDTH * scale, TV_HEIGHT * scale),
+            "",
+            Style::CLOSE | Style::RESIZE,
+            &Default::default(),
+        );
 
-    if screen_width > screen_height {
-        viewport.width = screen_height / screen_width;
-        viewport.left = (1. - viewport.width) / 2.;
-    } else if screen_height > screen_width {
-        viewport.height = screen_width / screen_height;
-        viewport.top = (1. - viewport.height) / 2.;
+        let audio_player = AudioPlayer::new(44100);
+        audio_player.play();
+
+        let pixels_buffer = [0xFF; TV_HEIGHT as usize * TV_WIDTH as usize * 4];
+
+        let mut s = Self {
+            gameboy,
+            fps,
+            window,
+            audio_player,
+            pixels_buffer,
+        };
+
+        // to scale the view into the window
+        // this view is in the size of the GB TV screen
+        // but we can scale the window and all the pixels will be scaled
+        // accordingly
+        s.update_view(s.window.size().x, s.window.size().y);
+        s.update_fps();
+        s
     }
 
-    let mut view = View::new(
-        Vector2f::new((TV_WIDTH / 2) as f32, (TV_HEIGHT / 2) as f32),
-        Vector2f::new((TV_WIDTH) as f32, (TV_HEIGHT) as f32),
-    );
+    fn run_loop(&mut self) {
+        let mut texture = Texture::new(TV_WIDTH, TV_HEIGHT).expect("texture");
+        let mut t = std::time::Instant::now();
 
-    view.set_viewport(&viewport);
+        loop {
+            self.window.set_title(&format!(
+                "mizu - {} - FPS: {}",
+                self.gameboy.game_title(),
+                (1. / t.elapsed().as_secs_f64()).round()
+            ));
 
-    view
+            t = std::time::Instant::now();
+
+            if self.handle_key_inputs() {
+                // break the loop and exit the application
+                break;
+            }
+
+            self.gameboy.clock_for_frame();
+
+            let buffer = self.gameboy.audio_buffer();
+
+            self.audio_player.queue(&buffer);
+
+            self.window.clear(Color::BLACK);
+
+            convert_to_rgba(&self.gameboy.screen_buffer(), &mut self.pixels_buffer);
+
+            let image =
+                Image::create_from_pixels(TV_WIDTH, TV_HEIGHT, &self.pixels_buffer).expect("image");
+
+            texture.update_from_image(&image, 0, 0);
+
+            self.window.draw(&Sprite::with_texture(&texture));
+
+            self.window.display();
+        }
+    }
+
+    /// returns `true` if the app should close
+    fn handle_key_inputs(&mut self) -> bool {
+        while let Some(event) = self.window.poll_event() {
+            match event {
+                Event::Closed => {
+                    return true;
+                }
+                Event::KeyPressed { code: key, .. } => match key {
+                    Key::J => self.gameboy.press_joypad(JoypadButton::B),
+                    Key::K => self.gameboy.press_joypad(JoypadButton::A),
+                    Key::U => self.gameboy.press_joypad(JoypadButton::Select),
+                    Key::I => self.gameboy.press_joypad(JoypadButton::Start),
+                    Key::W => self.gameboy.press_joypad(JoypadButton::Up),
+                    Key::S => self.gameboy.press_joypad(JoypadButton::Down),
+                    Key::A => self.gameboy.press_joypad(JoypadButton::Left),
+                    Key::D => self.gameboy.press_joypad(JoypadButton::Right),
+
+                    Key::Return => {
+                        self.gameboy.press_joypad(JoypadButton::A);
+                        self.gameboy.press_joypad(JoypadButton::B);
+                        self.gameboy.press_joypad(JoypadButton::Start);
+                        self.gameboy.press_joypad(JoypadButton::Select);
+                    }
+
+                    // change FPS
+                    Key::Equal => {
+                        self.fps += 5;
+                        self.update_fps();
+                    }
+                    Key::Dash => {
+                        self.fps -= 5;
+                        self.update_fps();
+                    }
+                    _ => {}
+                },
+                Event::KeyReleased { code: key, .. } => match key {
+                    Key::J => self.gameboy.release_joypad(JoypadButton::B),
+                    Key::K => self.gameboy.release_joypad(JoypadButton::A),
+                    Key::U => self.gameboy.release_joypad(JoypadButton::Select),
+                    Key::I => self.gameboy.release_joypad(JoypadButton::Start),
+                    Key::W => self.gameboy.release_joypad(JoypadButton::Up),
+                    Key::S => self.gameboy.release_joypad(JoypadButton::Down),
+                    Key::A => self.gameboy.release_joypad(JoypadButton::Left),
+                    Key::D => self.gameboy.release_joypad(JoypadButton::Right),
+
+                    Key::Return => {
+                        self.gameboy.release_joypad(JoypadButton::A);
+                        self.gameboy.release_joypad(JoypadButton::B);
+                        self.gameboy.release_joypad(JoypadButton::Start);
+                        self.gameboy.release_joypad(JoypadButton::Select);
+                    }
+                    _ => {}
+                },
+                Event::Resized { width, height } => self.update_view(width, height),
+                _ => {}
+            }
+        }
+
+        false
+    }
+
+    fn update_view(&mut self, window_width: u32, window_height: u32) {
+        let target_width = TV_WIDTH as u32;
+        let target_height = TV_HEIGHT as u32;
+
+        let mut viewport = FloatRect::new(0., 0., 1., 1.);
+
+        let screen_width = window_width as f32 / target_width as f32;
+        let screen_height = window_height as f32 / target_height as f32;
+
+        if screen_width > screen_height {
+            viewport.width = screen_height / screen_width;
+            viewport.left = (1. - viewport.width) / 2.;
+        } else if screen_height > screen_width {
+            viewport.height = screen_width / screen_height;
+            viewport.top = (1. - viewport.height) / 2.;
+        }
+
+        let mut view = View::new(
+            Vector2f::new((TV_WIDTH / 2) as f32, (TV_HEIGHT / 2) as f32),
+            Vector2f::new((TV_WIDTH) as f32, (TV_HEIGHT) as f32),
+        );
+
+        view.set_viewport(&viewport);
+
+        self.window.set_view(&view);
+    }
+
+    fn update_fps(&mut self) {
+        self.window.set_framerate_limit(self.fps);
+    }
 }
 
 fn main() {
@@ -85,15 +228,6 @@ fn main() {
     let scale = matches.value_of("scale");
     let fps = matches.value_of("fps");
 
-    let config = GameboyConfig { is_dmg };
-
-    let mut gameboy = GameBoy::new(rom_file, boot_rom_file, config).unwrap();
-
-    gameboy.connect_device(Box::new(Printer::default()));
-
-    let mut audio_player = AudioPlayer::new(44100);
-    audio_player.play();
-
     let scale = scale
         .and_then(|s| {
             let s = s.parse::<u32>().ok();
@@ -107,7 +241,7 @@ fn main() {
         })
         .unwrap_or(DEFAULT_SCALE);
 
-    let mut fps = fps
+    let fps = fps
         .and_then(|s| {
             let s = s.parse::<u32>().ok();
             if s.is_none() {
@@ -120,114 +254,13 @@ fn main() {
         })
         .unwrap_or(DEFAULT_FPS);
 
-    let mut window = RenderWindow::new(
-        (TV_WIDTH * scale, TV_HEIGHT * scale),
-        "",
-        Style::CLOSE | Style::RESIZE,
-        &Default::default(),
-    );
+    let config = GameboyConfig { is_dmg };
 
-    let mut pixels_buffer = [0xFF; TV_HEIGHT as usize * TV_WIDTH as usize * 4];
+    let gameboy = GameBoy::new(rom_file, boot_rom_file, config).unwrap();
 
-    window.set_framerate_limit(fps);
+    let mut gameboy_front = GameboyFront::new(gameboy, fps, scale);
 
-    // to scale the view into the window
-    // this view is in the size of the GB TV screen
-    // but we can scale the window and all the pixels will be scaled
-    // accordingly
-    window.set_view(&get_view(
-        window.size().x,
-        window.size().y,
-        TV_WIDTH as u32,
-        TV_HEIGHT as u32,
-    ));
-
-    let mut texture = Texture::new(TV_WIDTH, TV_HEIGHT).expect("texture");
-    let mut t = std::time::Instant::now();
-
-    'main: loop {
-        window.set_title(&format!(
-            "mizu - {} - FPS: {}",
-            gameboy.game_title(),
-            (1. / t.elapsed().as_secs_f64()).round()
-        ));
-
-        t = std::time::Instant::now();
-
-        while let Some(event) = window.poll_event() {
-            match event {
-                Event::Closed => break 'main,
-                Event::KeyPressed { code: key, .. } => match key {
-                    Key::J => gameboy.press_joypad(JoypadButton::B),
-                    Key::K => gameboy.press_joypad(JoypadButton::A),
-                    Key::U => gameboy.press_joypad(JoypadButton::Select),
-                    Key::I => gameboy.press_joypad(JoypadButton::Start),
-                    Key::W => gameboy.press_joypad(JoypadButton::Up),
-                    Key::S => gameboy.press_joypad(JoypadButton::Down),
-                    Key::A => gameboy.press_joypad(JoypadButton::Left),
-                    Key::D => gameboy.press_joypad(JoypadButton::Right),
-
-                    Key::Return => {
-                        gameboy.press_joypad(JoypadButton::A);
-                        gameboy.press_joypad(JoypadButton::B);
-                        gameboy.press_joypad(JoypadButton::Start);
-                        gameboy.press_joypad(JoypadButton::Select);
-                    }
-
-                    // change FPS
-                    Key::Equal => {
-                        fps += 5;
-                        window.set_framerate_limit(fps);
-                    }
-                    Key::Dash => {
-                        fps -= 5;
-                        window.set_framerate_limit(fps);
-                    }
-                    _ => {}
-                },
-                Event::KeyReleased { code: key, .. } => match key {
-                    Key::J => gameboy.release_joypad(JoypadButton::B),
-                    Key::K => gameboy.release_joypad(JoypadButton::A),
-                    Key::U => gameboy.release_joypad(JoypadButton::Select),
-                    Key::I => gameboy.release_joypad(JoypadButton::Start),
-                    Key::W => gameboy.release_joypad(JoypadButton::Up),
-                    Key::S => gameboy.release_joypad(JoypadButton::Down),
-                    Key::A => gameboy.release_joypad(JoypadButton::Left),
-                    Key::D => gameboy.release_joypad(JoypadButton::Right),
-
-                    Key::Return => {
-                        gameboy.release_joypad(JoypadButton::A);
-                        gameboy.release_joypad(JoypadButton::B);
-                        gameboy.release_joypad(JoypadButton::Start);
-                        gameboy.release_joypad(JoypadButton::Select);
-                    }
-                    _ => {}
-                },
-                Event::Resized { width, height } => {
-                    window.set_view(&get_view(width, height, TV_WIDTH as u32, TV_HEIGHT as u32));
-                }
-                _ => {}
-            }
-        }
-
-        gameboy.clock_for_frame();
-
-        let buffer = gameboy.audio_buffer();
-
-        audio_player.queue(&buffer);
-
-        window.clear(Color::BLACK);
-
-        convert_to_rgba(&gameboy.screen_buffer(), &mut pixels_buffer);
-
-        let image = Image::create_from_pixels(TV_WIDTH, TV_HEIGHT, &pixels_buffer).expect("image");
-
-        texture.update_from_image(&image, 0, 0);
-
-        window.draw(&Sprite::with_texture(&texture));
-
-        window.display();
-    }
+    gameboy_front.run_loop();
 }
 
 fn convert_to_rgba(data: &[u8], output: &mut [u8]) {
