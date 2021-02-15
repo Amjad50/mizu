@@ -306,11 +306,12 @@ impl Cartridge {
         mapper.init((rom_size / 0x4000) as u16, ram_size);
 
         if cartridge_type.battery {
-            if let Ok((saved_ram, extra)) =
-                Self::load_sram_file(file_path.as_ref(), ram_size, mapper.save_battery_size())
-            {
-                ram = saved_ram;
-                mapper.load_battery(&extra);
+            match Self::load_sram_file(file_path.as_ref(), ram_size, mapper.save_battery_size()) {
+                Ok((saved_ram, extra)) => {
+                    ram = saved_ram;
+                    mapper.load_battery(&extra);
+                }
+                Err(err) => eprintln!("ERROR: {}", err),
             }
         }
 
@@ -401,8 +402,13 @@ impl Cartridge {
         file.read_exact(&mut result)
             .map_err(|_| SramError::SramFileSizeDoesNotMatch)?;
 
-        file.read_exact(&mut extra)
-            .map_err(|_| SramError::SramFileSizeDoesNotMatch)?;
+        // fail silently, since imported sav files does not support same format
+        // as we does.
+        //
+        // TODO: Maybe we should follow format most emulators follow?
+        if file.read_exact(&mut extra).is_err() {
+            eprintln!("[ERROR] could not read extra information from the save file, this data can be for RTC.");
+        }
 
         Ok((result, extra))
     }
