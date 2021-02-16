@@ -72,6 +72,11 @@ pub struct Printer {
     ready_to_print_next: bool,
     printing_delay: u8,
     received_bit_counter: u8,
+
+    /// dynamically sized image buffer that will increase on each row print,
+    /// trying to simulate the paper that the gameboy printer used.
+    image_buffer: Vec<u8>,
+    image_size: (u32, u32),
 }
 
 impl Default for Printer {
@@ -88,7 +93,24 @@ impl Default for Printer {
             ready_to_print_next: false,
             printing_delay: 0,
             received_bit_counter: 0,
+            image_buffer: Vec::new(),
+            image_size: (0, 0),
         }
+    }
+}
+
+impl Printer {
+    pub fn get_image_buffer(&self) -> &[u8] {
+        &self.image_buffer
+    }
+
+    pub fn get_image_size(&self) -> (u32, u32) {
+        self.image_size
+    }
+
+    pub fn clear_image_buffer(&mut self) {
+        self.image_buffer.clear();
+        self.image_size = (0, 0);
     }
 }
 
@@ -190,7 +212,10 @@ impl Printer {
                         self.status |= PrinterStatus::PRINTING;
                         self.status.remove(PrinterStatus::READY_TO_PRINT);
                         self.printing_delay = 20;
-                        self.print(&self.current_packet.data, self.ram_next_write_pointer);
+                        self.print(
+                            &self.current_packet.data.to_owned(),
+                            self.ram_next_write_pointer,
+                        );
                     }
                     self.ready_to_print_next = false;
                 }
@@ -232,9 +257,7 @@ impl Printer {
 
     /// The data in ram are stored as normal tiles, every 16 bytes form one tile
     /// (8x8). Every 16 * 20 bytes form one tile row (160x8).
-    fn print(&self, params: &[u8], max_data_len: usize) {
-        const BRIGHTNESS: [char; 4] = [' ', '.', '-', '#'];
-
+    fn print(&mut self, params: &[u8], max_data_len: usize) {
         assert_eq!(params.len(), 4);
 
         // FIXME: use these parameters
@@ -244,6 +267,17 @@ impl Printer {
         let _exposure = params[3];
 
         let rows_to_print = max_data_len / 40;
+
+        let (_, old_height) = self.image_size;
+        let new_width = 160;
+        let new_height = old_height + rows_to_print as u32;
+
+        self.image_size = (new_width, new_height);
+
+        // reserve space for the rows
+        let old_size = self.image_buffer.len();
+        let extra_space = rows_to_print * 160 * 3;
+        self.image_buffer.reserve(extra_space);
 
         for y in 0..rows_to_print {
             for x in 0..20 {
@@ -266,13 +300,20 @@ impl Printer {
                 for pixel in &result {
                     let color = (palette >> (pixel * 2)) & 0b11;
 
-                    // TODO: render to a screen or an image buffer to be used
-                    //  by the front-end
-                    print!("{}", BRIGHTNESS[color as usize]);
+                    // TODO: use `exposure` parameter to increase or decrease
+                    // the brightness of printing
+                    let gray_shade = 85 * (3 - color);
+
+                    // RGB
+                    for _ in 0..3 {
+                        self.image_buffer.push(gray_shade);
+                    }
                 }
             }
-            println!();
         }
+
+        // we should nto exceed the space we have
+        assert_eq!(old_size + extra_space, self.image_buffer.len());
     }
 }
 
