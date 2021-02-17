@@ -1,8 +1,10 @@
 use std::cell::RefCell;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use mizu_core::Printer;
 
+use native_dialog::FileDialog;
 use sfml::{
     graphics::{Color, Image, RenderTarget, RenderWindow, Sprite, Texture},
     window::{Event, Key, Style},
@@ -117,6 +119,15 @@ impl MizuPrinter {
                         self.clear_pixels_buffer();
                         self.window_scroll = 0;
                     }
+                    Key::S => {
+                        let file_dialog = FileDialog::new()
+                            .set_filename("print.png")
+                            .add_filter("PNG Image", &["png"]);
+
+                        if let Ok(Some(filename)) = file_dialog.show_save_single_file() {
+                            self.save_buffer_image_to_file(filename);
+                        }
+                    }
                     _ => {}
                 },
                 Event::MouseWheelScrolled { delta, .. } => {
@@ -144,5 +155,24 @@ impl MizuPrinter {
 
         // it will be zero if `TV_HEIGHT` is larger than `h`
         h.saturating_sub(TV_HEIGHT)
+    }
+
+    fn save_buffer_image_to_file(&self, file_path: PathBuf) {
+        let printer = self.printer.borrow();
+        let printer_image_buffer = printer.get_image_buffer();
+        let (width, height) = printer.get_image_size();
+
+        if width * height != 0 {
+            let mut result_image_buffer = vec![0xFF; width as usize * height as usize * 4];
+
+            convert_to_rgba(printer_image_buffer, &mut result_image_buffer);
+
+            let image =
+                Image::create_from_pixels(width, height, &result_image_buffer).expect("image");
+
+            image.save_to_file(file_path.to_str().expect("PathBuf to_str"));
+        } else {
+            println!("[ERROR] cannot save an empty image");
+        }
     }
 }
