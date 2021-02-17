@@ -4,7 +4,7 @@ use std::rc::Rc;
 use mizu_core::Printer;
 
 use sfml::{
-    graphics::{Color, Image, RenderTarget, RenderWindow, Sprite, Texture, Transformable},
+    graphics::{Color, Image, RenderTarget, RenderWindow, Sprite, Texture},
     window::{Event, Key, Style},
 };
 
@@ -14,6 +14,7 @@ pub struct MizuPrinter {
     printer: Rc<RefCell<Printer>>,
     window: RenderWindow,
     window_scroll: u32,
+    pixels_buffer: [u8; TV_WIDTH as usize * TV_HEIGHT as usize * 4],
 }
 
 impl Default for MizuPrinter {
@@ -36,6 +37,7 @@ impl Default for MizuPrinter {
             printer,
             window,
             window_scroll: 0,
+            pixels_buffer: [0xFF; TV_HEIGHT as usize * TV_WIDTH as usize * 4],
         }
     }
 }
@@ -57,28 +59,30 @@ impl MizuPrinter {
         }
 
         let printer = self.printer.borrow();
-
         let printer_image_buffer = printer.get_image_buffer();
-        let (width, height) = printer.get_image_size();
 
-        if width * height != 0 {
-            let mut texture = Texture::new(width, height).expect("texture");
-            let mut window_image_buffer = vec![0; width as usize * height as usize * 4];
+        let mut texture = Texture::new(TV_WIDTH, TV_HEIGHT).expect("texture");
 
-            // printer will output RGB but SFML need RGBA
-            convert_to_rgba(printer_image_buffer, &mut window_image_buffer);
+        // the number of pixels to skip on scroll, each row is 160 pixels, each
+        // pixel is 3 bytes
+        let scroll_skip_pixels = self.window_scroll as usize * 160 * 3;
+        let printer_image_buffer_view = &printer_image_buffer[scroll_skip_pixels..];
 
-            let image =
-                Image::create_from_pixels(width, height, &window_image_buffer).expect("image");
+        // printer will output RGB but SFML need RGBA, this will map the
+        // `printer_image_buffer_view` to `pixels_buffer` if the printer buffer
+        // is smaller than pixels buffer or if its empty, it will only consume
+        // the amount needed (because we use `zip` inside `convert_to_rgba`)
+        // and zip will group two values until one of the two lists finish
+        convert_to_rgba(printer_image_buffer_view, &mut self.pixels_buffer);
 
-            texture.update_from_image(&image, 0, 0);
-            let mut sprite = Sprite::with_texture(&texture);
-            sprite.set_position((0., -(self.window_scroll as f32)));
+        let image =
+            Image::create_from_pixels(TV_WIDTH, TV_HEIGHT, &self.pixels_buffer).expect("image");
 
-            self.window.draw(&sprite);
-        } else {
-            self.window.clear(Color::BLACK);
-        }
+        texture.update_from_image(&image, 0, 0);
+        let sprite = Sprite::with_texture(&texture);
+
+        self.window.clear(Color::BLACK);
+        self.window.draw(&sprite);
 
         self.window.display();
 
@@ -87,6 +91,13 @@ impl MizuPrinter {
 }
 
 impl MizuPrinter {
+    /// fills the buffer with white color
+    fn clear_pixels_buffer(&mut self) {
+        for i in self.pixels_buffer.iter_mut() {
+            *i = 0xFF;
+        }
+    }
+
     /// return `ture` if the printer should be disconnected (closed)
     fn handle_printer_key_inputs(&mut self) -> bool {
         let max_scroll = self.get_max_printer_window_scroll() as i32;
@@ -103,6 +114,7 @@ impl MizuPrinter {
                     Key::C => {
                         // clear image buffer
                         self.printer.borrow_mut().clear_image_buffer();
+                        self.clear_pixels_buffer();
                         self.window_scroll = 0;
                     }
                     _ => {}
