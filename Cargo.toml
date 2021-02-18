@@ -1,6 +1,6 @@
 [package]
 name = "mizu"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Amjad Alsharafi <amjadsharafi10@gmail.com>"]
 edition = "2018"
 description = "An accurate gameboy(DMG) and gameboy color emulator. Front-end for mizu-core"
@@ -11,7 +11,7 @@ keywords = ["gameboy", "emulator"]
 categories = ["emulators"]
 
 [dependencies]
-mizu-core = { version = "^0.1.1", path = "mizu-core" }
+mizu-core = { version = "^0.1.2", path = "mizu-core" }
 sfml = "^0.15.1"
 ringbuf = "0.2.2"
 cpal = "0.13.1"

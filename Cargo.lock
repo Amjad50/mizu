@@ -838,7 +838,7 @@ dependencies = [
 
 [[package]]
 name = "mizu"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "clap",
  "cpal",
@@ -850,7 +850,7 @@ dependencies = [
 
 [[package]]
 name = "mizu-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bitflags",
  "byteorder",
