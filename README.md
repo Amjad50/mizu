@@ -21,6 +21,7 @@ Mizu is an accurate Gameboy emulator built in Rust.
     - MBC2
     - MBC3
     - MBC5
+- Printer emulation
 
 # Controls
 The SFML front-end provide these keyboard bindings:
@@ -45,6 +46,7 @@ The SFML front-end provide these keyboard bindings:
 | Enter | A+B+Select+Start\*    |
 | +     | Increase 5 to FPS\*\* |
 | -     | Recude 5 from FPS\*\* |
+| P     | Open Printer          |
 
 > \* I made this because in `Zelda: Link's awakening` you need to press
 > all of these buttons on the same frame to bring the save menu, which is annoying.
@@ -53,6 +55,25 @@ The SFML front-end provide these keyboard bindings:
 > laggy, here FPS control the emulation speed. Normally it will run on `60` FPS.
 > If the user set FPS to `30` it will emulate in half the speed, this include audio,
 > and CPU emulation.
+
+## Printer window keys
+
+| Key   | Function                   |
+| ----- | -------------------------- |
+| C     | Clear current image buffer |
+| S     | Save image buffer to file  |
+
+# Printer
+Gameboy Printer is a serial device that can be connected to the gameboy and
+used by some cartridges to print images. Popular cartidges that uses it are:
+- Gameboy Camera.
+- Zelda: Link's Awakening DX (to print images from the album).
+- Pokemon (several versions) (to print pokemon info from the Pokedex).
+
+The printer can be opened by pressing the `P` key.
+
+The printer emulation allows to save the printed images into disk. The window
+will only show `160x144` pixels, but the image is scrollable.
 
 # Building and Installation
 For installing or building `mizu` we would use `cargo`.
