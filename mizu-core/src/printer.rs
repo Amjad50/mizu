@@ -271,7 +271,7 @@ impl Printer {
         number_of_sheets: u8,
         margins: u8,
         palette: u8,
-        _exposure: u8,
+        exposure: u8,
         max_data_len: usize,
     ) {
         // line feed only
@@ -284,6 +284,8 @@ impl Printer {
         let margin_before = margins >> 4;
         // low nibble
         let margin_after = margins & 0xF;
+
+        let exposure_multiply = compute_exposure_multiply(exposure);
 
         // TODO: check if margin count is in pixel units or not, because its
         //  a bit small, maximum of 15 pixels.
@@ -325,9 +327,19 @@ impl Printer {
                 for pixel in &result {
                     let color = (palette >> (pixel * 2)) & 0b11;
 
-                    // TODO: use `exposure` parameter to increase or decrease
-                    // the brightness of printing
-                    let gray_shade = 85 * (3 - color);
+                    // we use inverted gray shade, because white should not be
+                    // changed due to exposure, only black does
+                    let inverted_gray_shade = 85 * color;
+                    // apply exposure, the multiply value ranges are (0.75 ~ 1.25)
+                    let exposured_invertd_gray_shade =
+                        inverted_gray_shade as f64 * exposure_multiply;
+                    // lastly, just make sure the values do not exceed 255 and
+                    // not negative
+                    let exposured_invertd_gray_shade =
+                        exposured_invertd_gray_shade.min(255.).max(0.);
+
+                    // flip to convert to normal gray shade (255 white, 0 black)
+                    let gray_shade = 255 - (exposured_invertd_gray_shade as u8);
 
                     // RGB
                     for _ in 0..3 {
@@ -350,7 +362,7 @@ impl Printer {
                 number_of_sheets - 1,
                 margins,
                 palette,
-                _exposure,
+                exposure,
                 max_data_len,
             );
         }
@@ -369,6 +381,48 @@ impl Printer {
             self.image_buffer.push(255);
         }
     }
+}
+
+// util function to map between two number ranges
+fn map_num(inp: i32, inp_start: i32, inp_end: i32, out_start: i32, out_end: i32) -> i32 {
+    ((inp - inp_start) as f64 / (inp_end - inp_start) as f64 * (out_end - out_start) as f64
+        + out_start as f64) as i32
+}
+
+/// maps the 7 bits from exposure to (75% ~ 125%) which is equivalent to
+/// an increase by the range (-25% ~ 25%)
+fn compute_exposure_multiply(exposure: u8) -> f64 {
+    (100 + map_num((exposure & 0x7F) as i32, 0, 0x7F, -25, 25)) as f64 / 100.
+}
+
+#[test]
+fn map_num_test() {
+    let a = map_num(5, 0, 100, 1, 11);
+    assert_eq!(a, 1);
+}
+
+#[test]
+fn compute_exposure_multiply_test() {
+    let mut min = 200f64;
+    let mut max = -200f64;
+
+    for exposure in 0..=0x7F {
+        let a = compute_exposure_multiply(exposure);
+
+        // a should always increase, the first time we are just setting the numbers
+        // so we cannot compare in the first time
+        if exposure != 0 {
+            assert!(a >= min);
+            assert!(a >= max);
+        }
+
+        min = min.min(a);
+        max = max.max(a);
+    }
+
+    // these are the possible ranges of exposure
+    assert_eq!(min, 0.75);
+    assert_eq!(max, 1.25);
 }
 
 impl SerialDevice for Printer {
