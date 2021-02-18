@@ -68,7 +68,7 @@ pub struct Printer {
     received_byte: u8,
     status: PrinterStatus,
     /// In order to print, after sending data packets, the GB must send an empty
-    /// data packet, otherwize the print command will be ignored
+    /// data packet, otherwise the print command will be ignored
     ready_to_print_next: bool,
     printing_delay: u8,
     received_bit_counter: u8,
@@ -212,8 +212,17 @@ impl Printer {
                         self.status |= PrinterStatus::PRINTING;
                         self.status.remove(PrinterStatus::READY_TO_PRINT);
                         self.printing_delay = 20;
+
+                        let number_of_sheets = self.current_packet.data[0];
+                        let margins = self.current_packet.data[1];
+                        let palette = self.current_packet.data[2];
+                        let exposure = self.current_packet.data[3];
+
                         self.print(
-                            &self.current_packet.data.to_owned(),
+                            number_of_sheets,
+                            margins,
+                            palette,
+                            exposure,
                             self.ram_next_write_pointer,
                         );
                     }
@@ -257,14 +266,30 @@ impl Printer {
 
     /// The data in ram are stored as normal tiles, every 16 bytes form one tile
     /// (8x8). Every 16 * 20 bytes form one tile row (160x8).
-    fn print(&mut self, params: &[u8], max_data_len: usize) {
-        assert_eq!(params.len(), 4);
+    fn print(
+        &mut self,
+        number_of_sheets: u8,
+        margins: u8,
+        palette: u8,
+        _exposure: u8,
+        max_data_len: usize,
+    ) {
+        // line feed only
+        if number_of_sheets == 0 {
+            self.print_line_feed();
+            return;
+        }
 
-        // FIXME: use these parameters
-        let _number_of_sheets = params[0];
-        let _margin = params[1];
-        let palette = params[2];
-        let _exposure = params[3];
+        // high nibble
+        let margin_before = margins >> 4;
+        // low nibble
+        let margin_after = margins & 0xF;
+
+        // TODO: check if margin count is in pixel units or not, because its
+        //  a bit small, maximum of 15 pixels.
+        for _ in 0..margin_before {
+            self.print_line_feed();
+        }
 
         let rows_to_print = max_data_len / 40;
 
@@ -312,8 +337,37 @@ impl Printer {
             }
         }
 
-        // we should nto exceed the space we have
+        // we should not exceed the space we have
         assert_eq!(old_size + extra_space, self.image_buffer.len());
+
+        for _ in 0..margin_after {
+            self.print_line_feed();
+        }
+
+        if number_of_sheets > 1 {
+            // recursively print the next sheet if there is more than one
+            self.print(
+                number_of_sheets - 1,
+                margins,
+                palette,
+                _exposure,
+                max_data_len,
+            );
+        }
+    }
+
+    /// prints one row of pixels
+    fn print_line_feed(&mut self) {
+        let (_, old_height) = self.image_size;
+        // add one line
+        self.image_size = (160, old_height + 1);
+
+        // add one row of white
+        self.image_buffer.reserve(160 * 3);
+
+        for _ in 0..(160 * 3) {
+            self.image_buffer.push(255);
+        }
     }
 }
 
@@ -322,7 +376,6 @@ impl SerialDevice for Printer {
         self.received_bit_counter += 1;
 
         if self.received_bit_counter == 9 {
-            //println!("got byte {:02X}", self.received_byte);
             self.handle_next_byte(self.received_byte);
             self.received_byte = 0;
             self.received_bit_counter = 1;
