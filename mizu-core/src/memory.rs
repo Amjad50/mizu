@@ -1,7 +1,10 @@
 mod dma;
 mod interrupts;
 
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
+use std::io::{Read, Write};
 use std::rc::Rc;
 
 pub use interrupts::{InterruptManager, InterruptType};
@@ -11,12 +14,14 @@ use crate::cartridge::Cartridge;
 use crate::cpu::CpuBusProvider;
 use crate::joypad::{Joypad, JoypadButton};
 use crate::ppu::Ppu;
+use crate::save_state::{Savable, SaveError};
 use crate::serial::{Serial, SerialDevice};
 use crate::timer::Timer;
 use crate::GameboyConfig;
 use dma::{BusType, Hdma, OamDma};
 use interrupts::Interrupts;
 
+#[derive(Serialize, Deserialize)]
 struct BootRom {
     enabled: bool,
     data: Vec<u8>,
@@ -31,7 +36,10 @@ impl Default for BootRom {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+// since cgb boot_rom is 0x900 in size, so a bit of an increase here
+impl_savable!(BootRom, 0x1000);
+
+#[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 enum Speed {
     Normal,
     Double,
@@ -43,7 +51,7 @@ impl Default for Speed {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 struct SpeedController {
     preparing_switch: bool,
     current_speed: Speed,
@@ -75,6 +83,8 @@ impl SpeedController {
         self.preparing_switch = false;
     }
 }
+
+impl_savable!(SpeedController, 32);
 
 struct Wram {
     data: [u8; 0x8000],
@@ -120,6 +130,32 @@ impl Wram {
     }
 }
 
+impl Savable for Wram {
+    fn save<W: Write>(&self, writer: &mut W) -> Result<(), SaveError> {
+        writer.write_u8(self.bank)?;
+        writer.write_all(&self.data)?;
+
+        Ok(())
+    }
+
+    fn load<R: Read>(&mut self, reader: &mut R) -> Result<(), SaveError> {
+        self.bank = reader.read_u8()?;
+        reader.read_exact(&mut self.data)?;
+
+        Ok(())
+    }
+
+    fn object_size() -> u64 {
+        0x8100
+    }
+
+    fn current_save_size(&self) -> Result<u64, SaveError> {
+        // + 1 for the bank u8
+        Ok(self.data.len() as u64 + 1)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
 struct Lock {
     during_boot: bool,
     is_dmg_mode: bool,
@@ -157,6 +193,9 @@ impl Lock {
     }
 }
 
+impl_savable!(Lock, 32);
+
+#[derive(Serialize, Deserialize)]
 struct UnknownRegister {
     data: u8,
     mask: u8,
@@ -176,6 +215,41 @@ impl UnknownRegister {
     }
 }
 
+// made this into a structure just to be easier to implement `Savable`
+#[derive(Serialize, Deserialize)]
+struct UnknownRegisters {
+    registers: [UnknownRegister; 4],
+}
+
+impl UnknownRegisters {
+    pub fn new(masks: [u8; 4]) -> Self {
+        Self {
+            registers: [
+                UnknownRegister::new(masks[0]),
+                UnknownRegister::new(masks[1]),
+                UnknownRegister::new(masks[2]),
+                UnknownRegister::new(masks[3]),
+            ],
+        }
+    }
+}
+
+impl std::ops::Index<usize> for UnknownRegisters {
+    type Output = UnknownRegister;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.registers[index]
+    }
+}
+
+impl std::ops::IndexMut<usize> for UnknownRegisters {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.registers[index]
+    }
+}
+
+impl_savable!(UnknownRegisters, 32);
+
 pub struct Bus {
     cartridge: Cartridge,
     ppu: Ppu,
@@ -191,7 +265,7 @@ pub struct Bus {
     boot_rom: BootRom,
     speed_controller: SpeedController,
     lock: Lock,
-    unknown_registers: [UnknownRegister; 4],
+    unknown_registers: UnknownRegisters,
 
     serial_device: Option<Rc<RefCell<dyn SerialDevice>>>,
 
@@ -233,12 +307,7 @@ impl Bus {
             boot_rom: BootRom::default(),
             speed_controller: SpeedController::default(),
             lock,
-            unknown_registers: [
-                UnknownRegister::new(0xFF),
-                UnknownRegister::new(0xFF),
-                UnknownRegister::new(0xFF),
-                UnknownRegister::new(0x70),
-            ],
+            unknown_registers: UnknownRegisters::new([0xFF, 0xFF, 0xFF, 0x70]),
             serial_device: None,
             stopped: false,
 
@@ -628,5 +697,47 @@ impl CpuBusProvider for Bus {
         let result = self.read_not_ticked(addr, self.oam_dma.conflicting_bus());
         self.on_cpu_machine_cycle();
         result
+    }
+}
+
+/// This is an implementation of Savable of the attributes that cannot implement
+/// Savable, like `bool`, `u32`, and `hram` array
+///
+/// So it is not for the whole Bus structure
+impl Savable for Bus {
+    fn save<W: Write>(&self, writer: &mut W) -> Result<(), SaveError> {
+        writer.write_u8(self.stopped as u8)?;
+        writer.write_u32::<LittleEndian>(self.elapsed_ppu_cycles)?;
+        writer.write_all(&self.hram)?;
+        bincode::serialize_into(writer, &self.config)?;
+
+        Ok(())
+    }
+
+    fn load<R: Read>(&mut self, reader: &mut R) -> Result<(), SaveError> {
+        let stopped_u8 = reader.read_u8()?;
+        if stopped_u8 > 1 {
+            // TODO: maybe should not panic?
+            panic!("invalid boolean value");
+        }
+        self.stopped = stopped_u8 == 1;
+
+        self.elapsed_ppu_cycles = reader.read_u32::<LittleEndian>()?;
+        reader.read_exact(&mut self.hram)?;
+        self.config = bincode::deserialize_from(reader)?;
+
+        Ok(())
+    }
+
+    fn object_size() -> u64 {
+        256
+    }
+
+    fn current_save_size(&self) -> Result<u64, SaveError> {
+        let mut tmp_save = Vec::with_capacity(Self::object_size() as usize);
+
+        self.save(&mut tmp_save)?;
+
+        Ok(tmp_save.len() as u64)
     }
 }

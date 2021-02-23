@@ -1,9 +1,10 @@
 use crate::memory::{InterruptManager, InterruptType};
 use crate::GameboyConfig;
 use bitflags::bitflags;
+use serde::{Deserialize, Serialize};
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Default, Serialize, Deserialize)]
     struct TimerControl: u8 {
         const TIMER_ENABLE = 1 <<  2;
         const FREQ_DIVIDER = 0b11;
@@ -27,6 +28,7 @@ impl TimerControl {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Timer {
     divider: u16,
     timer_counter: u8,
@@ -158,3 +160,5 @@ impl Timer {
         (self.divider >> bit) & 1 == 1
     }
 }
+
+impl_savable!(Timer, 32);

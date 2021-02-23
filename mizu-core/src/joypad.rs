@@ -1,5 +1,6 @@
 use crate::memory::{InterruptManager, InterruptType};
 use bitflags::bitflags;
+use serde::{Deserialize, Serialize};
 use std::convert::From;
 
 pub enum JoypadButton {
@@ -42,7 +43,9 @@ impl From<JoypadButton> for JoypadButtons {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Joypad {
+    #[serde(skip)]
     buttons: JoypadButtons,
     selecting_directions: bool,
     selecting_start: bool,
@@ -109,3 +112,5 @@ impl Joypad {
         self.buttons.remove(button.into())
     }
 }
+
+impl_savable!(Joypad, 32);

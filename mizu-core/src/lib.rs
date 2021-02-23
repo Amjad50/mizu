@@ -1,3 +1,6 @@
+#[macro_use]
+mod save_state;
+
 mod apu;
 mod cartridge;
 mod cpu;
@@ -17,6 +20,8 @@ use std::io::Read;
 use std::path::Path;
 use std::rc::Rc;
 
+use serde::{Deserialize, Serialize};
+
 pub use joypad::JoypadButton;
 pub use printer::Printer;
 
@@ -25,7 +30,7 @@ use cpu::Cpu;
 use memory::Bus;
 use serial::SerialDevice;
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub struct GameboyConfig {
     /// Should the gameboy run in DMG mode? default is in CGB mode
     pub is_dmg: bool,

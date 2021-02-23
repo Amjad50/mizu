@@ -1,6 +1,7 @@
 use crate::ppu::Ppu;
+use serde::{Deserialize, Serialize};
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Hdma {
     source_addr: u16,
     dest_addr: u16,
@@ -110,7 +111,7 @@ impl Hdma {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum BusType {
     // VRAM
     Video,
@@ -118,7 +119,7 @@ pub enum BusType {
     External,
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct OamDma {
     conflicting_bus: Option<BusType>,
     current_value: u8,
@@ -193,3 +194,6 @@ impl OamDma {
         }
     }
 }
+
+impl_savable!(OamDma, 32);
+impl_savable!(Hdma, 32);
