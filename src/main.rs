@@ -8,8 +8,9 @@ use mizu_core::{GameBoy, GameboyConfig, JoypadButton};
 
 use sfml::{
     graphics::{Color, FloatRect, Image, RenderTarget, RenderWindow, Sprite, Texture, View},
-    system::{SfBox, Vector2f},
+    system::Vector2f,
     window::{Event, Key, Style},
+    SfBox,
 };
 
 use clap::{App, Arg};
@@ -135,7 +136,7 @@ impl GameboyFront {
                     Key::A => self.gameboy.press_joypad(JoypadButton::Left),
                     Key::D => self.gameboy.press_joypad(JoypadButton::Right),
 
-                    Key::Return => {
+                    Key::ENTER => {
                         self.gameboy.press_joypad(JoypadButton::A);
                         self.gameboy.press_joypad(JoypadButton::B);
                         self.gameboy.press_joypad(JoypadButton::Start);
@@ -143,11 +144,11 @@ impl GameboyFront {
                     }
 
                     // change FPS
-                    Key::Equal => {
+                    Key::EQUAL => {
                         self.fps += 5;
                         self.update_fps();
                     }
-                    Key::Dash => {
+                    Key::HYPHEN => {
                         self.fps -= 5;
                         self.update_fps();
                     }
@@ -171,7 +172,7 @@ impl GameboyFront {
                     Key::A => self.gameboy.release_joypad(JoypadButton::Left),
                     Key::D => self.gameboy.release_joypad(JoypadButton::Right),
 
-                    Key::Return => {
+                    Key::ENTER => {
                         self.gameboy.release_joypad(JoypadButton::A);
                         self.gameboy.release_joypad(JoypadButton::B);
                         self.gameboy.release_joypad(JoypadButton::Start);

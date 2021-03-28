@@ -12,7 +12,7 @@ categories = ["emulators"]
 
 [dependencies]
 mizu-core = { version = "^0.1.2", path = "mizu-core" }
-sfml = "^0.15.1"
+sfml = "^0.16.0"
 ringbuf = "0.2.2"
 cpal = "0.13.1"
 clap = "2.33.3"
