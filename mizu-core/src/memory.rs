@@ -707,6 +707,8 @@ impl CpuBusProvider for Bus {
 impl Savable for Bus {
     fn save<W: Write>(&self, writer: &mut W) -> Result<(), SaveError> {
         writer.write_u8(self.stopped as u8)?;
+        // TODO: do we need this? since the sync with APU would be broken
+        //  on save/load, then maybe we should start from 0?
         writer.write_u32::<LittleEndian>(self.elapsed_ppu_cycles)?;
         writer.write_all(&self.hram)?;
         bincode::serialize_into(writer, &self.config)?;

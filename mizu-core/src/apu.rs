@@ -4,6 +4,8 @@ mod noise_channel;
 mod pulse_channel;
 mod wave_channel;
 
+use serde::{Deserialize, Serialize};
+
 use crate::GameboyConfig;
 use bitflags::bitflags;
 use channel::{ApuChannel, Dac, LengthCountedChannel};
@@ -12,6 +14,7 @@ use pulse_channel::PulseChannel;
 use wave_channel::WaveChannel;
 
 bitflags! {
+    #[derive(Serialize, Deserialize)]
     struct ChannelsControl: u8 {
         const VIN_LEFT  = 1 << 7;
         const VOL_LEFT  = 7 << 4;
@@ -31,7 +34,8 @@ impl ChannelsControl {
 }
 
 bitflags! {
-    struct ChannelsSelection :u8 {
+    #[derive(Serialize, Deserialize)]
+    struct ChannelsSelection: u8 {
         const NOISE_LEFT   = 1 << 7;
         const WAVE_LEFT    = 1 << 6;
         const PULSE2_LEFT  = 1 << 5;
@@ -43,6 +47,7 @@ bitflags! {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Apu {
     pulse1: Dac<LengthCountedChannel<PulseChannel>>,
     pulse2: Dac<LengthCountedChannel<PulseChannel>>,
@@ -55,6 +60,7 @@ pub struct Apu {
     power: bool,
 
     sample_counter: f64,
+    #[serde(skip)]
     buffer: Vec<f32>,
 
     /// Stores the value of the 4th bit (5th in double speed mode) of the divider
@@ -537,3 +543,5 @@ impl Apu {
         }
     }
 }
+
+impl_savable!(Apu, 0x200);
