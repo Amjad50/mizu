@@ -1,6 +1,7 @@
 use super::{Mapper, MappingResult};
+use serde::{Deserialize, Serialize};
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Mbc5 {
     rom_banks: u16,
     is_2k_ram: bool,
@@ -24,6 +25,7 @@ impl Mbc5 {
     }
 }
 
+#[typetag::serde]
 impl Mapper for Mbc5 {
     fn init(&mut self, rom_banks: u16, ram_size: usize) {
         assert!(rom_banks <= 512);

@@ -1,5 +1,7 @@
 use super::{Mapper, MappingResult};
+use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize)]
 pub struct NoMapper {
     ram_size: usize,
 }
@@ -10,6 +12,7 @@ impl Default for NoMapper {
     }
 }
 
+#[typetag::serde]
 impl Mapper for NoMapper {
     fn init(&mut self, rom_banks: u16, ram_size: usize) {
         // only support 32KB

@@ -1,5 +1,7 @@
 use super::{Mapper, MappingResult};
+use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize)]
 pub struct Mbc1 {
     is_2k_ram: bool,
     ram_banks: u8,
@@ -42,6 +44,7 @@ impl Mbc1 {
     }
 }
 
+#[typetag::serde]
 impl Mapper for Mbc1 {
     fn init(&mut self, rom_banks: u16, ram_size: usize) {
         self.rom_banks = rom_banks;

@@ -31,6 +31,7 @@ pub enum MappingResult {
     NotMapped,
 }
 
+#[typetag::serde]
 pub trait Mapper {
     fn init(&mut self, rom_banks: u16, ram_size: usize);
 

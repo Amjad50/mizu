@@ -1,5 +1,6 @@
 use super::{Mapper, MappingResult, ONE_SECOND_MAPPER_CLOCKS};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -10,6 +11,7 @@ fn system_time_now() -> u64 {
         .as_secs()
 }
 
+#[derive(Serialize, Deserialize)]
 struct RtcRegister {
     /// A full second is ONE_SECOND_MAPPER_CLOCKS, which is synced to the bus
     sub_second: u32,
@@ -196,7 +198,7 @@ impl RtcRegister {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Mbc3 {
     rom_banks: u16,
     is_2k_ram: bool,
@@ -253,6 +255,7 @@ impl Mbc3 {
     }
 }
 
+#[typetag::serde]
 impl Mapper for Mbc3 {
     fn init(&mut self, rom_banks: u16, ram_size: usize) {
         assert!(rom_banks <= 256);

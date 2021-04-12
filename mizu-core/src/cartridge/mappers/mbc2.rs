@@ -1,5 +1,51 @@
 use super::{Mapper, MappingResult};
+use serde::{Deserialize, Serialize};
 
+type Mbc2Ram = [u8; 512];
+
+mod mbc2_ram_serde {
+    use super::Mbc2Ram;
+    use serde::{
+        de::{Error, Visitor},
+        Deserializer, Serializer,
+    };
+    use std::convert::TryInto;
+
+    pub fn deserialize<'de, D>(d: D) -> Result<Mbc2Ram, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct BytesVisitor;
+
+        impl<'a> Visitor<'a> for BytesVisitor {
+            type Value = Mbc2Ram;
+
+            fn expecting(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(fmt, "512 `u8` array")
+            }
+
+            fn visit_bytes<E>(self, visitor: &[u8]) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                visitor
+                    .try_into()
+                    .or(Err(Error::invalid_length(visitor.len(), &self)))
+            }
+        }
+
+        d.deserialize_bytes(BytesVisitor)
+    }
+
+    pub fn serialize<S>(t: &[u8], s: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        s.serialize_bytes(t)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct Mbc2 {
     rom_banks: u8,
 
@@ -7,7 +53,8 @@ pub struct Mbc2 {
     rom_bank_4000: u8,
 
     /// internal 512x4bit ram
-    ram: [u8; 512],
+    #[serde(with = "mbc2_ram_serde")]
+    ram: Mbc2Ram,
 
     ram_enable: bool,
 }
@@ -23,6 +70,7 @@ impl Default for Mbc2 {
     }
 }
 
+#[typetag::serde]
 impl Mapper for Mbc2 {
     fn init(&mut self, rom_banks: u16, _ram_size: usize) {
         assert!(rom_banks <= 16);

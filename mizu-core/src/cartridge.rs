@@ -1,13 +1,23 @@
 mod error;
 mod mappers;
 
-pub use error::CartridgeError;
+use sha2::{Digest, Sha256};
 
-use error::SramError;
-use mappers::{Mapper, MapperType, MappingResult};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+
+pub use error::CartridgeError;
+
+use crate::save_state::{Savable, SaveError};
+use error::SramError;
+use mappers::{Mapper, MapperType, MappingResult};
+
+const NINTENDO_LOGO_DATA: &[u8; 48] = &[
+    0xce, 0xed, 0x66, 0x66, 0xcc, 0x0d, 0x00, 0x0b, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0c, 0x00, 0x0d,
+    0x00, 0x08, 0x11, 0x1f, 0x88, 0x89, 0x00, 0x0e, 0xdc, 0xcc, 0x6e, 0xe6, 0xdd, 0xdd, 0xd9, 0x99,
+    0xbb, 0xbb, 0x67, 0x63, 0x6e, 0x0e, 0xec, 0xcc, 0xdd, 0xdc, 0x99, 0x9f, 0xbb, 0xb9, 0x33, 0x3e,
+];
 
 #[derive(Debug, PartialEq)]
 enum TargetDevice {
@@ -188,6 +198,7 @@ pub struct Cartridge {
     cartridge_type: CartridgeType,
     target_device: TargetDevice,
     mapper: Box<dyn Mapper>,
+    hash: [u8; 32],
     rom: Vec<u8>,
     ram: Vec<u8>,
 }
@@ -207,6 +218,8 @@ impl Cartridge {
 
         let mut data = Vec::new();
         file.read_to_end(&mut data)?;
+
+        let hash: [u8; 32] = Sha256::digest(&data).into();
 
         if data.len() < 0x8000 || data.len() % 0x4000 != 0 {
             eprintln!(
@@ -321,6 +334,7 @@ impl Cartridge {
             cartridge_type,
             target_device,
             mapper,
+            hash,
             rom: data,
             ram,
         })
@@ -451,8 +465,35 @@ impl Drop for Cartridge {
     }
 }
 
-const NINTENDO_LOGO_DATA: &[u8; 48] = &[
-    0xce, 0xed, 0x66, 0x66, 0xcc, 0x0d, 0x00, 0x0b, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0c, 0x00, 0x0d,
-    0x00, 0x08, 0x11, 0x1f, 0x88, 0x89, 0x00, 0x0e, 0xdc, 0xcc, 0x6e, 0xe6, 0xdd, 0xdd, 0xd9, 0x99,
-    0xbb, 0xbb, 0x67, 0x63, 0x6e, 0x0e, 0xec, 0xcc, 0xdd, 0xdc, 0x99, 0x9f, 0xbb, 0xb9, 0x33, 0x3e,
-];
+impl Savable for Cartridge {
+    fn save<W: Write>(&self, mut writer: &mut W) -> Result<(), SaveError> {
+        bincode::serialize_into(&mut writer, &self.hash)?;
+        bincode::serialize_into(&mut writer, &self.mapper)?;
+        bincode::serialize_into(&mut writer, &self.ram)?;
+
+        Ok(())
+    }
+
+    fn load<R: Read>(&mut self, mut reader: &mut R) -> Result<(), SaveError> {
+        let hash: [u8; 32] = bincode::deserialize_from(&mut reader)?;
+        // extra check
+        assert_eq!(hash, self.hash);
+
+        self.mapper = bincode::deserialize_from(&mut reader)?;
+        self.ram = bincode::deserialize_from(&mut reader)?;
+
+        Ok(())
+    }
+
+    fn object_size() -> u64 {
+        0x10000 + 1000
+    }
+
+    fn current_save_size(&self) -> Result<u64, SaveError> {
+        let mut tmp_save = Vec::with_capacity(Self::object_size() as usize);
+
+        self.save(&mut tmp_save)?;
+
+        Ok(tmp_save.len() as u64)
+    }
+}
