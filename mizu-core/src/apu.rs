@@ -4,10 +4,11 @@ mod noise_channel;
 mod pulse_channel;
 mod wave_channel;
 
+use bitflags::bitflags;
+use save_state::impl_savable;
 use serde::{Deserialize, Serialize};
 
 use crate::GameboyConfig;
-use bitflags::bitflags;
 use channel::{ApuChannel, Dac, LengthCountedChannel};
 use noise_channel::NoiseChannel;
 use pulse_channel::PulseChannel;

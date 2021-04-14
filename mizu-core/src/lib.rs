@@ -1,5 +1,5 @@
 #[macro_use]
-mod save_state;
+extern crate save_state;
 
 mod apu;
 mod cartridge;

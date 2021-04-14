@@ -20,7 +20,9 @@ native-dialog = "0.5.4"
 
 [workspace]
 members = [
-    "mizu-core"
+    "mizu-core",
+    "save_state",
+    "save_state_derive"
 ]
 
 [profile.dev]

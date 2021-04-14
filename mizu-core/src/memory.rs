@@ -2,7 +2,9 @@ mod dma;
 mod interrupts;
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use save_state::{impl_savable, Savable, SaveError};
 use serde::{Deserialize, Serialize};
+
 use std::cell::RefCell;
 use std::io::{Read, Write};
 use std::rc::Rc;
@@ -14,7 +16,6 @@ use crate::cartridge::Cartridge;
 use crate::cpu::CpuBusProvider;
 use crate::joypad::{Joypad, JoypadButton};
 use crate::ppu::Ppu;
-use crate::save_state::{Savable, SaveError};
 use crate::serial::{Serial, SerialDevice};
 use crate::timer::Timer;
 use crate::GameboyConfig;

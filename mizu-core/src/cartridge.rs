@@ -9,9 +9,9 @@ use std::path::{Path, PathBuf};
 
 pub use error::CartridgeError;
 
-use crate::save_state::{Savable, SaveError};
 use error::SramError;
 use mappers::{Mapper, MapperType, MappingResult};
+use save_state::{Savable, SaveError};
 
 const NINTENDO_LOGO_DATA: &[u8; 48] = &[
     0xce, 0xed, 0x66, 0x66, 0xcc, 0x0d, 0x00, 0x0b, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0c, 0x00, 0x0d,

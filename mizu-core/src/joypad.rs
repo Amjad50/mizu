@@ -1,7 +1,10 @@
-use crate::memory::{InterruptManager, InterruptType};
 use bitflags::bitflags;
+use save_state::impl_savable;
 use serde::{Deserialize, Serialize};
+
 use std::convert::From;
+
+use crate::memory::{InterruptManager, InterruptType};
 
 pub enum JoypadButton {
     Start,

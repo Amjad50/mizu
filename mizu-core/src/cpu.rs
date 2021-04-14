@@ -2,6 +2,7 @@ pub mod instruction;
 mod instructions_table;
 
 use bitflags::bitflags;
+use save_state::impl_savable;
 use serde::{Deserialize, Serialize};
 
 use crate::memory::InterruptType;

@@ -2,13 +2,14 @@ use bincode::Error as bincodeError;
 use std::convert::From;
 use std::io::{Cursor, Error as ioError, Read, Write};
 
+#[macro_export]
 macro_rules! impl_savable {
     ($struct_name: ident, $object_size: expr) => {
-        impl crate::save_state::Savable for $struct_name {
+        impl ::save_state::Savable for $struct_name {
             fn save<W: ::std::io::Write>(
                 &self,
                 writer: &mut W,
-            ) -> Result<(), crate::save_state::SaveError> {
+            ) -> Result<(), ::save_state::SaveError> {
                 ::bincode::serialize_into(writer, self)?;
                 Ok(())
             }
@@ -16,7 +17,7 @@ macro_rules! impl_savable {
             fn load<R: ::std::io::Read>(
                 &mut self,
                 reader: &mut R,
-            ) -> Result<(), crate::save_state::SaveError> {
+            ) -> Result<(), ::save_state::SaveError> {
                 let obj = ::bincode::deserialize_from(reader)?;
 
                 let _ = ::std::mem::replace(self, obj);
@@ -27,7 +28,7 @@ macro_rules! impl_savable {
                 $object_size
             }
 
-            fn current_save_size(&self) -> Result<u64, crate::save_state::SaveError> {
+            fn current_save_size(&self) -> Result<u64, ::save_state::SaveError> {
                 ::bincode::serialized_size(self).map_err(|e| e.into())
             }
         }

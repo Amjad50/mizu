@@ -1,6 +1,7 @@
 use crate::memory::{InterruptManager, InterruptType};
 use crate::GameboyConfig;
 use bitflags::bitflags;
+use save_state::impl_savable;
 use serde::{Deserialize, Serialize};
 
 pub trait SerialDevice {
