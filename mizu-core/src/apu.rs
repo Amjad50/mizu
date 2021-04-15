@@ -545,4 +545,4 @@ impl Apu {
     }
 }
 
-impl_savable!(Apu, 0x200);
+impl_savable!(Apu);

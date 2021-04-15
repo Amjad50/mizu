@@ -116,4 +116,4 @@ impl Joypad {
     }
 }
 
-impl_savable!(Joypad, 32);
+impl_savable!(Joypad);

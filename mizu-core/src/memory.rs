@@ -38,7 +38,7 @@ impl Default for BootRom {
 }
 
 // since cgb boot_rom is 0x900 in size, so a bit of an increase here
-impl_savable!(BootRom, 0x1000);
+impl_savable!(BootRom);
 
 #[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 enum Speed {
@@ -85,7 +85,7 @@ impl SpeedController {
     }
 }
 
-impl_savable!(SpeedController, 32);
+impl_savable!(SpeedController);
 
 struct Wram {
     data: [u8; 0x8000],
@@ -146,10 +146,6 @@ impl Savable for Wram {
         Ok(())
     }
 
-    fn object_size() -> u64 {
-        0x8100
-    }
-
     fn current_save_size(&self) -> Result<u64, SaveError> {
         // + 1 for the bank u8
         Ok(self.data.len() as u64 + 1)
@@ -194,7 +190,7 @@ impl Lock {
     }
 }
 
-impl_savable!(Lock, 32);
+impl_savable!(Lock);
 
 #[derive(Serialize, Deserialize)]
 struct UnknownRegister {
@@ -249,7 +245,7 @@ impl std::ops::IndexMut<usize> for UnknownRegisters {
     }
 }
 
-impl_savable!(UnknownRegisters, 32);
+impl_savable!(UnknownRegisters);
 
 pub struct Bus {
     cartridge: Cartridge,
@@ -732,12 +728,8 @@ impl Savable for Bus {
         Ok(())
     }
 
-    fn object_size() -> u64 {
-        256
-    }
-
     fn current_save_size(&self) -> Result<u64, SaveError> {
-        let mut tmp_save = Vec::with_capacity(Self::object_size() as usize);
+        let mut tmp_save = Vec::new();
 
         self.save(&mut tmp_save)?;
 

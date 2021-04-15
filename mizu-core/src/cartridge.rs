@@ -485,12 +485,8 @@ impl Savable for Cartridge {
         Ok(())
     }
 
-    fn object_size() -> u64 {
-        0x10000 + 1000
-    }
-
     fn current_save_size(&self) -> Result<u64, SaveError> {
-        let mut tmp_save = Vec::with_capacity(Self::object_size() as usize);
+        let mut tmp_save = Vec::new();
 
         self.save(&mut tmp_save)?;
 

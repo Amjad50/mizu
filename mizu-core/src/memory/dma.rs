@@ -195,5 +195,5 @@ impl OamDma {
     }
 }
 
-impl_savable!(OamDma, 32);
-impl_savable!(Hdma, 32);
+impl_savable!(OamDma);
+impl_savable!(Hdma);

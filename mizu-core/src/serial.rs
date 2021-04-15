@@ -145,4 +145,4 @@ impl Serial {
     }
 }
 
-impl_savable!(Serial, 64);
+impl_savable!(Serial);

@@ -162,4 +162,4 @@ impl Timer {
     }
 }
 
-impl_savable!(Timer, 32);
+impl_savable!(Timer);

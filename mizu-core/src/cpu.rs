@@ -941,4 +941,4 @@ impl Cpu {
     }
 }
 
-impl_savable!(Cpu, 64);
+impl_savable!(Cpu);

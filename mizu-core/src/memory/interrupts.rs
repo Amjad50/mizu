@@ -123,4 +123,4 @@ impl InterruptManager for Interrupts {
     }
 }
 
-impl_savable!(Interrupts, 32);
+impl_savable!(Interrupts);
