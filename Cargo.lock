@@ -1430,6 +1430,7 @@ dependencies = [
  "bincode",
  "byteorder",
  "paste",
+ "save_state_derive",
  "serde",
  "thiserror",
 ]

@@ -1,3 +1,6 @@
+pub use bincode;
+pub use save_state_derive::*;
+
 use bincode::Error as bincodeError;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use paste::paste;
