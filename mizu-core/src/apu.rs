@@ -5,8 +5,7 @@ mod pulse_channel;
 mod wave_channel;
 
 use bitflags::bitflags;
-use save_state::impl_savable;
-use serde::{Deserialize, Serialize};
+use save_state::Savable;
 
 use crate::GameboyConfig;
 use channel::{ApuChannel, Dac, LengthCountedChannel};
@@ -15,7 +14,7 @@ use pulse_channel::PulseChannel;
 use wave_channel::WaveChannel;
 
 bitflags! {
-    #[derive(Serialize, Deserialize)]
+    #[derive(Savable)]
     struct ChannelsControl: u8 {
         const VIN_LEFT  = 1 << 7;
         const VOL_LEFT  = 7 << 4;
@@ -35,7 +34,7 @@ impl ChannelsControl {
 }
 
 bitflags! {
-    #[derive(Serialize, Deserialize)]
+    #[derive(Savable)]
     struct ChannelsSelection: u8 {
         const NOISE_LEFT   = 1 << 7;
         const WAVE_LEFT    = 1 << 6;
@@ -48,11 +47,16 @@ bitflags! {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Savable)]
 pub struct Apu {
+    // TODO: implement savable for generics
+    #[savable(serde)]
     pulse1: Dac<LengthCountedChannel<PulseChannel>>,
+    #[savable(serde)]
     pulse2: Dac<LengthCountedChannel<PulseChannel>>,
+    #[savable(serde)]
     wave: Dac<LengthCountedChannel<WaveChannel>>,
+    #[savable(serde)]
     noise: Dac<LengthCountedChannel<NoiseChannel>>,
 
     channels_control: ChannelsControl,
@@ -61,7 +65,7 @@ pub struct Apu {
     power: bool,
 
     sample_counter: f64,
-    #[serde(skip)]
+    #[savable(skip)]
     buffer: Vec<f32>,
 
     /// Stores the value of the 4th bit (5th in double speed mode) of the divider
@@ -544,5 +548,3 @@ impl Apu {
         }
     }
 }
-
-impl_savable!(Apu);

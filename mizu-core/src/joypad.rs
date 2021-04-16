@@ -1,6 +1,5 @@
 use bitflags::bitflags;
-use save_state::impl_savable;
-use serde::{Deserialize, Serialize};
+use save_state::Savable;
 
 use std::convert::From;
 
@@ -46,9 +45,9 @@ impl From<JoypadButton> for JoypadButtons {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Savable)]
 pub struct Joypad {
-    #[serde(skip)]
+    #[savable(skip)]
     buttons: JoypadButtons,
     selecting_directions: bool,
     selecting_start: bool,
@@ -115,5 +114,3 @@ impl Joypad {
         self.buttons.remove(button.into())
     }
 }
-
-impl_savable!(Joypad);

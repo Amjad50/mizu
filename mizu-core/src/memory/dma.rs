@@ -1,7 +1,8 @@
 use crate::ppu::Ppu;
+use save_state::Savable;
 use serde::{Deserialize, Serialize};
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Savable)]
 pub struct Hdma {
     source_addr: u16,
     dest_addr: u16,
@@ -119,8 +120,9 @@ pub enum BusType {
     External,
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Savable)]
 pub struct OamDma {
+    #[savable(serde)]
     conflicting_bus: Option<BusType>,
     current_value: u8,
     address: u16,
@@ -194,6 +196,3 @@ impl OamDma {
         }
     }
 }
-
-impl_savable!(OamDma);
-impl_savable!(Hdma);

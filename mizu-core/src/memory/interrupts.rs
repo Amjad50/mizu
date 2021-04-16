@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use serde::{Deserialize, Serialize};
+use save_state::Savable;
 use std::convert::{From, TryFrom};
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -31,7 +31,7 @@ pub trait InterruptManager {
 }
 
 bitflags! {
-    #[derive(Serialize, Deserialize)]
+    #[derive(Savable)]
     struct InterruptsFlags: u8 {
         /// This is only used when reading `interrupt_enable` only
         const UNUSED   = 0b111 << 5;
@@ -55,7 +55,7 @@ impl From<InterruptType> for InterruptsFlags {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Savable)]
 pub struct Interrupts {
     enabled: InterruptsFlags,
     requested: InterruptsFlags,
@@ -122,5 +122,3 @@ impl InterruptManager for Interrupts {
         self.requested.insert(interrupt);
     }
 }
-
-impl_savable!(Interrupts);

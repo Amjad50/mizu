@@ -1,12 +1,10 @@
 mod dma;
 mod interrupts;
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use save_state::{impl_savable, Savable, SaveError};
+use save_state::Savable;
 use serde::{Deserialize, Serialize};
 
 use std::cell::RefCell;
-use std::io::{Read, Write};
 use std::rc::Rc;
 
 pub use interrupts::{InterruptManager, InterruptType};
@@ -22,7 +20,7 @@ use crate::GameboyConfig;
 use dma::{BusType, Hdma, OamDma};
 use interrupts::Interrupts;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Savable)]
 struct BootRom {
     enabled: bool,
     data: Vec<u8>,
@@ -37,9 +35,6 @@ impl Default for BootRom {
     }
 }
 
-// since cgb boot_rom is 0x900 in size, so a bit of an increase here
-impl_savable!(BootRom);
-
 #[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 enum Speed {
     Normal,
@@ -52,9 +47,10 @@ impl Default for Speed {
     }
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Savable)]
 struct SpeedController {
     preparing_switch: bool,
+    #[savable(serde)]
     current_speed: Speed,
 }
 
@@ -85,8 +81,7 @@ impl SpeedController {
     }
 }
 
-impl_savable!(SpeedController);
-
+#[derive(Savable)]
 struct Wram {
     data: [u8; 0x8000],
     bank: u8,
@@ -131,28 +126,7 @@ impl Wram {
     }
 }
 
-impl Savable for Wram {
-    fn save<W: Write>(&self, writer: &mut W) -> Result<(), SaveError> {
-        writer.write_u8(self.bank)?;
-        writer.write_all(&self.data)?;
-
-        Ok(())
-    }
-
-    fn load<R: Read>(&mut self, reader: &mut R) -> Result<(), SaveError> {
-        self.bank = reader.read_u8()?;
-        reader.read_exact(&mut self.data)?;
-
-        Ok(())
-    }
-
-    fn current_save_size(&self) -> Result<u64, SaveError> {
-        // + 1 for the bank u8
-        Ok(self.data.len() as u64 + 1)
-    }
-}
-
-#[derive(Serialize, Deserialize)]
+#[derive(Savable)]
 struct Lock {
     during_boot: bool,
     is_dmg_mode: bool,
@@ -190,8 +164,6 @@ impl Lock {
     }
 }
 
-impl_savable!(Lock);
-
 #[derive(Serialize, Deserialize)]
 struct UnknownRegister {
     data: u8,
@@ -213,8 +185,9 @@ impl UnknownRegister {
 }
 
 // made this into a structure just to be easier to implement `Savable`
-#[derive(Serialize, Deserialize)]
+#[derive(Savable)]
 struct UnknownRegisters {
+    #[savable(serde)]
     registers: [UnknownRegister; 4],
 }
 
@@ -245,8 +218,7 @@ impl std::ops::IndexMut<usize> for UnknownRegisters {
     }
 }
 
-impl_savable!(UnknownRegisters);
-
+#[derive(Savable)]
 pub struct Bus {
     cartridge: Cartridge,
     ppu: Ppu,
@@ -264,6 +236,7 @@ pub struct Bus {
     lock: Lock,
     unknown_registers: UnknownRegisters,
 
+    #[savable(skip)]
     serial_device: Option<Rc<RefCell<dyn SerialDevice>>>,
 
     stopped: bool,
@@ -694,45 +667,5 @@ impl CpuBusProvider for Bus {
         let result = self.read_not_ticked(addr, self.oam_dma.conflicting_bus());
         self.on_cpu_machine_cycle();
         result
-    }
-}
-
-/// This is an implementation of Savable of the attributes that cannot implement
-/// Savable, like `bool`, `u32`, and `hram` array
-///
-/// So it is not for the whole Bus structure
-impl Savable for Bus {
-    fn save<W: Write>(&self, writer: &mut W) -> Result<(), SaveError> {
-        writer.write_u8(self.stopped as u8)?;
-        // TODO: do we need this? since the sync with APU would be broken
-        //  on save/load, then maybe we should start from 0?
-        writer.write_u32::<LittleEndian>(self.elapsed_ppu_cycles)?;
-        writer.write_all(&self.hram)?;
-        bincode::serialize_into(writer, &self.config)?;
-
-        Ok(())
-    }
-
-    fn load<R: Read>(&mut self, reader: &mut R) -> Result<(), SaveError> {
-        let stopped_u8 = reader.read_u8()?;
-        if stopped_u8 > 1 {
-            // TODO: maybe should not panic?
-            panic!("invalid boolean value");
-        }
-        self.stopped = stopped_u8 == 1;
-
-        self.elapsed_ppu_cycles = reader.read_u32::<LittleEndian>()?;
-        reader.read_exact(&mut self.hram)?;
-        self.config = bincode::deserialize_from(reader)?;
-
-        Ok(())
-    }
-
-    fn current_save_size(&self) -> Result<u64, SaveError> {
-        let mut tmp_save = Vec::new();
-
-        self.save(&mut tmp_save)?;
-
-        Ok(tmp_save.len() as u64)
     }
 }

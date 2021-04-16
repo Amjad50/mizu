@@ -1,8 +1,7 @@
 use crate::memory::{InterruptManager, InterruptType};
 use crate::GameboyConfig;
 use bitflags::bitflags;
-use save_state::impl_savable;
-use serde::{Deserialize, Serialize};
+use save_state::Savable;
 
 pub trait SerialDevice {
     /// A device implemnts this, when receiving a call from this function will
@@ -11,7 +10,7 @@ pub trait SerialDevice {
 }
 
 bitflags! {
-    #[derive(Default, Serialize, Deserialize)]
+    #[derive(Default, Savable)]
     struct SerialControl: u8 {
         const IN_TRANSFER  = 1 << 7;
         const CLOCK_SPEED  = 1 << 1;
@@ -45,7 +44,7 @@ impl SerialControl {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Savable)]
 pub struct Serial {
     serial_control: SerialControl,
     transfere_data: u8,
@@ -144,5 +143,3 @@ impl Serial {
         self.transfere_data |= bit as u8;
     }
 }
-
-impl_savable!(Serial);

@@ -1,15 +1,17 @@
+use serde::{Deserialize, Serialize};
+
 use super::colors::ColorPalette;
 use super::sprite::SelectedSprite;
 use fixed_vec_deque::FixedVecDeque;
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum SpritePriorityMode {
     ByIndex, // CGB
     ByCoord, // DMG
 }
 
 /// Background store the `bg_priority` of the `bg_attribs` for the pixel data
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Serialize, Deserialize)]
 pub struct BgFifoPixel {
     pub color: u8,
     pub palette: ColorPalette,
@@ -18,7 +20,7 @@ pub struct BgFifoPixel {
 
 /// Sprite store the index of the sprite, as in CGB priority is done by index
 ///  and not by coordinate
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Serialize, Deserialize)]
 pub struct SpriteFifoPixel {
     pub color: u8,
     pub palette: ColorPalette,

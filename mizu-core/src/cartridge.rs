@@ -11,7 +11,7 @@ pub use error::CartridgeError;
 
 use error::SramError;
 use mappers::{Mapper, MapperType, MappingResult};
-use save_state::{Savable, SaveError};
+use save_state::Savable;
 
 const NINTENDO_LOGO_DATA: &[u8; 48] = &[
     0xce, 0xed, 0x66, 0x66, 0xcc, 0x0d, 0x00, 0x0b, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0c, 0x00, 0x0d,
@@ -192,13 +192,22 @@ impl CartridgeType {
     }
 }
 
+#[derive(Savable)]
 pub struct Cartridge {
+    #[savable(skip)]
     file_path: Box<Path>,
+    #[savable(skip)]
     game_title: String,
+    #[savable(skip)]
     cartridge_type: CartridgeType,
+    #[savable(skip)]
     target_device: TargetDevice,
+    #[savable(serde)]
     mapper: Box<dyn Mapper>,
+    #[savable(skip)]
+    #[allow(unused)]
     hash: [u8; 32],
+    #[savable(skip)]
     rom: Vec<u8>,
     ram: Vec<u8>,
 }
@@ -462,34 +471,5 @@ impl Drop for Cartridge {
         if self.cartridge_type.battery {
             self.save_sram_file().unwrap();
         }
-    }
-}
-
-impl Savable for Cartridge {
-    fn save<W: Write>(&self, mut writer: &mut W) -> Result<(), SaveError> {
-        bincode::serialize_into(&mut writer, &self.hash)?;
-        bincode::serialize_into(&mut writer, &self.mapper)?;
-        bincode::serialize_into(&mut writer, &self.ram)?;
-
-        Ok(())
-    }
-
-    fn load<R: Read>(&mut self, mut reader: &mut R) -> Result<(), SaveError> {
-        let hash: [u8; 32] = bincode::deserialize_from(&mut reader)?;
-        // extra check
-        assert_eq!(hash, self.hash);
-
-        self.mapper = bincode::deserialize_from(&mut reader)?;
-        self.ram = bincode::deserialize_from(&mut reader)?;
-
-        Ok(())
-    }
-
-    fn current_save_size(&self) -> Result<u64, SaveError> {
-        let mut tmp_save = Vec::new();
-
-        self.save(&mut tmp_save)?;
-
-        Ok(tmp_save.len() as u64)
     }
 }

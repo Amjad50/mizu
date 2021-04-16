@@ -7,35 +7,6 @@ use paste::paste;
 use std::convert::From;
 use std::io::{Cursor, Error as ioError, Read, Write};
 
-#[macro_export]
-macro_rules! impl_savable {
-    ($struct_name: ident) => {
-        impl ::save_state::Savable for $struct_name {
-            fn save<W: ::std::io::Write>(
-                &self,
-                writer: &mut W,
-            ) -> ::std::result::Result<(), ::save_state::SaveError> {
-                ::bincode::serialize_into(writer, self)?;
-                Ok(())
-            }
-
-            fn load<R: ::std::io::Read>(
-                &mut self,
-                reader: &mut R,
-            ) -> ::std::result::Result<(), ::save_state::SaveError> {
-                let obj = ::bincode::deserialize_from(reader)?;
-
-                let _ = ::std::mem::replace(self, obj);
-                Ok(())
-            }
-
-            fn current_save_size(&self) -> ::std::result::Result<u64, ::save_state::SaveError> {
-                ::bincode::serialized_size(self).map_err(|e| e.into())
-            }
-        }
-    };
-}
-
 pub trait Savable {
     fn save<W: Write>(&self, writer: &mut W) -> Result<(), SaveError>;
     fn load<R: Read>(&mut self, reader: &mut R) -> Result<(), SaveError>;

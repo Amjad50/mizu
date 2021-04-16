@@ -970,7 +970,6 @@ dependencies = [
 name = "mizu-core"
 version = "0.1.2"
 dependencies = [
- "bincode",
  "bitflags",
  "byteorder",
  "crc",

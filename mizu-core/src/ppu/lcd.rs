@@ -1,12 +1,20 @@
 use super::colors::Color;
+use save_state::Savable;
 
 pub const LCD_WIDTH: usize = 160;
 pub const LCD_HEIGHT: usize = 144;
 
+#[derive(Savable)]
 pub struct Lcd {
+    // x is the only attribute that should be saved, just to be in sync
+    // with the PPU rendering, even though the fram will contain half pixels
+    // from the state before the load
     x: u8,
+    #[savable(skip)]
     buf: [[u8; LCD_WIDTH * LCD_HEIGHT * 3]; 2],
+    #[savable(skip)]
     selected_buffer: usize,
+    #[savable(skip)]
     raw_buf: [u8; LCD_WIDTH * LCD_HEIGHT * 3],
 }
 

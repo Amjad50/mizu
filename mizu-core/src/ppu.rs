@@ -5,16 +5,21 @@ mod fifo;
 mod lcd;
 mod sprite;
 
+use bitflags::bitflags;
+use save_state::Savable;
+use serde::{Deserialize, Serialize};
+
 use crate::memory::{InterruptManager, InterruptType};
 use crate::GameboyConfig;
+
 use bg_attribs::BgAttribute;
-use bitflags::bitflags;
 use colors::{Color, ColorPalette, ColorPalettesCollection};
 use fifo::{BgFifo, SpriteFifo, SpritePriorityMode};
 use lcd::Lcd;
 use sprite::{SelectedSprite, Sprite};
 
 bitflags! {
+    #[derive(Savable)]
     struct LcdControl: u8 {
         const DISPLAY_ENABLE          = 1 << 7;
         const WINDOW_TILEMAP          = 1 << 6;
@@ -84,6 +89,7 @@ impl LcdControl {
 }
 
 bitflags! {
+    #[derive(Savable)]
     struct LcdStatus: u8 {
         const LYC_LY_INTERRUPT        = 1 << 6;
         const MODE_2_OAM_INTERRUPT    = 1 << 5;
@@ -127,7 +133,7 @@ impl LcdStatus {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 struct Fetcher {
     delay_counter: u8,
     data: Option<([u8; 8], BgAttribute)>,
@@ -159,6 +165,7 @@ impl Fetcher {
     }
 }
 
+#[derive(Savable)]
 pub struct Ppu {
     lcd_control: LcdControl,
     lcd_status: LcdStatus,
@@ -177,8 +184,10 @@ pub struct Ppu {
 
     vram: [u8; 0x4000],
     vram_bank: u8,
+    #[savable(skip)]
     oam: [Sprite; 40],
     // the sprites that got selected
+    #[savable(serde)]
     selected_oam: [SelectedSprite; 10],
     selected_oam_size: u8,
 
@@ -186,11 +195,14 @@ pub struct Ppu {
     cgb_sprite_palettes: ColorPalettesCollection,
 
     fine_scroll_x_discard: u8,
+    #[savable(serde)]
     fetcher: Fetcher,
     is_drawing_window: bool,
     window_y_counter: u8,
 
+    #[savable(skip)]
     bg_fifo: BgFifo,
+    #[savable(skip)]
     sprite_fifo: SpriteFifo,
 
     lcd: Lcd,
@@ -203,6 +215,7 @@ pub struct Ppu {
     /// track if the next frame is LCD still turning on
     lcd_turned_on: bool,
 
+    #[savable(serde)]
     sprite_priority_mode: SpritePriorityMode,
 
     is_cgb_mode: bool,

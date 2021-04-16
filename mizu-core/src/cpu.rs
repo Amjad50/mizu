@@ -2,7 +2,7 @@ pub mod instruction;
 mod instructions_table;
 
 use bitflags::bitflags;
-use save_state::impl_savable;
+use save_state::Savable;
 use serde::{Deserialize, Serialize};
 
 use crate::memory::InterruptType;
@@ -58,7 +58,7 @@ pub enum CpuState {
 }
 
 bitflags! {
-    #[derive(Serialize, Deserialize)]
+    #[derive(Savable)]
     struct CpuFlags: u8 {
         const Z = 1 << 7;
         const N = 1 << 6;
@@ -75,7 +75,7 @@ enum HaltMode {
     HaltBug,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Savable)]
 pub struct Cpu {
     reg_a: u8,
     reg_b: u8,
@@ -92,6 +92,7 @@ pub struct Cpu {
 
     enable_interrupt_next: bool,
     ime: bool,
+    #[savable(serde)]
     halt_mode: HaltMode,
 
     config: GameboyConfig,
@@ -940,5 +941,3 @@ impl Cpu {
         cpu_state
     }
 }
-
-impl_savable!(Cpu);
