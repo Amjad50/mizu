@@ -208,7 +208,7 @@ impl Savable for usize {
     }
 
     fn save_size(&self) -> Result<u64, SaveError> {
-        Ok(::std::mem::size_of::<Self>() as u64)
+        Ok(::std::mem::size_of::<u64>() as u64)
     }
 }
 
@@ -224,7 +224,7 @@ impl Savable for isize {
     }
 
     fn save_size(&self) -> Result<u64, SaveError> {
-        Ok(::std::mem::size_of::<Self>() as u64)
+        Ok(::std::mem::size_of::<i64>() as u64)
     }
 }
 
