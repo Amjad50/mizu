@@ -133,7 +133,7 @@ impl LcdStatus {
     }
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Savable)]
 struct Fetcher {
     delay_counter: u8,
     data: Option<([u8; 8], BgAttribute)>,
@@ -193,7 +193,6 @@ pub struct Ppu {
     cgb_sprite_palettes: ColorPalettesCollection,
 
     fine_scroll_x_discard: u8,
-    #[savable(serde)]
     fetcher: Fetcher,
     is_drawing_window: bool,
     window_y_counter: u8,

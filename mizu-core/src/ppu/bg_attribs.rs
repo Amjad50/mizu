@@ -1,8 +1,8 @@
 use bitflags::bitflags;
-use serde::{Deserialize, Serialize};
+use save_state::Savable;
 
 bitflags! {
-    #[derive(Default, Serialize, Deserialize)]
+    #[derive(Default, Savable)]
     pub struct BgAttribute: u8 {
         const PRIORITY = 1 << 7;
         const VER_FLIP = 1 << 6;

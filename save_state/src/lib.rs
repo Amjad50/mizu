@@ -152,6 +152,26 @@ macro_rules! impl_savable {
     };
 }
 
+macro_rules! impl_for_tuple {
+    ($($id: tt $tuple_element: ident),+) => {
+        impl<$($tuple_element),+> Savable for ($($tuple_element),+)
+        where $($tuple_element: Savable),+
+        {
+            #[inline]
+            fn save<W: ::std::io::Write>(&self, mut writer: &mut W) -> Result<(), SaveError> {
+                $(<$tuple_element as Savable>::save(&self.$id, &mut writer)?;)+
+                Ok(())
+            }
+
+            #[inline]
+            fn load<R: ::std::io::Read>(&mut self, mut reader: &mut R) -> Result<(), SaveError> {
+                $(<$tuple_element as Savable>::load(&mut self.$id, &mut reader)?;)+
+                Ok(())
+            }
+        }
+    };
+}
+
 impl_primitive!(u8);
 impl_primitive!(u16, ::);
 impl_primitive!(u32, ::);
@@ -166,6 +186,15 @@ impl_savable!(bool);
 impl_savable!(char);
 impl_savable!(String);
 impl_savable!(Vec<T>);
+
+impl_for_tuple!(0 A0, 1 A1);
+impl_for_tuple!(0 A0, 1 A1, 2 A2);
+impl_for_tuple!(0 A0, 1 A1, 2 A2, 3 A3);
+impl_for_tuple!(0 A0, 1 A1, 2 A2, 3 A3, 4 A4);
+impl_for_tuple!(0 A0, 1 A1, 2 A2, 3 A3, 4 A4, 5 A5);
+impl_for_tuple!(0 A0, 1 A1, 2 A2, 3 A3, 4 A4, 5 A5, 6 A6);
+impl_for_tuple!(0 A0, 1 A1, 2 A2, 3 A3, 4 A4, 5 A5, 6 A6, 7 A7);
+impl_for_tuple!(0 A0, 1 A1, 2 A2, 3 A3, 4 A4, 5 A5, 6 A6, 7 A7, 8 A8);
 
 impl Savable for usize {
     fn save<W: ::std::io::Write>(&self, writer: &mut W) -> Result<(), SaveError> {
@@ -216,6 +245,44 @@ where
         for element in self {
             element.load(&mut reader)?;
         }
+        Ok(())
+    }
+}
+
+impl<T> Savable for Option<T>
+where
+    T: Savable + Default,
+{
+    fn save<W: Write>(&self, mut writer: &mut W) -> Result<(), SaveError> {
+        match self {
+            Some(s) => {
+                true.save(&mut writer)?;
+                s.save(&mut writer)?;
+            }
+            None => false.save(&mut writer)?,
+        }
+        Ok(())
+    }
+
+    fn load<R: Read>(&mut self, mut reader: &mut R) -> Result<(), SaveError> {
+        let mut value = false;
+        value.load(&mut reader)?;
+
+        if value {
+            match self {
+                Some(s) => {
+                    s.load(&mut reader)?;
+                }
+                None => {
+                    let mut s = T::default();
+                    s.load(&mut reader)?;
+                    self.replace(s);
+                }
+            }
+        } else {
+            *self = None;
+        }
+
         Ok(())
     }
 }
