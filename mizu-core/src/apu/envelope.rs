@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
+use save_state::Savable;
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Savable)]
 pub struct EnvelopGenerator {
     starting_volume: u8,
     current_volume: u8,

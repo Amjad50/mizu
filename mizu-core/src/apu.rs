@@ -49,14 +49,9 @@ bitflags! {
 
 #[derive(Savable)]
 pub struct Apu {
-    // TODO: implement savable for generics
-    #[savable(serde)]
     pulse1: Dac<LengthCountedChannel<PulseChannel>>,
-    #[savable(serde)]
     pulse2: Dac<LengthCountedChannel<PulseChannel>>,
-    #[savable(serde)]
     wave: Dac<LengthCountedChannel<WaveChannel>>,
-    #[savable(serde)]
     noise: Dac<LengthCountedChannel<NoiseChannel>>,
 
     channels_control: ChannelsControl,

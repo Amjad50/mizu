@@ -1,11 +1,11 @@
-use serde::{Deserialize, Serialize};
+use save_state::Savable;
 
 use super::ApuChannel;
 use crate::GameboyConfig;
 
 const VOLUME_SHIFT_TABLE: [u8; 4] = [4, 0, 1, 2];
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Savable)]
 pub struct WaveChannel {
     volume: u8,
     volume_shift: u8,

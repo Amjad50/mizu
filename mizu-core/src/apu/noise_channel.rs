@@ -1,9 +1,9 @@
-use serde::{Deserialize, Serialize};
+use save_state::Savable;
 
 use super::envelope::EnvelopGenerator;
 use super::ApuChannel;
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Savable)]
 pub struct NoiseChannel {
     shift_clock_frequency: u8,
     step_mode_7_bits: bool,

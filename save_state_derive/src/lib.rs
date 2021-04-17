@@ -29,17 +29,17 @@ fn expand(input: DeriveInput) -> Result<TokenStream2> {
 
 fn impl_for_serde_full(container: &Container) -> Result<TokenStream2> {
     let ident = &container.ident;
+    let (impl_generics, ty_generics, where_clause) = container.generics.split_for_impl();
 
-    // TODO: implement for generics
     Ok(quote! {
         #[automatically_derived]
-        impl ::save_state::Savable for #ident {
+        impl #impl_generics ::save_state::Savable for #ident #ty_generics #where_clause {
             #[inline]
             fn save<W: ::std::io::Write>(
                 &self,
                 writer: &mut W,
             ) -> Result<(), ::save_state::SaveError> {
-                ::bincode::serialize_into(writer, self)?;
+                ::save_state::bincode::serialize_into(writer, self)?;
                 Ok(())
             }
 
@@ -48,15 +48,10 @@ fn impl_for_serde_full(container: &Container) -> Result<TokenStream2> {
                 &mut self,
                 reader: &mut R,
             ) -> Result<(), ::save_state::SaveError> {
-                let obj = ::bincode::deserialize_from(reader)?;
+                let obj = ::save_state::bincode::deserialize_from(reader)?;
 
                 let _ = ::std::mem::replace(self, obj);
                 Ok(())
-            }
-
-            #[inline]
-            fn save_size(&self) -> Result<u64, ::save_state::SaveError> {
-                ::bincode::serialized_size(self).map_err(|e| e.into())
             }
         }
     })
@@ -116,10 +111,11 @@ fn impl_for_savables(container: &Container) -> Result<TokenStream2> {
     let save_fields = impl_fields_for_save(&container.fields);
     let load_fields = impl_fields_for_load(&container.fields);
     let size_sum = get_fields_impl_size_sum(&container.fields);
+    let (impl_generics, ty_generics, where_clause) = container.generics.split_for_impl();
 
     Ok(quote! {
         #[automatically_derived]
-        impl ::save_state::Savable for #ident {
+        impl #impl_generics ::save_state::Savable for #ident #ty_generics #where_clause {
             #[inline]
             fn save<W: ::std::io::Write>(
                 &self,
