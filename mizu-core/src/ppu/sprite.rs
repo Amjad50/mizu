@@ -1,8 +1,8 @@
 use bitflags::bitflags;
-use serde::{Deserialize, Serialize};
+use save_state::Savable;
 
 bitflags! {
-    #[derive(Default, Serialize, Deserialize)]
+    #[derive(Default, Savable)]
     struct SpriteFlags: u8 {
         const PRIORITY    = 1 << 7;
         const Y_FLIP      = 1 << 6;
@@ -13,7 +13,7 @@ bitflags! {
     }
 }
 
-#[derive(Default, Copy, Clone, Serialize, Deserialize)]
+#[derive(Default, Copy, Clone, Savable)]
 pub struct SelectedSprite {
     sprite: Sprite,
     index: u8,
@@ -33,7 +33,7 @@ impl SelectedSprite {
     }
 }
 
-#[derive(Clone, Copy, Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Default, Debug, Savable)]
 pub struct Sprite {
     y: u8,
     x: u8,

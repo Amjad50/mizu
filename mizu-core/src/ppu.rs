@@ -184,10 +184,8 @@ pub struct Ppu {
 
     vram: [u8; 0x4000],
     vram_bank: u8,
-    #[savable(skip)]
     oam: [Sprite; 40],
     // the sprites that got selected
-    #[savable(serde)]
     selected_oam: [SelectedSprite; 10],
     selected_oam_size: u8,
 
@@ -200,9 +198,7 @@ pub struct Ppu {
     is_drawing_window: bool,
     window_y_counter: u8,
 
-    #[savable(skip)]
     bg_fifo: BgFifo,
-    #[savable(skip)]
     sprite_fifo: SpriteFifo,
 
     lcd: Lcd,

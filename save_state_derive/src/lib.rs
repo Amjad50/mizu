@@ -34,6 +34,7 @@ fn impl_for_serde_full(container: &Container) -> Result<TokenStream2> {
     Ok(quote! {
         #[automatically_derived]
         impl ::save_state::Savable for #ident {
+            #[inline]
             fn save<W: ::std::io::Write>(
                 &self,
                 writer: &mut W,
@@ -42,6 +43,7 @@ fn impl_for_serde_full(container: &Container) -> Result<TokenStream2> {
                 Ok(())
             }
 
+            #[inline]
             fn load<R: ::std::io::Read>(
                 &mut self,
                 reader: &mut R,
@@ -52,7 +54,8 @@ fn impl_for_serde_full(container: &Container) -> Result<TokenStream2> {
                 Ok(())
             }
 
-            fn current_save_size(&self) -> Result<u64, ::save_state::SaveError> {
+            #[inline]
+            fn save_size(&self) -> Result<u64, ::save_state::SaveError> {
                 ::bincode::serialized_size(self).map_err(|e| e.into())
             }
         }
@@ -96,7 +99,7 @@ fn get_fields_impl_size_sum(fields: &[Field]) -> TokenStream2 {
         if f.attrs.use_serde {
             quote!(::save_state::bincode::serialized_size(&self.#ident).map_err::<::save_state::SaveError, _>(|e| e.into())?)
         } else {
-            quote!(::save_state::Savable::current_save_size(&self.#ident)?)
+            quote!(::save_state::Savable::save_size(&self.#ident)?)
         }
     });
 
@@ -117,6 +120,7 @@ fn impl_for_savables(container: &Container) -> Result<TokenStream2> {
     Ok(quote! {
         #[automatically_derived]
         impl ::save_state::Savable for #ident {
+            #[inline]
             fn save<W: ::std::io::Write>(
                 &self,
                 mut writer: &mut W,
@@ -125,6 +129,7 @@ fn impl_for_savables(container: &Container) -> Result<TokenStream2> {
                 Ok(())
             }
 
+            #[inline]
             fn load<R: ::std::io::Read>(
                 &mut self,
                 mut reader: &mut R,
@@ -133,7 +138,8 @@ fn impl_for_savables(container: &Container) -> Result<TokenStream2> {
                 Ok(())
             }
 
-            fn current_save_size(&self) -> Result<u64, ::save_state::SaveError> {
+            #[inline]
+            fn save_size(&self) -> Result<u64, ::save_state::SaveError> {
                 Ok(#size_sum)
             }
         }

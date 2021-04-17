@@ -164,7 +164,7 @@ impl Lock {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Savable)]
 struct UnknownRegister {
     data: u8,
     mask: u8,
@@ -187,7 +187,6 @@ impl UnknownRegister {
 // made this into a structure just to be easier to implement `Savable`
 #[derive(Savable)]
 struct UnknownRegisters {
-    #[savable(serde)]
     registers: [UnknownRegister; 4],
 }
 

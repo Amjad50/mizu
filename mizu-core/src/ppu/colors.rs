@@ -1,5 +1,4 @@
 use save_state::Savable;
-use serde::{Deserialize, Serialize};
 
 macro_rules! color {
     ($r:expr, $g:expr, $b:expr) => {
@@ -38,7 +37,7 @@ impl Color {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
+#[derive(Clone, Copy, Savable)]
 pub struct ColorPalette {
     data: [u16; 4],
 }
@@ -94,7 +93,6 @@ impl ColorPalette {
 pub struct ColorPalettesCollection {
     index: u8,
     auto_increment: bool,
-    #[savable(serde)]
     palettes: [ColorPalette; 8],
 }
 

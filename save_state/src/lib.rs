@@ -5,14 +5,72 @@ use bincode::Error as bincodeError;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use paste::paste;
 use std::convert::From;
-use std::io::{Cursor, Error as ioError, Read, Write};
+use std::io::{
+    Cursor, Error as ioError, ErrorKind as ioErrorKind, Read, Result as ioResult, Write,
+};
+
+/// a simple help that implements `io::Write`, which helps get the size of
+/// a Savable object
+#[derive(Default)]
+struct Counter {
+    counter: u64,
+}
+
+impl Counter {
+    #[inline]
+    fn add(&mut self, c: usize) -> ioResult<()> {
+        // for some reason, using `checked_add` is exponentially slower, this is good
+        let (counter, overflow) = self.counter.overflowing_add(c as u64);
+        self.counter = counter;
+
+        if overflow {
+            Err(ioError::new(
+                ioErrorKind::InvalidInput,
+                "write length exceed u64 limit",
+            ))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl Write for Counter {
+    #[inline]
+    fn write(&mut self, buf: &[u8]) -> ioResult<usize> {
+        self.add(buf.len())?;
+        Ok(buf.len())
+    }
+
+    #[inline]
+    fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> ioResult<usize> {
+        let len = bufs.iter().map(|b| b.len()).sum();
+        self.add(len)?;
+        Ok(len)
+    }
+
+    #[inline]
+    fn write_all(&mut self, buf: &[u8]) -> ioResult<()> {
+        self.add(buf.len())?;
+        Ok(())
+    }
+
+    #[inline]
+    fn flush(&mut self) -> ioResult<()> {
+        Ok(())
+    }
+}
 
 pub trait Savable {
     fn save<W: Write>(&self, writer: &mut W) -> Result<(), SaveError>;
     fn load<R: Read>(&mut self, reader: &mut R) -> Result<(), SaveError>;
     /// The size of the object if saved now, note that this might change, for example
     /// due to the length of string objects or data inside the object.
-    fn current_save_size(&self) -> Result<u64, SaveError>;
+    #[inline]
+    fn save_size(&self) -> Result<u64, SaveError> {
+        let mut counter = Counter::default();
+        self.save(&mut counter)?;
+        Ok(counter.counter)
+    }
 }
 
 pub fn save_object<T: Savable>(object: &T) -> Result<Vec<u8>, SaveError> {
@@ -54,17 +112,20 @@ impl From<bincodeError> for SaveError {
 macro_rules! impl_primitive {
     ($struct_name: ident $(, $g: tt)? ) => {
         impl Savable for $struct_name {
+            #[inline]
             fn save<W: ::std::io::Write>(&self, writer: &mut W) -> Result<(), SaveError> {
                 paste!(writer.[<write_ $struct_name>]$($g<LittleEndian>)?(*self)?);
                 Ok(())
             }
 
+            #[inline]
             fn load<R: ::std::io::Read>(&mut self, reader: &mut R) -> Result<(), SaveError> {
                 *self = paste!(reader.[<read_ $struct_name>]$($g<LittleEndian>)?()?);
                 Ok(())
             }
 
-            fn current_save_size(&self) -> Result<u64, SaveError> {
+            #[inline]
+            fn save_size(&self) -> Result<u64, SaveError> {
                Ok(::std::mem::size_of::<Self>() as u64)
             }
         }
@@ -75,19 +136,17 @@ macro_rules! impl_primitive {
 macro_rules! impl_savable {
     ($struct_name: ident $(<$($generics: ident),+>)?) => {
         impl $(<$($generics: serde::Serialize + serde::de::DeserializeOwned),+>)? Savable for $struct_name $(<$($generics),+>)?{
+            #[inline]
             fn save<W: ::std::io::Write>(&self, writer: &mut W) -> Result<(), SaveError> {
                 ::bincode::serialize_into(writer, self)?;
                 Ok(())
             }
 
+            #[inline]
             fn load<R: ::std::io::Read>(&mut self, reader: &mut R) -> Result<(), SaveError> {
                 let obj = ::bincode::deserialize_from(reader)?;
                 let _ = ::std::mem::replace(self, obj);
                 Ok(())
-            }
-
-            fn current_save_size(&self) -> Result<u64, SaveError> {
-                ::bincode::serialized_size(self).map_err(|e| e.into())
             }
         }
     };
@@ -119,7 +178,7 @@ impl Savable for usize {
         Ok(())
     }
 
-    fn current_save_size(&self) -> Result<u64, SaveError> {
+    fn save_size(&self) -> Result<u64, SaveError> {
         Ok(::std::mem::size_of::<Self>() as u64)
     }
 }
@@ -135,23 +194,28 @@ impl Savable for isize {
         Ok(())
     }
 
-    fn current_save_size(&self) -> Result<u64, SaveError> {
+    fn save_size(&self) -> Result<u64, SaveError> {
         Ok(::std::mem::size_of::<Self>() as u64)
     }
 }
 
-impl<const N: usize> Savable for [u8; N] {
-    fn save<W: ::std::io::Write>(&self, writer: &mut W) -> Result<(), SaveError> {
-        writer.write_all(self)?;
+// TODO: wait for `min_specialization` feature and implement
+//  `u8` separatly as it would be faster
+impl<T, const N: usize> Savable for [T; N]
+where
+    T: Savable,
+{
+    fn save<W: ::std::io::Write>(&self, mut writer: &mut W) -> Result<(), SaveError> {
+        for element in self {
+            element.save(&mut writer)?;
+        }
         Ok(())
     }
 
-    fn load<R: ::std::io::Read>(&mut self, reader: &mut R) -> Result<(), SaveError> {
-        reader.read_exact(self)?;
+    fn load<R: ::std::io::Read>(&mut self, mut reader: &mut R) -> Result<(), SaveError> {
+        for element in self {
+            element.load(&mut reader)?;
+        }
         Ok(())
-    }
-
-    fn current_save_size(&self) -> Result<u64, SaveError> {
-        Ok(self.len() as u64)
     }
 }

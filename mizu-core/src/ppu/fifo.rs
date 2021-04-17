@@ -1,3 +1,4 @@
+use save_state::Savable;
 use serde::{Deserialize, Serialize};
 
 use super::colors::ColorPalette;
@@ -11,7 +12,7 @@ pub enum SpritePriorityMode {
 }
 
 /// Background store the `bg_priority` of the `bg_attribs` for the pixel data
-#[derive(Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Default, Savable)]
 pub struct BgFifoPixel {
     pub color: u8,
     pub palette: ColorPalette,
@@ -20,7 +21,7 @@ pub struct BgFifoPixel {
 
 /// Sprite store the index of the sprite, as in CGB priority is done by index
 ///  and not by coordinate
-#[derive(Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Default, Savable)]
 pub struct SpriteFifoPixel {
     pub color: u8,
     pub palette: ColorPalette,
@@ -62,6 +63,33 @@ impl BgFifo {
 
     pub fn clear(&mut self) {
         self.pixels.clear();
+    }
+}
+
+impl Savable for BgFifo {
+    fn save<W: std::io::Write>(&self, mut writer: &mut W) -> Result<(), save_state::SaveError> {
+        // push the size of the current buffer
+        <usize as Savable>::save(&self.pixels.len(), &mut writer)?;
+        for pixel in self.pixels.iter() {
+            Savable::save(pixel, &mut writer)?;
+        }
+
+        Ok(())
+    }
+
+    fn load<R: std::io::Read>(&mut self, mut reader: &mut R) -> Result<(), save_state::SaveError> {
+        let mut size = 0;
+        <usize as Savable>::load(&mut size, &mut reader)?;
+        assert!(size <= 16);
+
+        self.pixels.clear();
+
+        for _ in 0..size {
+            let pixel = self.pixels.push_back();
+            pixel.load(&mut reader)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -129,5 +157,37 @@ impl SpriteFifo {
 
     pub fn clear(&mut self) {
         self.pixels.clear();
+    }
+}
+
+impl Savable for SpriteFifo {
+    fn save<W: std::io::Write>(&self, mut writer: &mut W) -> Result<(), save_state::SaveError> {
+        // push the size of the current buffer
+        <usize as Savable>::save(&self.pixels.len(), &mut writer)?;
+        for pixel in self.pixels.iter() {
+            Savable::save(pixel, &mut writer)?;
+        }
+
+        save_state::bincode::serialize_into(&mut writer, &self.sprite_priority_mode)?;
+
+        Ok(())
+    }
+
+    fn load<R: std::io::Read>(&mut self, mut reader: &mut R) -> Result<(), save_state::SaveError> {
+        let mut size = 0;
+        <usize as Savable>::load(&mut size, &mut reader)?;
+
+        assert!(size <= 8);
+
+        self.pixels.clear();
+
+        for _ in 0..size {
+            let pixel = self.pixels.push_back();
+            pixel.load(&mut reader)?;
+        }
+
+        self.sprite_priority_mode = save_state::bincode::deserialize_from(&mut reader)?;
+
+        Ok(())
     }
 }
