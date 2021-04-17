@@ -7,7 +7,6 @@ mod sprite;
 
 use bitflags::bitflags;
 use save_state::Savable;
-use serde::{Deserialize, Serialize};
 
 use crate::memory::{InterruptManager, InterruptType};
 use crate::GameboyConfig;
