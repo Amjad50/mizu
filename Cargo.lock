@@ -485,16 +485,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "csfml-audio-sys"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4e20d25b6f2c582dff0b82440dd2b6b6a3ae78eb07096ca226a64f02779da96"
-dependencies = [
- "csfml-system-sys",
- "sfml-build",
-]
-
-[[package]]
 name = "csfml-graphics-sys"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1462,7 +1452,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4c72108133019d399b24d0c0bd179cc26aa2909b0001e4202d756e4c90c21b4"
 dependencies = [
  "bitflags",
- "csfml-audio-sys",
  "csfml-graphics-sys",
  "csfml-system-sys",
  "csfml-window-sys",
