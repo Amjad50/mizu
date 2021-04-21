@@ -84,6 +84,8 @@ pub fn load_object<T: Savable>(object: &mut T, data: &[u8]) -> Result<(), SaveEr
     let mut cursor = Cursor::new(data);
     object.load(&mut cursor)?;
 
+    // TODO: make sure the buffer is all finished, cursor is at EOF
+
     Ok(())
 }
 
@@ -95,6 +97,8 @@ pub enum SaveError {
     BincodeError(bincodeError),
     #[error("Load size of the input data does not match `object_size`")]
     LoadSizeDoesNotMatch,
+    #[error("Cartridge does not match")]
+    CartridgeDoesNotMatch,
 }
 
 impl From<ioError> for SaveError {

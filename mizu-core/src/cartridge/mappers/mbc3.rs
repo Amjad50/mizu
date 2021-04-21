@@ -1,6 +1,6 @@
 use super::{Mapper, MappingResult, ONE_SECOND_MAPPER_CLOCKS};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use serde::{Deserialize, Serialize};
+use save_state::Savable;
 use std::io::Cursor;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -11,7 +11,7 @@ fn system_time_now() -> u64 {
         .as_secs()
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Savable)]
 struct RtcRegister {
     /// A full second is ONE_SECOND_MAPPER_CLOCKS, which is synced to the bus
     sub_second: u32,
@@ -198,7 +198,7 @@ impl RtcRegister {
     }
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Savable)]
 pub struct Mbc3 {
     rom_banks: u16,
     is_2k_ram: bool,
@@ -255,7 +255,6 @@ impl Mbc3 {
     }
 }
 
-#[typetag::serde]
 impl Mapper for Mbc3 {
     fn init(&mut self, rom_banks: u16, ram_size: usize) {
         assert!(rom_banks <= 256);
@@ -363,5 +362,17 @@ impl Mapper for Mbc3 {
 
     fn clock(&mut self) {
         self.rtc_register.clock_second_part();
+    }
+
+    fn save_state_size(&self) -> Result<u64, save_state::SaveError> {
+        self.save_size()
+    }
+
+    fn save_state(&self) -> Result<Vec<u8>, save_state::SaveError> {
+        save_state::save_object(self)
+    }
+
+    fn load_state(&mut self, data: &[u8]) -> Result<(), save_state::SaveError> {
+        save_state::load_object(self, data)
     }
 }

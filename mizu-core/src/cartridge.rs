@@ -25,8 +25,9 @@ enum TargetDevice {
     Color,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Savable)]
 struct CartridgeType {
+    #[savable(serde)]
     mapper_type: MapperType,
     ram: bool,
     battery: bool,
@@ -192,22 +193,13 @@ impl CartridgeType {
     }
 }
 
-#[derive(Savable)]
 pub struct Cartridge {
-    #[savable(skip)]
     file_path: Box<Path>,
-    #[savable(skip)]
     game_title: String,
-    #[savable(skip)]
     cartridge_type: CartridgeType,
-    #[savable(skip)]
     target_device: TargetDevice,
-    #[savable(serde)]
     mapper: Box<dyn Mapper>,
-    #[savable(skip)]
-    #[allow(unused)]
     hash: [u8; 32],
-    #[savable(skip)]
     rom: Vec<u8>,
     ram: Vec<u8>,
 }
@@ -471,5 +463,43 @@ impl Drop for Cartridge {
         if self.cartridge_type.battery {
             self.save_sram_file().unwrap();
         }
+    }
+}
+
+impl Savable for Cartridge {
+    fn save<W: Write>(&self, mut writer: &mut W) -> Result<(), save_state::SaveError> {
+        self.hash.save(&mut writer)?;
+        self.cartridge_type.save(&mut writer)?;
+        let data = self.mapper.save_state()?;
+        writer.write_all(&data)?;
+        self.ram.save(&mut writer)?;
+
+        Ok(())
+    }
+
+    fn load<R: Read>(&mut self, mut reader: &mut R) -> Result<(), save_state::SaveError> {
+        // FIXME: move cartridge checks to before any data is loaded, since
+        //  it will be corrupted when we reach here and fine its not for the same
+        //  cartridge
+        let mut hash = [0u8; 32];
+        hash.load(&mut reader)?;
+        if hash != self.hash {
+            return Err(save_state::SaveError::CartridgeDoesNotMatch);
+        }
+
+        // make a copy here, so we can fill it without changing the original one
+        let mut cartridge_type = self.cartridge_type;
+        cartridge_type.load(&mut reader)?;
+        if self.cartridge_type != cartridge_type {
+            return Err(save_state::SaveError::CartridgeDoesNotMatch);
+        }
+
+        let size = self.mapper.save_state_size()? as usize;
+        let mut data = vec![0; size];
+        reader.read_exact(&mut data)?;
+        self.mapper.load_state(&data)?;
+        self.ram.load(&mut reader)?;
+
+        Ok(())
     }
 }

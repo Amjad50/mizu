@@ -1,7 +1,7 @@
 use super::{Mapper, MappingResult};
-use serde::{Deserialize, Serialize};
+use save_state::Savable;
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Savable)]
 pub struct Mbc5 {
     rom_banks: u16,
     is_2k_ram: bool,
@@ -25,7 +25,6 @@ impl Mbc5 {
     }
 }
 
-#[typetag::serde]
 impl Mapper for Mbc5 {
     fn init(&mut self, rom_banks: u16, ram_size: usize) {
         assert!(rom_banks <= 512);
@@ -84,5 +83,17 @@ impl Mapper for Mbc5 {
             }
             _ => {}
         }
+    }
+
+    fn save_state_size(&self) -> Result<u64, save_state::SaveError> {
+        self.save_size()
+    }
+
+    fn save_state(&self) -> Result<Vec<u8>, save_state::SaveError> {
+        save_state::save_object(self)
+    }
+
+    fn load_state(&mut self, data: &[u8]) -> Result<(), save_state::SaveError> {
+        save_state::load_object(self, data)
     }
 }

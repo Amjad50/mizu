@@ -10,10 +10,13 @@ pub(super) use mbc3::Mbc3;
 pub(super) use mbc5::Mbc5;
 pub(super) use no_mapper::NoMapper;
 
+use save_state::SaveError;
+use serde::{Deserialize, Serialize};
+
 /// The number of clocks needed from the bus to complete one second
 pub const ONE_SECOND_MAPPER_CLOCKS: u32 = 4194304 / 2;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum MapperType {
     NoMapper,
     Mbc1 { multicart: bool },
@@ -31,7 +34,6 @@ pub enum MappingResult {
     NotMapped,
 }
 
-#[typetag::serde]
 pub trait Mapper {
     fn init(&mut self, rom_banks: u16, ram_size: usize);
 
@@ -66,4 +68,14 @@ pub trait Mapper {
     fn clock(&mut self) {
         // ignore
     }
+
+    // this only works because the types of the mapper have constant save size,
+    // the problem is that we cannot have methods that contain generic like
+    // `Savable::save` and `Savable::load` in a trait object, like in our case
+    // with the mapper field in `Cartridge`
+    //
+    // TODO: find a better solution
+    fn save_state_size(&self) -> Result<u64, SaveError>;
+    fn save_state(&self) -> Result<Vec<u8>, SaveError>;
+    fn load_state(&mut self, data: &[u8]) -> Result<(), SaveError>;
 }

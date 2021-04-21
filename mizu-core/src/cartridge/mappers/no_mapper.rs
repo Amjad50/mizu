@@ -1,7 +1,7 @@
 use super::{Mapper, MappingResult};
-use serde::{Deserialize, Serialize};
+use save_state::Savable;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Savable)]
 pub struct NoMapper {
     ram_size: usize,
 }
@@ -12,7 +12,6 @@ impl Default for NoMapper {
     }
 }
 
-#[typetag::serde]
 impl Mapper for NoMapper {
     fn init(&mut self, rom_banks: u16, ram_size: usize) {
         // only support 32KB
@@ -41,5 +40,17 @@ impl Mapper for NoMapper {
 
     fn map_ram_write(&mut self, addr: u16, _data: u8) -> MappingResult {
         self.map_ram_read(addr)
+    }
+
+    fn save_state_size(&self) -> Result<u64, save_state::SaveError> {
+        self.save_size()
+    }
+
+    fn save_state(&self) -> Result<Vec<u8>, save_state::SaveError> {
+        save_state::save_object(self)
+    }
+
+    fn load_state(&mut self, data: &[u8]) -> Result<(), save_state::SaveError> {
+        save_state::load_object(self, data)
     }
 }
