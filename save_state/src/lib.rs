@@ -1,9 +1,9 @@
-use bincode;
 pub use save_state_derive::*;
+use serde_cbor;
 
-use bincode::Error as bincodeError;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use paste::paste;
+use serde_cbor::Error as serdeCborError;
 use std::convert::From;
 use std::io::{
     Cursor, Error as ioError, ErrorKind as ioErrorKind, Read, Result as ioResult, Write,
@@ -11,12 +11,12 @@ use std::io::{
 
 pub type Result<T> = std::result::Result<T, SaveError>;
 
-pub fn serialize_into<W, T: ?Sized>(writer: W, value: &T) -> Result<()>
+pub fn serialize_into<W, T>(writer: W, value: &T) -> Result<()>
 where
     W: std::io::Write,
     T: serde::Serialize,
 {
-    bincode::serialize_into(writer, value).map_err(|e| e.into())
+    serde_cbor::to_writer(writer, value).map_err(|e| e.into())
 }
 
 pub fn deserialize_from<R, T>(reader: R) -> Result<T>
@@ -24,14 +24,18 @@ where
     R: std::io::Read,
     T: serde::de::DeserializeOwned,
 {
-    bincode::deserialize_from(reader).map_err(|e| e.into())
+    let mut deserializer = serde_cbor::de::Deserializer::from_reader(reader);
+    let value = serde::de::Deserialize::deserialize(&mut deserializer)?;
+    Ok(value)
 }
 
-pub fn serialized_size<T: ?Sized>(value: &T) -> Result<u64>
+pub fn serialized_size<T>(value: &T) -> Result<u64>
 where
     T: serde::Serialize,
 {
-    bincode::serialized_size(value).map_err(|e| e.into())
+    let mut counter = Counter::default();
+    serde_cbor::to_writer(&mut counter, value)?;
+    Ok(counter.counter)
 }
 
 /// a simple help that implements `io::Write`, which helps get the size of
@@ -109,9 +113,14 @@ pub fn load_object<T: Savable>(object: &mut T, data: &[u8]) -> Result<()> {
     let mut cursor = Cursor::new(data);
     object.load(&mut cursor)?;
 
-    // TODO: make sure the buffer is all finished, cursor is at EOF
+    let (remaining_data_len, overflow) = (data.len() as u64).overflowing_sub(cursor.position());
+    assert!(!overflow);
 
-    Ok(())
+    if remaining_data_len > 0 {
+        Err(SaveError::TrailingData(remaining_data_len))
+    } else {
+        Ok(())
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -119,9 +128,9 @@ pub enum SaveError {
     #[error("Io Eror: {0}")]
     IoError(ioError),
     #[error("Bincode Error: {0}")]
-    BincodeError(bincodeError),
-    #[error("Load size of the input data does not match the size of the object to be loaded into")]
-    LoadSizeDoesNotMatch,
+    SerdeCobrError(serdeCborError),
+    #[error("After loading an object, some data still remained ({0} bytes)")]
+    TrailingData(u64),
     #[error("Cartridge does not match")]
     CartridgeDoesNotMatch,
     #[error("Enum could not be loaded correctly due to corrupted data ({0})")]
@@ -134,9 +143,9 @@ impl From<ioError> for SaveError {
     }
 }
 
-impl From<bincodeError> for SaveError {
-    fn from(e: bincodeError) -> Self {
-        SaveError::BincodeError(e)
+impl From<serdeCborError> for SaveError {
+    fn from(e: serdeCborError) -> Self {
+        SaveError::SerdeCobrError(e)
     }
 }
 
@@ -169,13 +178,13 @@ macro_rules! impl_savable {
         impl $(<$($generics: serde::Serialize + serde::de::DeserializeOwned),+>)? Savable for $struct_name $(<$($generics),+>)?{
             #[inline]
             fn save<W: ::std::io::Write>(&self, writer: &mut W) -> Result<()> {
-                ::bincode::serialize_into(writer, self)?;
+                serialize_into(writer, self)?;
                 Ok(())
             }
 
             #[inline]
             fn load<R: ::std::io::Read>(&mut self, reader: &mut R) -> Result<()> {
-                let obj = ::bincode::deserialize_from(reader)?;
+                let obj = deserialize_from(reader)?;
                 let _ = ::std::mem::replace(self, obj);
                 Ok(())
             }
