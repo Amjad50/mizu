@@ -27,7 +27,6 @@ enum TargetDevice {
 
 #[derive(Debug, Clone, Copy, PartialEq, Savable)]
 struct CartridgeType {
-    #[savable(serde)]
     mapper_type: MapperType,
     ram: bool,
     battery: bool,

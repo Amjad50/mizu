@@ -10,13 +10,12 @@ pub(super) use mbc3::Mbc3;
 pub(super) use mbc5::Mbc5;
 pub(super) use no_mapper::NoMapper;
 
-use save_state::SaveError;
-use serde::{Deserialize, Serialize};
+use save_state::{Savable, SaveError};
 
 /// The number of clocks needed from the bus to complete one second
 pub const ONE_SECOND_MAPPER_CLOCKS: u32 = 4194304 / 2;
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Savable)]
 pub enum MapperType {
     NoMapper,
     Mbc1 { multicart: bool },

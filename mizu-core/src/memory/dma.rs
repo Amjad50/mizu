@@ -1,6 +1,5 @@
 use crate::ppu::Ppu;
 use save_state::Savable;
-use serde::{Deserialize, Serialize};
 
 #[derive(Default, Savable)]
 pub struct Hdma {
@@ -112,7 +111,7 @@ impl Hdma {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
+#[derive(Clone, Copy, Savable)]
 pub enum BusType {
     // VRAM
     Video,
@@ -120,9 +119,14 @@ pub enum BusType {
     External,
 }
 
+impl Default for BusType {
+    fn default() -> Self {
+        Self::Video
+    }
+}
+
 #[derive(Default, Savable)]
 pub struct OamDma {
-    #[savable(serde)]
     conflicting_bus: Option<BusType>,
     current_value: u8,
     address: u16,

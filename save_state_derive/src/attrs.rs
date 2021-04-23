@@ -45,6 +45,7 @@ impl ContainerAttrs {
     }
 }
 
+#[derive(Clone)]
 pub struct FieldAttrs {
     pub use_serde: bool,
     pub skip: bool,

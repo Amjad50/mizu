@@ -913,7 +913,6 @@ dependencies = [
  "crc",
  "fixed-vec-deque",
  "save_state",
- "serde",
  "sha2",
  "thiserror",
 ]

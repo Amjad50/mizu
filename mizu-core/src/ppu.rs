@@ -209,7 +209,6 @@ pub struct Ppu {
     /// track if the next frame is LCD still turning on
     lcd_turned_on: bool,
 
-    #[savable(serde)]
     sprite_priority_mode: SpritePriorityMode,
 
     is_cgb_mode: bool,

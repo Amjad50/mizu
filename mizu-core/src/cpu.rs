@@ -3,7 +3,6 @@ mod instructions_table;
 
 use bitflags::bitflags;
 use save_state::Savable;
-use serde::{Deserialize, Serialize};
 
 use crate::memory::InterruptType;
 use crate::GameboyConfig;
@@ -67,7 +66,7 @@ bitflags! {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq)]
+#[derive(Savable, PartialEq)]
 enum HaltMode {
     NotHalting,
     HaltRunInterrupt,
@@ -92,7 +91,6 @@ pub struct Cpu {
 
     enable_interrupt_next: bool,
     ime: bool,
-    #[savable(serde)]
     halt_mode: HaltMode,
 
     config: GameboyConfig,

@@ -1,11 +1,10 @@
 use save_state::Savable;
-use serde::{Deserialize, Serialize};
 
 use super::colors::ColorPalette;
 use super::sprite::SelectedSprite;
 use fixed_vec_deque::FixedVecDeque;
 
-#[derive(PartialEq, Clone, Copy, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Copy, Savable)]
 pub enum SpritePriorityMode {
     ByIndex, // CGB
     ByCoord, // DMG
@@ -168,7 +167,7 @@ impl Savable for SpriteFifo {
             Savable::save(pixel, &mut writer)?;
         }
 
-        save_state::bincode::serialize_into(&mut writer, &self.sprite_priority_mode)?;
+        self.sprite_priority_mode.save(&mut writer)?;
 
         Ok(())
     }
@@ -186,7 +185,7 @@ impl Savable for SpriteFifo {
             pixel.load(&mut reader)?;
         }
 
-        self.sprite_priority_mode = save_state::bincode::deserialize_from(&mut reader)?;
+        self.sprite_priority_mode.load(&mut reader)?;
 
         Ok(())
     }

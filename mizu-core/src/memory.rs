@@ -2,7 +2,6 @@ mod dma;
 mod interrupts;
 
 use save_state::Savable;
-use serde::{Deserialize, Serialize};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -35,7 +34,7 @@ impl Default for BootRom {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Debug, Savable)]
 enum Speed {
     Normal,
     Double,
@@ -50,7 +49,6 @@ impl Default for Speed {
 #[derive(Default, Savable)]
 struct SpeedController {
     preparing_switch: bool,
-    #[savable(serde)]
     current_speed: Speed,
 }
 

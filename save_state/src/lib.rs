@@ -99,6 +99,8 @@ pub enum SaveError {
     LoadSizeDoesNotMatch,
     #[error("Cartridge does not match")]
     CartridgeDoesNotMatch,
+    #[error("Enum could not be loaded correctly due to corrupted data")]
+    InvalidEnumVariant,
 }
 
 impl From<ioError> for SaveError {
