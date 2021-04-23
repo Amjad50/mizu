@@ -38,20 +38,20 @@ fn impl_for_serde_full(container: &Container) -> Result<TokenStream2> {
             fn save<W: ::std::io::Write>(
                 &self,
                 writer: &mut W,
-            ) -> Result<(), ::save_state::SaveError> {
-                ::save_state::bincode::serialize_into(writer, self)?;
-                Ok(())
+            ) -> ::save_state::Result<()> {
+                ::save_state::serialize_into(writer, self)?;
+                ::std::result::Result::Ok(())
             }
 
             #[inline]
             fn load<R: ::std::io::Read>(
                 &mut self,
                 reader: &mut R,
-            ) -> Result<(), ::save_state::SaveError> {
-                let obj = ::save_state::bincode::deserialize_from(reader)?;
+            ) -> ::save_state::Result<()> {
+                let obj = ::save_state::deserialize_from(reader)?;
 
                 let _ = ::std::mem::replace(self, obj);
-                Ok(())
+                ::std::result::Result::Ok(())
             }
         }
     })
@@ -66,7 +66,7 @@ fn impl_fields_for_save(fields: &Fields, ident_prefix: TokenStream2) -> Vec<Toke
         .zip(idents)
         .map(|(f, ident)| {
             if f.attrs.use_serde {
-                quote!(::save_state::bincode::serialize_into(&mut writer, #ident_prefix #ident)?;)
+                quote!(::save_state::serialize_into(&mut writer, #ident_prefix #ident)?;)
             } else {
                 quote!(::save_state::Savable::save(#ident_prefix #ident, &mut writer)?;)
             }
@@ -82,7 +82,7 @@ fn impl_fields_for_load(fields: &Fields, ident_prefix: TokenStream2) -> Vec<Toke
         .zip(idents)
         .map(|(f, ident)| {
             if f.attrs.use_serde {
-                quote!(let _ = ::std::mem::replace(#ident_prefix #ident, ::save_state::bincode::deserialize_from(&mut reader)?);)
+                quote!(let _ = ::std::mem::replace(#ident_prefix #ident, ::save_state::deserialize_from(&mut reader)?);)
             } else {
                 quote!(::save_state::Savable::load(#ident_prefix #ident, &mut reader)?;)
             }
@@ -93,13 +93,17 @@ fn impl_fields_for_load(fields: &Fields, ident_prefix: TokenStream2) -> Vec<Toke
 fn get_fields_impl_size_sum(fields: &Fields, ident_prefix: TokenStream2) -> TokenStream2 {
     let idents = fields.unskipped_idents();
 
-    let all_fields = fields.unskipped_fields.iter().zip(idents.iter()).map(|(f, ident)| {
-        if f.attrs.use_serde {
-            quote!(::save_state::bincode::serialized_size(#ident_prefix #ident).map_err::<::save_state::SaveError, _>(|e| e.into())?)
-        } else {
-            quote!(::save_state::Savable::save_size(#ident_prefix #ident)?)
-        }
-    });
+    let all_fields = fields
+        .unskipped_fields
+        .iter()
+        .zip(idents.iter())
+        .map(|(f, ident)| {
+            if f.attrs.use_serde {
+                quote!(::save_state::serialized_size(#ident_prefix #ident)?)
+            } else {
+                quote!(::save_state::Savable::save_size(#ident_prefix #ident)?)
+            }
+        });
 
     if idents.is_empty() {
         quote!(0)
@@ -130,23 +134,23 @@ fn impl_for_struct(container: &Container, fields: &Fields) -> Result<TokenStream
             fn save<W: ::std::io::Write>(
                 &self,
                 mut writer: &mut W,
-            ) -> Result<(), ::save_state::SaveError> {
+            ) -> ::save_state::Result<()> {
                 #(#save_fields)*
-                Ok(())
+                ::std::result::Result::Ok(())
             }
 
             #[inline]
             fn load<R: ::std::io::Read>(
                 &mut self,
                 mut reader: &mut R,
-            ) -> Result<(), ::save_state::SaveError> {
+            ) -> ::save_state::Result<()> {
                 #(#load_fields)*
-                Ok(())
+                ::std::result::Result::Ok(())
             }
 
             #[inline]
-            fn save_size(&self) -> Result<u64, ::save_state::SaveError> {
-                Ok(#size_sum)
+            fn save_size(&self) -> ::save_state::Result<u64> {
+                ::std::result::Result::Ok(#size_sum)
             }
         }
     })
@@ -189,7 +193,7 @@ fn impl_for_enum(container: &Container, variants: &[Variant]) -> Result<TokenStr
         // perform intialiaztion with `Default` to all fields
         let default_initializations = all_fields
             .iter()
-            .map(|ident| quote!(let mut #ident = Default::default();));
+            .map(|ident| quote!(let mut #ident = ::std::default::Default::default();));
 
         // only perform load for the unskipped fields
         let load_fields = impl_fields_for_load(&v.fields, quote!(&mut));
@@ -222,28 +226,28 @@ fn impl_for_enum(container: &Container, variants: &[Variant]) -> Result<TokenStr
             fn save<W: ::std::io::Write>(
                 &self,
                 mut writer: &mut W,
-            ) -> Result<(), ::save_state::SaveError> {
+            ) -> ::save_state::Result<()> {
                 match self {
                     #(#save_variants)*
                 }
-                Ok(())
+                ::std::result::Result::Ok(())
             }
 
             #[inline]
             fn load<R: ::std::io::Read>(
                 &mut self,
                 mut reader: &mut R,
-            ) -> Result<(), ::save_state::SaveError> {
+            ) -> ::save_state::Result<()> {
                 let mut position: usize = 0;
                 position.load(&mut reader)?;
                 let enum_value = match position {
                     #(#load_variants)*
-                    _ => return Err(::save_state::SaveError::InvalidEnumVariant)
+                    v => return Err(::save_state::SaveError::InvalidEnumVariant(v))
                 };
 
                 *self = enum_value;
 
-                Ok(())
+                ::std::result::Result::Ok(())
             }
         }
     })

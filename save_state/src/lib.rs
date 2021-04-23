@@ -1,4 +1,4 @@
-pub use bincode;
+use bincode;
 pub use save_state_derive::*;
 
 use bincode::Error as bincodeError;
@@ -8,6 +8,31 @@ use std::convert::From;
 use std::io::{
     Cursor, Error as ioError, ErrorKind as ioErrorKind, Read, Result as ioResult, Write,
 };
+
+pub type Result<T> = std::result::Result<T, SaveError>;
+
+pub fn serialize_into<W, T: ?Sized>(writer: W, value: &T) -> Result<()>
+where
+    W: std::io::Write,
+    T: serde::Serialize,
+{
+    bincode::serialize_into(writer, value).map_err(|e| e.into())
+}
+
+pub fn deserialize_from<R, T>(reader: R) -> Result<T>
+where
+    R: std::io::Read,
+    T: serde::de::DeserializeOwned,
+{
+    bincode::deserialize_from(reader).map_err(|e| e.into())
+}
+
+pub fn serialized_size<T: ?Sized>(value: &T) -> Result<u64>
+where
+    T: serde::Serialize,
+{
+    bincode::serialized_size(value).map_err(|e| e.into())
+}
 
 /// a simple help that implements `io::Write`, which helps get the size of
 /// a Savable object
@@ -61,26 +86,26 @@ impl Write for Counter {
 }
 
 pub trait Savable {
-    fn save<W: Write>(&self, writer: &mut W) -> Result<(), SaveError>;
-    fn load<R: Read>(&mut self, reader: &mut R) -> Result<(), SaveError>;
+    fn save<W: Write>(&self, writer: &mut W) -> Result<()>;
+    fn load<R: Read>(&mut self, reader: &mut R) -> Result<()>;
     /// The size of the object if saved now, note that this might change, for example
     /// due to the length of string objects or data inside the object.
     #[inline]
-    fn save_size(&self) -> Result<u64, SaveError> {
+    fn save_size(&self) -> Result<u64> {
         let mut counter = Counter::default();
         self.save(&mut counter)?;
         Ok(counter.counter)
     }
 }
 
-pub fn save_object<T: Savable>(object: &T) -> Result<Vec<u8>, SaveError> {
+pub fn save_object<T: Savable>(object: &T) -> Result<Vec<u8>> {
     let mut result = Vec::new();
     object.save(&mut result)?;
 
     Ok(result)
 }
 
-pub fn load_object<T: Savable>(object: &mut T, data: &[u8]) -> Result<(), SaveError> {
+pub fn load_object<T: Savable>(object: &mut T, data: &[u8]) -> Result<()> {
     let mut cursor = Cursor::new(data);
     object.load(&mut cursor)?;
 
@@ -95,12 +120,12 @@ pub enum SaveError {
     IoError(ioError),
     #[error("Bincode Error: {0}")]
     BincodeError(bincodeError),
-    #[error("Load size of the input data does not match `object_size`")]
+    #[error("Load size of the input data does not match the size of the object to be loaded into")]
     LoadSizeDoesNotMatch,
     #[error("Cartridge does not match")]
     CartridgeDoesNotMatch,
-    #[error("Enum could not be loaded correctly due to corrupted data")]
-    InvalidEnumVariant,
+    #[error("Enum could not be loaded correctly due to corrupted data ({0})")]
+    InvalidEnumVariant(usize),
 }
 
 impl From<ioError> for SaveError {
@@ -119,19 +144,19 @@ macro_rules! impl_primitive {
     ($struct_name: ident $(, $g: tt)? ) => {
         impl Savable for $struct_name {
             #[inline]
-            fn save<W: ::std::io::Write>(&self, writer: &mut W) -> Result<(), SaveError> {
+            fn save<W: ::std::io::Write>(&self, writer: &mut W) -> Result<()> {
                 paste!(writer.[<write_ $struct_name>]$($g<LittleEndian>)?(*self)?);
                 Ok(())
             }
 
             #[inline]
-            fn load<R: ::std::io::Read>(&mut self, reader: &mut R) -> Result<(), SaveError> {
+            fn load<R: ::std::io::Read>(&mut self, reader: &mut R) -> Result<()> {
                 *self = paste!(reader.[<read_ $struct_name>]$($g<LittleEndian>)?()?);
                 Ok(())
             }
 
             #[inline]
-            fn save_size(&self) -> Result<u64, SaveError> {
+            fn save_size(&self) -> Result<u64> {
                Ok(::std::mem::size_of::<Self>() as u64)
             }
         }
@@ -143,13 +168,13 @@ macro_rules! impl_savable {
     ($struct_name: ident $(<$($generics: ident),+>)?) => {
         impl $(<$($generics: serde::Serialize + serde::de::DeserializeOwned),+>)? Savable for $struct_name $(<$($generics),+>)?{
             #[inline]
-            fn save<W: ::std::io::Write>(&self, writer: &mut W) -> Result<(), SaveError> {
+            fn save<W: ::std::io::Write>(&self, writer: &mut W) -> Result<()> {
                 ::bincode::serialize_into(writer, self)?;
                 Ok(())
             }
 
             #[inline]
-            fn load<R: ::std::io::Read>(&mut self, reader: &mut R) -> Result<(), SaveError> {
+            fn load<R: ::std::io::Read>(&mut self, reader: &mut R) -> Result<()> {
                 let obj = ::bincode::deserialize_from(reader)?;
                 let _ = ::std::mem::replace(self, obj);
                 Ok(())
@@ -164,13 +189,13 @@ macro_rules! impl_for_tuple {
         where $($tuple_element: Savable),+
         {
             #[inline]
-            fn save<W: ::std::io::Write>(&self, mut writer: &mut W) -> Result<(), SaveError> {
+            fn save<W: ::std::io::Write>(&self, mut writer: &mut W) -> Result<()> {
                 $(<$tuple_element as Savable>::save(&self.$id, &mut writer)?;)+
                 Ok(())
             }
 
             #[inline]
-            fn load<R: ::std::io::Read>(&mut self, mut reader: &mut R) -> Result<(), SaveError> {
+            fn load<R: ::std::io::Read>(&mut self, mut reader: &mut R) -> Result<()> {
                 $(<$tuple_element as Savable>::load(&mut self.$id, &mut reader)?;)+
                 Ok(())
             }
@@ -203,33 +228,33 @@ impl_for_tuple!(0 A0, 1 A1, 2 A2, 3 A3, 4 A4, 5 A5, 6 A6, 7 A7);
 impl_for_tuple!(0 A0, 1 A1, 2 A2, 3 A3, 4 A4, 5 A5, 6 A6, 7 A7, 8 A8);
 
 impl Savable for usize {
-    fn save<W: ::std::io::Write>(&self, writer: &mut W) -> Result<(), SaveError> {
+    fn save<W: ::std::io::Write>(&self, writer: &mut W) -> Result<()> {
         writer.write_u64::<LittleEndian>(*self as u64)?;
         Ok(())
     }
 
-    fn load<R: ::std::io::Read>(&mut self, reader: &mut R) -> Result<(), SaveError> {
+    fn load<R: ::std::io::Read>(&mut self, reader: &mut R) -> Result<()> {
         *self = reader.read_u64::<LittleEndian>()? as usize;
         Ok(())
     }
 
-    fn save_size(&self) -> Result<u64, SaveError> {
+    fn save_size(&self) -> Result<u64> {
         Ok(::std::mem::size_of::<u64>() as u64)
     }
 }
 
 impl Savable for isize {
-    fn save<W: ::std::io::Write>(&self, writer: &mut W) -> Result<(), SaveError> {
+    fn save<W: ::std::io::Write>(&self, writer: &mut W) -> Result<()> {
         writer.write_i64::<LittleEndian>(*self as i64)?;
         Ok(())
     }
 
-    fn load<R: ::std::io::Read>(&mut self, reader: &mut R) -> Result<(), SaveError> {
+    fn load<R: ::std::io::Read>(&mut self, reader: &mut R) -> Result<()> {
         *self = reader.read_i64::<LittleEndian>()? as isize;
         Ok(())
     }
 
-    fn save_size(&self) -> Result<u64, SaveError> {
+    fn save_size(&self) -> Result<u64> {
         Ok(::std::mem::size_of::<i64>() as u64)
     }
 }
@@ -240,14 +265,14 @@ impl<T, const N: usize> Savable for [T; N]
 where
     T: Savable,
 {
-    fn save<W: ::std::io::Write>(&self, mut writer: &mut W) -> Result<(), SaveError> {
+    fn save<W: ::std::io::Write>(&self, mut writer: &mut W) -> Result<()> {
         for element in self {
             element.save(&mut writer)?;
         }
         Ok(())
     }
 
-    fn load<R: ::std::io::Read>(&mut self, mut reader: &mut R) -> Result<(), SaveError> {
+    fn load<R: ::std::io::Read>(&mut self, mut reader: &mut R) -> Result<()> {
         for element in self {
             element.load(&mut reader)?;
         }
@@ -259,7 +284,7 @@ impl<T> Savable for Option<T>
 where
     T: Savable + Default,
 {
-    fn save<W: Write>(&self, mut writer: &mut W) -> Result<(), SaveError> {
+    fn save<W: Write>(&self, mut writer: &mut W) -> Result<()> {
         match self {
             Some(s) => {
                 true.save(&mut writer)?;
@@ -270,7 +295,7 @@ where
         Ok(())
     }
 
-    fn load<R: Read>(&mut self, mut reader: &mut R) -> Result<(), SaveError> {
+    fn load<R: Read>(&mut self, mut reader: &mut R) -> Result<()> {
         let mut value = false;
         value.load(&mut reader)?;
 
