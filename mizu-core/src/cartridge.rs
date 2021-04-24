@@ -466,7 +466,7 @@ impl Drop for Cartridge {
 }
 
 impl Savable for Cartridge {
-    fn save<W: Write>(&self, mut writer: &mut W) -> Result<(), save_state::SaveError> {
+    fn save<W: Write>(&self, mut writer: &mut W) -> save_state::Result<()> {
         self.hash.save(&mut writer)?;
         self.cartridge_type.save(&mut writer)?;
         let data = self.mapper.save_state()?;
@@ -476,22 +476,16 @@ impl Savable for Cartridge {
         Ok(())
     }
 
-    fn load<R: Read>(&mut self, mut reader: &mut R) -> Result<(), save_state::SaveError> {
-        // FIXME: move cartridge checks to before any data is loaded, since
-        //  it will be corrupted when we reach here and fine its not for the same
-        //  cartridge
+    fn load<R: Read>(&mut self, mut reader: &mut R) -> save_state::Result<()> {
+        // this check should be done at the beginning, here is another check
         let mut hash = [0u8; 32];
         hash.load(&mut reader)?;
-        if hash != self.hash {
-            return Err(save_state::SaveError::CartridgeDoesNotMatch);
-        }
+        assert_eq!(hash, self.hash);
 
         // make a copy here, so we can fill it without changing the original one
         let mut cartridge_type = self.cartridge_type;
         cartridge_type.load(&mut reader)?;
-        if self.cartridge_type != cartridge_type {
-            return Err(save_state::SaveError::CartridgeDoesNotMatch);
-        }
+        assert_eq!(self.cartridge_type, cartridge_type);
 
         let size = self.mapper.save_state_size()? as usize;
         let mut data = vec![0; size];

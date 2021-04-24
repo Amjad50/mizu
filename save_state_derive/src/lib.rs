@@ -242,7 +242,7 @@ fn impl_for_enum(container: &Container, variants: &[Variant]) -> Result<TokenStr
                 position.load(&mut reader)?;
                 let enum_value = match position {
                     #(#load_variants)*
-                    v => return Err(::save_state::SaveError::InvalidEnumVariant(v))
+                    v => return Err(::save_state::Error::InvalidEnumVariant(v))
                 };
 
                 *self = enum_value;

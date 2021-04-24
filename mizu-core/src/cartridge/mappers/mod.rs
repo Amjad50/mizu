@@ -1,3 +1,23 @@
+// to be used in all mappers
+#[macro_use]
+mod save_state_fns {
+    macro_rules! save_state_fns {
+        () => {
+            fn save_state_size(&self) -> save_state::Result<u64> {
+                self.save_size()
+            }
+
+            fn save_state(&self) -> save_state::Result<Vec<u8>> {
+                save_state::save_object(self)
+            }
+
+            fn load_state(&mut self, data: &[u8]) -> save_state::Result<()> {
+                save_state::load_object(self, data)
+            }
+        };
+    }
+}
+
 mod mbc1;
 mod mbc2;
 mod mbc3;
@@ -10,7 +30,7 @@ pub(super) use mbc3::Mbc3;
 pub(super) use mbc5::Mbc5;
 pub(super) use no_mapper::NoMapper;
 
-use save_state::{Savable, SaveError};
+use save_state::Savable;
 
 /// The number of clocks needed from the bus to complete one second
 pub const ONE_SECOND_MAPPER_CLOCKS: u32 = 4194304 / 2;
@@ -74,7 +94,7 @@ pub trait Mapper {
     // with the mapper field in `Cartridge`
     //
     // TODO: find a better solution
-    fn save_state_size(&self) -> Result<u64, SaveError>;
-    fn save_state(&self) -> Result<Vec<u8>, SaveError>;
-    fn load_state(&mut self, data: &[u8]) -> Result<(), SaveError>;
+    fn save_state_size(&self) -> save_state::Result<u64>;
+    fn save_state(&self) -> save_state::Result<Vec<u8>>;
+    fn load_state(&mut self, data: &[u8]) -> save_state::Result<()>;
 }

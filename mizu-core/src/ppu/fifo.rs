@@ -66,7 +66,7 @@ impl BgFifo {
 }
 
 impl Savable for BgFifo {
-    fn save<W: std::io::Write>(&self, mut writer: &mut W) -> Result<(), save_state::SaveError> {
+    fn save<W: std::io::Write>(&self, mut writer: &mut W) -> save_state::Result<()> {
         // push the size of the current buffer
         <usize as Savable>::save(&self.pixels.len(), &mut writer)?;
         for pixel in self.pixels.iter() {
@@ -76,7 +76,7 @@ impl Savable for BgFifo {
         Ok(())
     }
 
-    fn load<R: std::io::Read>(&mut self, mut reader: &mut R) -> Result<(), save_state::SaveError> {
+    fn load<R: std::io::Read>(&mut self, mut reader: &mut R) -> save_state::Result<()> {
         let mut size = 0;
         <usize as Savable>::load(&mut size, &mut reader)?;
         assert!(size <= 16);
@@ -160,7 +160,7 @@ impl SpriteFifo {
 }
 
 impl Savable for SpriteFifo {
-    fn save<W: std::io::Write>(&self, mut writer: &mut W) -> Result<(), save_state::SaveError> {
+    fn save<W: std::io::Write>(&self, mut writer: &mut W) -> save_state::Result<()> {
         // push the size of the current buffer
         <usize as Savable>::save(&self.pixels.len(), &mut writer)?;
         for pixel in self.pixels.iter() {
@@ -172,7 +172,7 @@ impl Savable for SpriteFifo {
         Ok(())
     }
 
-    fn load<R: std::io::Read>(&mut self, mut reader: &mut R) -> Result<(), save_state::SaveError> {
+    fn load<R: std::io::Read>(&mut self, mut reader: &mut R) -> save_state::Result<()> {
         let mut size = 0;
         <usize as Savable>::load(&mut size, &mut reader)?;
 

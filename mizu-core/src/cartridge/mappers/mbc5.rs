@@ -85,15 +85,5 @@ impl Mapper for Mbc5 {
         }
     }
 
-    fn save_state_size(&self) -> Result<u64, save_state::SaveError> {
-        self.save_size()
-    }
-
-    fn save_state(&self) -> Result<Vec<u8>, save_state::SaveError> {
-        save_state::save_object(self)
-    }
-
-    fn load_state(&mut self, data: &[u8]) -> Result<(), save_state::SaveError> {
-        save_state::load_object(self, data)
-    }
+    save_state_fns!();
 }

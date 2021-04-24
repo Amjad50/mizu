@@ -9,7 +9,7 @@ use std::io::{
     Cursor, Error as ioError, ErrorKind as ioErrorKind, Read, Result as ioResult, Write,
 };
 
-pub type Result<T> = std::result::Result<T, SaveError>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 pub fn serialize_into<W, T>(writer: W, value: &T) -> Result<()>
 where
@@ -117,35 +117,33 @@ pub fn load_object<T: Savable>(object: &mut T, data: &[u8]) -> Result<()> {
     assert!(!overflow);
 
     if remaining_data_len > 0 {
-        Err(SaveError::TrailingData(remaining_data_len))
+        Err(Error::TrailingData(remaining_data_len))
     } else {
         Ok(())
     }
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum SaveError {
+pub enum Error {
     #[error("Io Eror: {0}")]
     IoError(ioError),
     #[error("Bincode Error: {0}")]
     SerdeCobrError(serdeCborError),
     #[error("After loading an object, some data still remained ({0} bytes)")]
     TrailingData(u64),
-    #[error("Cartridge does not match")]
-    CartridgeDoesNotMatch,
     #[error("Enum could not be loaded correctly due to corrupted data ({0})")]
     InvalidEnumVariant(usize),
 }
 
-impl From<ioError> for SaveError {
+impl From<ioError> for Error {
     fn from(e: ioError) -> Self {
-        SaveError::IoError(e)
+        Error::IoError(e)
     }
 }
 
-impl From<serdeCborError> for SaveError {
+impl From<serdeCborError> for Error {
     fn from(e: serdeCborError) -> Self {
-        SaveError::SerdeCobrError(e)
+        Error::SerdeCobrError(e)
     }
 }
 
