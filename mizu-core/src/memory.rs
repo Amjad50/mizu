@@ -314,6 +314,10 @@ impl Bus {
         s
     }
 
+    pub fn cartridge(&self) -> &Cartridge {
+        &self.cartridge
+    }
+
     pub fn screen_buffer(&self) -> &[u8] {
         self.ppu.screen_buffer()
     }

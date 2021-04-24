@@ -17,6 +17,7 @@ ringbuf = "0.2.2"
 cpal = "0.13.1"
 clap = "2.33.3"
 native-dialog = "0.5.4"
+directories-next = "2.0.0"
 
 [workspace]
 members = [

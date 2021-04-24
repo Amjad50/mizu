@@ -1,10 +1,17 @@
 mod audio;
 mod printer_front;
 
+use std::{
+    fs::{self, File},
+    io::Write,
+    path::{Path, PathBuf},
+};
+
 use audio::AudioPlayer;
+use directories_next::ProjectDirs;
 use printer_front::MizuPrinter;
 
-use mizu_core::{GameBoy, GameboyConfig, JoypadButton};
+use mizu_core::{GameBoy, GameboyConfig, JoypadButton, SaveError};
 
 use sfml::{
     graphics::{Color, FloatRect, Image, RenderTarget, RenderWindow, Sprite, Texture, View},
@@ -119,6 +126,90 @@ impl GameboyFront {
         }
     }
 
+    fn base_save_state_folder(&self) -> Option<PathBuf> {
+        if let Some(proj_dirs) = ProjectDirs::from("", "Amjad50", "Mizu") {
+            let base_saved_states_dir = proj_dirs.data_local_dir().join("saved_states");
+            // Linux:   /home/<user>/.local/share/mizu/saved_states
+            // Windows: C:\Users\<user>\AppData\Local\Amjad50\Mizu\data\saved_states
+            // macOS:   /Users/<user>/Library/Application Support/Amjad50.Mizu/saved_states
+            fs::create_dir_all(&base_saved_states_dir).ok()?;
+            Some(base_saved_states_dir)
+        } else {
+            None
+        }
+    }
+
+    fn save_state_file(&self, slot: u8) -> Option<Box<Path>> {
+        let cartridge_path = self.gameboy.file_path();
+
+        if let Some(base_saved_states_dir) = self.base_save_state_folder() {
+            // we use the cartridge path and replace all `.` with `_` to remove
+            // the extensions but keep the unique filename
+            let save_file_base_name = format!(
+                "{}_{}",
+                cartridge_path
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace('.', "_"),
+                slot
+            );
+            Some(
+                base_saved_states_dir
+                    .join(save_file_base_name)
+                    .with_extension("mst")
+                    .into_boxed_path(),
+            )
+        } else {
+            None
+        }
+    }
+
+    fn save_state(&self, slot: u8) -> Result<(), SaveError> {
+        let file_path = self.save_state_file(slot).ok_or(SaveError::SaveFileError)?;
+        println!("saving state file {}", file_path.to_string_lossy());
+        let mut file = File::create(file_path)?;
+
+        // first save to a vector as writing to the file is very slow (maybe because of the flushes)
+        let mut data = Vec::new();
+        self.gameboy.save_state(&mut data)?;
+
+        // write content of the saved_state to the file
+        file.write_all(&data)?;
+
+        Ok(())
+    }
+
+    /// return `true` if the file is loaded, `false` otherwize in case of no errors
+    fn load_state(&mut self, slot: u8) -> Result<bool, SaveError> {
+        let file_path = self.save_state_file(slot).ok_or(SaveError::SaveFileError)?;
+        println!("trying to load state file {}", file_path.to_string_lossy());
+
+        if file_path.exists() {
+            let file = File::open(file_path)?;
+            self.gameboy.load_state(file)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn num_key(key: Key) -> Option<u8> {
+        match key {
+            Key::NUM1 => Some(0),
+            Key::NUM2 => Some(1),
+            Key::NUM3 => Some(2),
+            Key::NUM4 => Some(3),
+            Key::NUM5 => Some(4),
+            Key::NUM6 => Some(5),
+            Key::NUM7 => Some(6),
+            Key::NUM8 => Some(7),
+            Key::NUM9 => Some(8),
+            Key::NUM0 => Some(9),
+            _ => None,
+        }
+    }
+
     /// returns `true` if the app should close
     fn handle_key_inputs(&mut self) -> bool {
         while let Some(event) = self.window.poll_event() {
@@ -126,7 +217,9 @@ impl GameboyFront {
                 Event::Closed => {
                     return true;
                 }
-                Event::KeyPressed { code: key, .. } => match key {
+                Event::KeyPressed {
+                    code: key, shift, ..
+                } => match key {
                     Key::J => self.gameboy.press_joypad(JoypadButton::B),
                     Key::K => self.gameboy.press_joypad(JoypadButton::A),
                     Key::U => self.gameboy.press_joypad(JoypadButton::Select),
@@ -135,6 +228,13 @@ impl GameboyFront {
                     Key::S => self.gameboy.press_joypad(JoypadButton::Down),
                     Key::A => self.gameboy.press_joypad(JoypadButton::Left),
                     Key::D => self.gameboy.press_joypad(JoypadButton::Right),
+
+                    _ if Self::num_key(key).is_some() && shift => {
+                        self.load_state(Self::num_key(key).unwrap()).unwrap();
+                    }
+                    _ if Self::num_key(key).is_some() => {
+                        self.save_state(Self::num_key(key).unwrap()).unwrap();
+                    }
 
                     Key::ENTER => {
                         self.gameboy.press_joypad(JoypadButton::A);

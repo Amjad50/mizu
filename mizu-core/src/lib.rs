@@ -5,6 +5,7 @@ mod joypad;
 mod memory;
 mod ppu;
 mod printer;
+mod save_error;
 mod serial;
 mod timer;
 
@@ -13,7 +14,7 @@ mod tests;
 
 use std::cell::RefCell;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -21,11 +22,15 @@ use save_state::Savable;
 
 pub use joypad::JoypadButton;
 pub use printer::Printer;
+pub use save_error::SaveError;
 
 use cartridge::{Cartridge, CartridgeError};
 use cpu::Cpu;
 use memory::Bus;
 use serial::SerialDevice;
+
+const SAVE_STATE_MAGIC: &[u8; 4] = b"MST\xee";
+const SAVE_STATE_VERSION: usize = 1;
 
 #[derive(Debug, Default, Clone, Copy, Savable)]
 pub struct GameboyConfig {
@@ -46,7 +51,6 @@ impl GameboyConfig {
 pub struct GameBoy {
     cpu: Cpu,
     bus: Bus,
-    game_title: String,
 }
 
 impl GameBoy {
@@ -56,8 +60,6 @@ impl GameBoy {
         config: GameboyConfig,
     ) -> Result<Self, CartridgeError> {
         let cartridge = Cartridge::from_file(file_path)?;
-
-        let game_title = cartridge.game_title().to_string();
 
         let (bus, cpu) = if let Some(boot_rom_file) = boot_rom_file {
             let mut boot_rom_file = File::open(boot_rom_file)?;
@@ -84,11 +86,7 @@ impl GameBoy {
             )
         };
 
-        Ok(Self {
-            bus,
-            cpu,
-            game_title,
-        })
+        Ok(Self { bus, cpu })
     }
 
     /// Synced to PPU
@@ -107,7 +105,11 @@ impl GameBoy {
     }
 
     pub fn game_title(&self) -> &str {
-        &self.game_title
+        &self.bus.cartridge().game_title()
+    }
+
+    pub fn file_path(&self) -> &Path {
+        &self.bus.cartridge().file_path()
     }
 
     pub fn screen_buffer(&self) -> &[u8] {
@@ -134,5 +136,42 @@ impl GameBoy {
     /// Disconnects the serial device if any is connected, else, nothing is done
     pub fn disconnect_device(&mut self) {
         self.bus.disconnect_device();
+    }
+
+    pub fn save_state<W: Write>(&self, mut writer: W) -> Result<(), SaveError> {
+        SAVE_STATE_MAGIC.save(&mut writer)?;
+        SAVE_STATE_VERSION.save(&mut writer)?;
+        let cartridge_hash: &[u8; 32] = self.bus.cartridge().hash();
+        cartridge_hash.save(&mut writer)?;
+
+        self.cpu.save(&mut writer)?;
+        self.bus.save(&mut writer)?;
+        Ok(())
+    }
+
+    pub fn load_state<R: Read>(&mut self, mut reader: R) -> Result<(), SaveError> {
+        let mut magic = [0u8; 4];
+        let mut version = 0usize;
+        let mut hash = [0u8; 32];
+
+        magic.load(&mut reader)?;
+        if &magic != SAVE_STATE_MAGIC {
+            return Err(SaveError::InvalidSaveStateHeader);
+        }
+
+        version.load(&mut reader)?;
+        if version != SAVE_STATE_VERSION {
+            return Err(SaveError::UnmatchedSaveErrorVersion(version));
+        }
+
+        hash.load(&mut reader)?;
+        if &hash != self.bus.cartridge().hash() {
+            return Err(SaveError::InvalidCartridgeHash);
+        }
+
+        self.cpu.load(&mut reader)?;
+        self.bus.load(&mut reader)?;
+
+        Ok(())
     }
 }

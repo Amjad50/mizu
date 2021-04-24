@@ -393,6 +393,14 @@ impl Cartridge {
     pub fn game_title(&self) -> &str {
         &self.game_title
     }
+
+    pub fn hash(&self) -> &[u8; 32] {
+        &self.hash
+    }
+
+    pub fn file_path(&self) -> &Path {
+        &self.file_path
+    }
 }
 
 impl Cartridge {
