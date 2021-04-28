@@ -14,7 +14,10 @@ use printer_front::MizuPrinter;
 use mizu_core::{GameBoy, GameboyConfig, JoypadButton, SaveError};
 
 use sfml::{
-    graphics::{Color, FloatRect, Image, RenderTarget, RenderWindow, Sprite, Texture, View},
+    graphics::{
+        Color, Drawable, FloatRect, Font, Image, Rect, RenderTarget, RenderWindow, Sprite, Text,
+        Texture, Transformable, View,
+    },
     system::Vector2f,
     window::{Event, Key, Style},
     SfBox,
@@ -27,6 +30,104 @@ pub const TV_HEIGHT: u32 = 144;
 const DEFAULT_SCALE: u32 = 5;
 const DEFAULT_FPS: u32 = 60;
 
+const NOTIF_FONT_SIZE: u32 = 25;
+const NOTIF_FONT_OUTLINE: f32 = 1.5;
+const NOTIF_DURATION: f32 = 4.;
+const NOTIF_DISAPPEAR_REMAIN_TIME: f32 = 0.5;
+
+const FONT_TTF_FILE: &[u8] = include_bytes!("./resources/Inconsolata/Inconsolata-Regular.ttf");
+
+struct Notifications {
+    messages: Vec<(String, f32)>,
+    font: SfBox<Font>,
+    width: u32,
+    height: u32,
+}
+
+impl Notifications {
+    fn new() -> Self {
+        Self {
+            messages: Vec::new(),
+            font: Font::from_memory(FONT_TTF_FILE).unwrap(),
+            width: TV_WIDTH,
+            height: TV_HEIGHT,
+        }
+    }
+
+    fn update_size(&mut self, width: u32, height: u32) {
+        self.width = width;
+        self.height = height;
+    }
+
+    fn add_msg(&mut self, msg: &str) {
+        self.messages.push((msg.to_owned(), NOTIF_DURATION));
+    }
+
+    fn update(&mut self, delta: f32) {
+        self.messages.iter_mut().for_each(|(_, c)| *c -= delta);
+        self.messages.retain(|(_, c)| c > &0.);
+    }
+}
+
+impl Drawable for Notifications {
+    fn draw<'a: 'shader, 'texture, 'shader, 'shader_texture>(
+        &'a self,
+        target: &mut dyn RenderTarget,
+        states: &sfml::graphics::RenderStates<'texture, 'shader, 'shader_texture>,
+    ) {
+        if self.messages.is_empty() {
+            return;
+        }
+
+        // get the view of the gameboy rendering
+        let gb_view = get_new_view(self.width, self.height, TV_WIDTH, TV_HEIGHT);
+
+        // save the current view to restore to it later
+        let saved_view = target.view().to_owned();
+        // create a new view for our text rendering
+        let mut text_rendring_view = saved_view.to_owned();
+        // use the gameboy viewport, but without any resizing
+        let mut gb_viewport = gb_view.viewport();
+        gb_viewport.width = 1.;
+        gb_viewport.height = 1.;
+        text_rendring_view.set_viewport(&gb_viewport);
+
+        // get the length of the gameboy rendering by using `target` as reference measures
+        // this will give us the distance, the text need to be offsetted in order
+        // to be at the bottom of the rendering display
+        let Rect { height: down, .. } = target.viewport(&gb_view);
+        let down_base = down as f32 - (NOTIF_FONT_SIZE as f32 * 2.);
+
+        target.set_view(&text_rendring_view);
+
+        for (i, (msg, c)) in self.messages.iter().rev().enumerate() {
+            // TODO: find a way to store the Text in the struct so that we don't need
+            //  to recreate it every frame (now we cannot because of lifetime issue)
+            let mut text = Text::new(msg, &self.font, NOTIF_FONT_SIZE);
+            text.set_outline_thickness(NOTIF_FONT_OUTLINE);
+            text.set_position((
+                NOTIF_FONT_SIZE as f32 / 2.,
+                down_base as f32 - (NOTIF_FONT_SIZE as f32 * i as f32),
+            ));
+
+            if c < &NOTIF_DISAPPEAR_REMAIN_TIME {
+                let ratio = 255. / NOTIF_DISAPPEAR_REMAIN_TIME;
+                let alpha_decrease = (ratio * (NOTIF_DISAPPEAR_REMAIN_TIME - *c)).min(255.) as u8;
+
+                let mut color = text.outline_color();
+                *color.alpha_mut() -= alpha_decrease;
+                text.set_outline_color(color);
+                let mut color = text.fill_color();
+                *color.alpha_mut() -= alpha_decrease;
+                text.set_fill_color(color);
+            }
+            target.draw_text(&text, states);
+        }
+
+        target.set_view(&saved_view);
+    }
+}
+
 struct GameboyFront {
     gameboy: GameBoy,
     window: RenderWindow,
@@ -34,6 +135,7 @@ struct GameboyFront {
     audio_player: AudioPlayer,
     pixels_buffer: [u8; TV_HEIGHT as usize * TV_WIDTH as usize * 4],
     printer: Option<MizuPrinter>,
+    notifications: Notifications,
 }
 
 impl GameboyFront {
@@ -44,9 +146,12 @@ impl GameboyFront {
             Style::CLOSE | Style::RESIZE,
             &Default::default(),
         );
+        let mut notifications = Notifications::new();
+
         let size = window.size();
 
         update_window_view(&mut window, size.x, size.y);
+        notifications.update_size(size.x, size.y);
 
         let audio_player = AudioPlayer::new(44100);
         audio_player.play();
@@ -60,6 +165,7 @@ impl GameboyFront {
             audio_player,
             pixels_buffer,
             printer: None,
+            notifications,
         };
 
         s.update_fps();
@@ -82,13 +188,15 @@ impl GameboyFront {
         let mut t = std::time::Instant::now();
 
         loop {
+            let elapsed = t.elapsed().as_secs_f32();
             self.window.set_title(&format!(
                 "mizu - {} - FPS: {} - printer {}connected",
                 self.gameboy.game_title(),
-                (1. / t.elapsed().as_secs_f64()).round(),
+                (1. / elapsed).round(),
                 // the format! has "{}connected", so we just fill `"dis"` if needed
                 if self.printer.is_some() { "" } else { "dis" },
             ));
+            self.notifications.update(elapsed);
 
             t = std::time::Instant::now();
 
@@ -120,6 +228,16 @@ impl GameboyFront {
                     self.disconnect_printer();
                 }
             }
+
+            let size = self.window.size();
+
+            // restore normal size of the window without stretching
+            self.window
+                .set_view(&get_new_view(size.x, size.y, size.x, size.y));
+            // draw the notifications
+            self.window.draw(&self.notifications);
+            // restore gameboy stretched size
+            update_window_view(&mut self.window, size.x, size.y);
 
             // frame limiting, must be last
             self.window.display();
@@ -194,6 +312,10 @@ impl GameboyFront {
         }
     }
 
+    fn notify(&mut self, msg: &str) {
+        self.notifications.add_msg(msg)
+    }
+
     fn num_key(key: Key) -> Option<u8> {
         match key {
             Key::NUM1 => Some(0),
@@ -230,10 +352,39 @@ impl GameboyFront {
                     Key::D => self.gameboy.press_joypad(JoypadButton::Right),
 
                     _ if Self::num_key(key).is_some() && shift => {
-                        self.load_state(Self::num_key(key).unwrap()).unwrap();
+                        let state_n = Self::num_key(key).unwrap();
+
+                        let notification_msg = match self.load_state(state_n) {
+                            Ok(false) => {
+                                format!(
+                                    "[Save state] save state #{} could not be found.",
+                                    state_n + 1
+                                )
+                            }
+                            Ok(true) => format!("[Save state] loaded save state #{}.", state_n + 1),
+                            Err(e) => format!(
+                                "[Save state] error while loading from #{} {}.",
+                                state_n + 1,
+                                e
+                            ),
+                        };
+
+                        self.notify(&notification_msg);
                     }
                     _ if Self::num_key(key).is_some() => {
-                        self.save_state(Self::num_key(key).unwrap()).unwrap();
+                        let state_n = Self::num_key(key).unwrap();
+                        let notification_msg = match self.save_state(state_n) {
+                            Ok(_) => {
+                                format!("[Save state] saved save state #{}.", state_n + 1)
+                            }
+                            Err(e) => format!(
+                                "[Save state] error while saving into #{} {}.",
+                                state_n + 1,
+                                e
+                            ),
+                        };
+
+                        self.notify(&notification_msg);
                     }
 
                     Key::ENTER => {
@@ -281,7 +432,8 @@ impl GameboyFront {
                     _ => {}
                 },
                 Event::Resized { width, height } => {
-                    update_window_view(&mut self.window, width, height)
+                    update_window_view(&mut self.window, width, height);
+                    self.notifications.update_size(width, height);
                 }
                 _ => {}
             }
@@ -315,8 +467,8 @@ fn get_new_view(
     }
 
     let mut view = View::new(
-        Vector2f::new((TV_WIDTH / 2) as f32, (TV_HEIGHT / 2) as f32),
-        Vector2f::new((TV_WIDTH) as f32, (TV_HEIGHT) as f32),
+        Vector2f::new((target_width / 2) as f32, (target_height / 2) as f32),
+        Vector2f::new((target_width) as f32, (target_height) as f32),
     );
 
     view.set_viewport(&viewport);
@@ -328,7 +480,7 @@ fn get_new_view(
 /// this view is in the size of the GB LCD screen
 /// but we can scale the window and all the pixels will be scaled
 /// accordingly
-pub fn update_window_view(window: &mut RenderWindow, window_width: u32, window_height: u32) {
+pub fn update_window_view(window: &mut dyn RenderTarget, window_width: u32, window_height: u32) {
     window.set_view(&get_new_view(
         window_width,
         window_height,
