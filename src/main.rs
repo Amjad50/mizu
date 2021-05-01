@@ -1,4 +1,5 @@
 mod audio;
+mod notification;
 mod printer_front;
 
 use std::{
@@ -9,15 +10,13 @@ use std::{
 
 use audio::AudioPlayer;
 use directories_next::ProjectDirs;
+use notification::Notifications;
 use printer_front::MizuPrinter;
 
 use mizu_core::{GameBoy, GameboyConfig, JoypadButton, SaveError};
 
 use sfml::{
-    graphics::{
-        Color, Drawable, FloatRect, Font, Image, Rect, RenderTarget, RenderWindow, Sprite, Text,
-        Texture, Transformable, View,
-    },
+    graphics::{Color, FloatRect, Image, RenderTarget, RenderWindow, Sprite, Texture, View},
     system::Vector2f,
     window::{Event, Key, Style},
     SfBox,
@@ -29,104 +28,6 @@ pub const TV_WIDTH: u32 = 160;
 pub const TV_HEIGHT: u32 = 144;
 const DEFAULT_SCALE: u32 = 5;
 const DEFAULT_FPS: u32 = 60;
-
-const NOTIF_FONT_SIZE: u32 = 25;
-const NOTIF_FONT_OUTLINE: f32 = 1.5;
-const NOTIF_DURATION: f32 = 4.;
-const NOTIF_DISAPPEAR_REMAIN_TIME: f32 = 0.5;
-
-const FONT_TTF_FILE: &[u8] = include_bytes!("./resources/Inconsolata/Inconsolata-Regular.ttf");
-
-struct Notifications {
-    messages: Vec<(String, f32)>,
-    font: SfBox<Font>,
-    width: u32,
-    height: u32,
-}
-
-impl Notifications {
-    fn new() -> Self {
-        Self {
-            messages: Vec::new(),
-            font: Font::from_memory(FONT_TTF_FILE).unwrap(),
-            width: TV_WIDTH,
-            height: TV_HEIGHT,
-        }
-    }
-
-    fn update_size(&mut self, width: u32, height: u32) {
-        self.width = width;
-        self.height = height;
-    }
-
-    fn add_msg(&mut self, msg: &str) {
-        self.messages.push((msg.to_owned(), NOTIF_DURATION));
-    }
-
-    fn update(&mut self, delta: f32) {
-        self.messages.iter_mut().for_each(|(_, c)| *c -= delta);
-        self.messages.retain(|(_, c)| c > &0.);
-    }
-}
-
-impl Drawable for Notifications {
-    fn draw<'a: 'shader, 'texture, 'shader, 'shader_texture>(
-        &'a self,
-        target: &mut dyn RenderTarget,
-        states: &sfml::graphics::RenderStates<'texture, 'shader, 'shader_texture>,
-    ) {
-        if self.messages.is_empty() {
-            return;
-        }
-
-        // get the view of the gameboy rendering
-        let gb_view = get_new_view(self.width, self.height, TV_WIDTH, TV_HEIGHT);
-
-        // save the current view to restore to it later
-        let saved_view = target.view().to_owned();
-        // create a new view for our text rendering
-        let mut text_rendring_view = saved_view.to_owned();
-        // use the gameboy viewport, but without any resizing
-        let mut gb_viewport = gb_view.viewport();
-        gb_viewport.width = 1.;
-        gb_viewport.height = 1.;
-        text_rendring_view.set_viewport(&gb_viewport);
-
-        // get the length of the gameboy rendering by using `target` as reference measures
-        // this will give us the distance, the text need to be offsetted in order
-        // to be at the bottom of the rendering display
-        let Rect { height: down, .. } = target.viewport(&gb_view);
-        let down_base = down as f32 - (NOTIF_FONT_SIZE as f32 * 2.);
-
-        target.set_view(&text_rendring_view);
-
-        for (i, (msg, c)) in self.messages.iter().rev().enumerate() {
-            // TODO: find a way to store the Text in the struct so that we don't need
-            //  to recreate it every frame (now we cannot because of lifetime issue)
-            let mut text = Text::new(msg, &self.font, NOTIF_FONT_SIZE);
-            text.set_outline_thickness(NOTIF_FONT_OUTLINE);
-            text.set_position((
-                NOTIF_FONT_SIZE as f32 / 2.,
-                down_base as f32 - (NOTIF_FONT_SIZE as f32 * i as f32),
-            ));
-
-            if c < &NOTIF_DISAPPEAR_REMAIN_TIME {
-                let ratio = 255. / NOTIF_DISAPPEAR_REMAIN_TIME;
-                let alpha_decrease = (ratio * (NOTIF_DISAPPEAR_REMAIN_TIME - *c)).min(255.) as u8;
-
-                let mut color = text.outline_color();
-                *color.alpha_mut() -= alpha_decrease;
-                text.set_outline_color(color);
-                let mut color = text.fill_color();
-                *color.alpha_mut() -= alpha_decrease;
-                text.set_fill_color(color);
-            }
-            target.draw_text(&text, states);
-        }
-
-        target.set_view(&saved_view);
-    }
-}
 
 struct GameboyFront {
     gameboy: GameBoy,
