@@ -14,7 +14,7 @@ mod tests;
 
 use std::cell::RefCell;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -149,29 +149,69 @@ impl GameBoy {
         Ok(())
     }
 
-    pub fn load_state<R: Read>(&mut self, mut reader: R) -> Result<(), SaveError> {
-        let mut magic = [0u8; 4];
-        let mut version = 0usize;
-        let mut hash = [0u8; 32];
+    pub fn load_state<R: Read + Seek>(&mut self, mut reader: R) -> Result<(), SaveError> {
+        // save state, so that if an error occured we will restore it back.
+        let mut recovery_save_state = Vec::new();
+        self.cpu
+            .save(&mut recovery_save_state)
+            .expect("recovery save cpu");
+        self.bus
+            .save(&mut recovery_save_state)
+            .expect("recovery save bus");
 
-        magic.load(&mut reader)?;
-        if &magic != SAVE_STATE_MAGIC {
-            return Err(SaveError::InvalidSaveStateHeader);
+        let mut load_routine = || {
+            let mut magic = [0u8; 4];
+            let mut version = 0usize;
+            let mut hash = [0u8; 32];
+
+            magic.load(&mut reader)?;
+            if &magic != SAVE_STATE_MAGIC {
+                return Err(SaveError::InvalidSaveStateHeader);
+            }
+
+            version.load(&mut reader)?;
+            if version != SAVE_STATE_VERSION {
+                return Err(SaveError::UnmatchedSaveErrorVersion(version));
+            }
+
+            hash.load(&mut reader)?;
+            if &hash != self.bus.cartridge().hash() {
+                return Err(SaveError::InvalidCartridgeHash);
+            }
+
+            self.cpu.load(&mut reader)?;
+            self.bus.load(&mut reader)?;
+
+            // make sure there is no more data
+            let stream_current_pos = reader.stream_position()?;
+            reader.seek(SeekFrom::End(0))?;
+            let stream_last_pos = reader.stream_position()?;
+
+            let (remaining_data_len, overflow) =
+                stream_last_pos.overflowing_sub(stream_current_pos);
+            assert!(!overflow);
+
+            if remaining_data_len > 0 {
+                // return seek
+                reader.seek(SeekFrom::Start(stream_current_pos))?;
+
+                Err(SaveError::SaveStateError(save_state::Error::TrailingData(
+                    remaining_data_len,
+                )))
+            } else {
+                Ok(())
+            }
+        };
+
+        if let Err(err) = load_routine() {
+            let mut cursor = Cursor::new(&recovery_save_state);
+
+            self.cpu.load(&mut cursor).expect("recovery load cpu");
+            self.bus.load(&mut cursor).expect("recovery load bus");
+
+            Err(err)
+        } else {
+            Ok(())
         }
-
-        version.load(&mut reader)?;
-        if version != SAVE_STATE_VERSION {
-            return Err(SaveError::UnmatchedSaveErrorVersion(version));
-        }
-
-        hash.load(&mut reader)?;
-        if &hash != self.bus.cartridge().hash() {
-            return Err(SaveError::InvalidCartridgeHash);
-        }
-
-        self.cpu.load(&mut reader)?;
-        self.bus.load(&mut reader)?;
-
-        Ok(())
     }
 }
