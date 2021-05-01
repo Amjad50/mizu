@@ -170,7 +170,11 @@ impl MizuPrinter {
             let image =
                 Image::create_from_pixels(width, height, &result_image_buffer).expect("image");
 
-            image.save_to_file(file_path.to_str().expect("PathBuf to_str"));
+            let did_save = image.save_to_file(file_path.to_str().expect("PathBuf to_str"));
+
+            if !did_save {
+                println!("[ERROR] was not able to save image due to unknown reason");
+            }
         } else {
             println!("[ERROR] cannot save an empty image");
         }
