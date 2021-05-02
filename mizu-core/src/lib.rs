@@ -30,7 +30,8 @@ use memory::Bus;
 use serial::SerialDevice;
 
 const SAVE_STATE_MAGIC: &[u8; 4] = b"MST\xee";
-const SAVE_STATE_VERSION: usize = 1;
+const SAVE_STATE_VERSION: usize = 2;
+const SAVE_STATE_ZSTD_COMPRESSION_LEVEL: i32 = 0; // default compression
 
 #[derive(Debug, Default, Clone, Copy, Savable)]
 pub struct GameboyConfig {
@@ -144,8 +145,13 @@ impl GameBoy {
         let cartridge_hash: &[u8; 32] = self.bus.cartridge().hash();
         cartridge_hash.save(&mut writer)?;
 
+        let mut writer = zstd::Encoder::new(&mut writer, SAVE_STATE_ZSTD_COMPRESSION_LEVEL)?;
+
         self.cpu.save(&mut writer)?;
         self.bus.save(&mut writer)?;
+
+        let _writer = writer.finish()?;
+
         Ok(())
     }
 
@@ -169,18 +175,33 @@ impl GameBoy {
                 return Err(SaveError::InvalidSaveStateHeader);
             }
 
+            // since there might be some possibility to migrate from different
+            // versions, we will not check here.
             version.load(&mut reader)?;
-            if version != SAVE_STATE_VERSION {
-                return Err(SaveError::UnmatchedSaveErrorVersion(version));
-            }
 
             hash.load(&mut reader)?;
             if &hash != self.bus.cartridge().hash() {
                 return Err(SaveError::InvalidCartridgeHash);
             }
 
-            self.cpu.load(&mut reader)?;
-            self.bus.load(&mut reader)?;
+            {
+                // use a box on read because there are two types of readers
+                // that we might use, compressed or not compressed based on the version
+                // of the save_state file
+                let mut second_stage_reader: Box<dyn Read>;
+
+                if version == 1 && SAVE_STATE_VERSION == 2 {
+                    // no need to use compression
+                    second_stage_reader = Box::new(&mut reader);
+                } else if version != SAVE_STATE_VERSION {
+                    return Err(SaveError::UnmatchedSaveErrorVersion(version));
+                } else {
+                    second_stage_reader = Box::new(zstd::Decoder::new(&mut reader)?);
+                }
+
+                self.cpu.load(&mut second_stage_reader)?;
+                self.bus.load(&mut second_stage_reader)?;
+            }
 
             // make sure there is no more data
             let stream_current_pos = reader.stream_position()?;
