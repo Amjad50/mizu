@@ -22,6 +22,7 @@ Mizu is an accurate Gameboy emulator built in Rust.
     - MBC3
     - MBC5
 - Printer emulation
+- Save states
 
 # Controls
 The SFML front-end provide these keyboard bindings:
@@ -41,12 +42,14 @@ The SFML front-end provide these keyboard bindings:
 
 ## Extra
 
-| Key   | Function              |
-| ----- | --------------------- |
-| Enter | A+B+Select+Start\*    |
-| +     | Increase 5 to FPS\*\* |
-| -     | Recude 5 from FPS\*\* |
-| P     | Open Printer          |
+| Key                 | Function              |
+| ------------------- | --------------------- |
+| Enter               | A+B+Select+Start\*    |
+| +                   | Increase 5 to FPS\*\* |
+| -                   | Recude 5 from FPS\*\* |
+| P                   | Open Printer          |
+| (NUM1~NUM0)         | Save state            |
+| Shift + (NUM1~NUM0) | Load state            |
 
 > \* I made this because in `Zelda: Link's awakening` you need to press
 > all of these buttons on the same frame to bring the save menu, which is annoying.
@@ -74,6 +77,34 @@ The printer can be opened by pressing the `P` key.
 
 The printer emulation allows to save the printed images into disk. The window
 will only show `160x144` pixels, but the image is scrollable.
+
+# Save states
+Save state is a very useful features emulators should have, it allows
+to save the state of the whole emulator at any point in time and be loaded
+any time later. `mizu`'s save states files are saved in these folders:
+```txt
+Linux:   /home/<user>/.local/share/mizu/saved_states
+Windows: C:\Users\<user>\AppData\Local\Amjad50\Mizu\data\saved_states
+macOS:   /Users/<user>/Library/Application Support/Amjad50.Mizu/saved_states
+```
+The structure of the save file is at version `2`:
+| Offset | Size      | Field                                       |
+| ------ | --------- |-------------------------------------------- |
+| 0x00   | 4         | MAGIC: `"MST\xee"` `(4D 53 54 EE)`          |
+| 0x04   | 8         | save state file version                     |
+| 0x0C   | 32        | cartridge `sha256` hash                     |
+| 0x2C   | variable  | `zstd` default level compressed saved state |
+
+There is no migrations between file versions (except from `1` to `2`), that means
+that a file saved from a past version of the emulator will not be able to be loaded
+in a future version of the emulator.
+(If any suggestions on how we can achieve this, you are welcome to open a PR).
+
+The `hash` is used to make sure that we are loading for the same game.
+
+The `zstd` compression appeared in version `2`, that is the reason we can load version `s`
+by loading with decompression. The compressed content, is the content we get
+by using the [`save_state`](./save_state) library.
 
 # Building and Installation
 For installing or building `mizu` we would use `cargo`.
