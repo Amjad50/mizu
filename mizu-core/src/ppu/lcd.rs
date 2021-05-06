@@ -11,20 +11,20 @@ pub struct Lcd {
     // from the state before the load
     x: u8,
     #[savable(skip)]
-    buf: [[u8; LCD_WIDTH * LCD_HEIGHT * 3]; 2],
+    buf: Box<[[u8; LCD_WIDTH * LCD_HEIGHT * 3]; 2]>,
     #[savable(skip)]
     selected_buffer: usize,
     #[savable(skip)]
-    raw_buf: [u8; LCD_WIDTH * LCD_HEIGHT * 3],
+    raw_buf: Box<[u8; LCD_WIDTH * LCD_HEIGHT * 3]>,
 }
 
 impl Default for Lcd {
     fn default() -> Self {
         Self {
             x: 0,
-            buf: [[0xFF; LCD_WIDTH * LCD_HEIGHT * 3]; 2],
+            buf: Box::new([[0xFF; LCD_WIDTH * LCD_HEIGHT * 3]; 2]),
             selected_buffer: 0,
-            raw_buf: [0x1F; LCD_WIDTH * LCD_HEIGHT * 3],
+            raw_buf: Box::new([0x1F; LCD_WIDTH * LCD_HEIGHT * 3]),
         }
     }
 }
@@ -77,7 +77,7 @@ impl Lcd {
 
     #[cfg(test)]
     pub fn raw_screen_buffer(&self) -> &[u8] {
-        &self.raw_buf
+        self.raw_buf.as_ref()
     }
 
     pub fn clear(&mut self) {
