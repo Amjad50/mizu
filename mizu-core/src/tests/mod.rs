@@ -65,8 +65,10 @@ mod blargg_tests;
 mod mooneye_tests;
 mod rtc3;
 mod samesuite_tests;
+mod save_state_tests;
 mod scribbltests;
 
+#[derive(save_state::Savable)]
 struct TestingGameBoy {
     cpu: Cpu,
     bus: Bus,
