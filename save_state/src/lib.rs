@@ -171,7 +171,7 @@ macro_rules! impl_primitive {
 }
 
 // this is used here to implement some std types
-macro_rules! impl_savable {
+macro_rules! impl_savable_with_serde {
     ($struct_name: ident $(<$($generics: ident),+>)?) => {
         impl $(<$($generics: serde::Serialize + serde::de::DeserializeOwned),+>)? Savable for $struct_name $(<$($generics),+>)?{
             #[inline]
@@ -220,10 +220,10 @@ impl_primitive!(i32, ::);
 impl_primitive!(i64, ::);
 impl_primitive!(f32, ::);
 impl_primitive!(f64, ::);
-impl_savable!(bool);
-impl_savable!(char);
-impl_savable!(String);
-impl_savable!(Vec<T>);
+impl_savable_with_serde!(bool);
+impl_savable_with_serde!(char);
+impl_savable_with_serde!(String);
+impl_savable_with_serde!(Vec<T>);
 
 impl_for_tuple!(0 A0, 1 A1);
 impl_for_tuple!(0 A0, 1 A1, 2 A2);
@@ -321,6 +321,26 @@ where
             *self = None;
         }
 
+        Ok(())
+    }
+}
+
+impl<T> Savable for std::marker::PhantomData<T> {
+    fn save<W: Write>(&self, _writer: &mut W) -> Result<()> {
+        Ok(())
+    }
+
+    fn load<R: Read>(&mut self, _reader: &mut R) -> Result<()> {
+        Ok(())
+    }
+}
+
+impl Savable for () {
+    fn save<W: Write>(&self, _writer: &mut W) -> Result<()> {
+        Ok(())
+    }
+
+    fn load<R: Read>(&mut self, _reader: &mut R) -> Result<()> {
         Ok(())
     }
 }
