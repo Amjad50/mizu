@@ -1,6 +1,6 @@
 [package]
 name = "mizu-core"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["Amjad Alsharafi <amjadsharafi10@gmail.com>"]
 edition = "2018"
 description = "The core library implementation of all Gameboy emulation for Mizu"
