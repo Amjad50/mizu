@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2021-02-18
+### Added
+- Save states with the [`save_state`](./save_state) library.
+- Notifications UI in the front-end, used to display messages and errors.
+- This `CHANGELOG` file.
+
+### Changed
+- Updated [SFML] to version `0.16.0`. (#2)
+
 ## [0.1.2] - 2021-02-18
 ### Added
 - Added printer support.
