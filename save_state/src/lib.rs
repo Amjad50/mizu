@@ -1,5 +1,4 @@
 pub use save_state_derive::*;
-use serde_cbor;
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use paste::paste;

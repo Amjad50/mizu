@@ -131,15 +131,14 @@ impl Cpu {
             cpu.reg_hl_write(0x014D);
         } else {
             // initial values of the registers (CGB) for CGB games
+            // common
+            cpu.reg_af_write(0x1180);
+            cpu.reg_bc_write(0x0000);
             if is_cart_cgb {
-                cpu.reg_af_write(0x1180);
-                cpu.reg_bc_write(0x0000);
                 cpu.reg_de_write(0xFF56);
                 cpu.reg_hl_write(0x000D);
             } else {
                 // initial values of the registers (CGB) for DMG games
-                cpu.reg_af_write(0x1180);
-                cpu.reg_bc_write(0x0000);
                 cpu.reg_de_write(0x0008);
                 cpu.reg_hl_write(0x007C);
             }

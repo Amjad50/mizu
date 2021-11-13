@@ -309,7 +309,7 @@ impl Container {
                     .into_iter()
                     .map(|id| syn::TypePath {
                         qself: None,
-                        path: id.clone().into(),
+                        path: id.into(),
                     })
                     .chain(self.associated_type_usage.into_iter())
                     .map::<WherePredicate, _>(|bounded_ty| parse_quote!(#bounded_ty: #(#bounds)+*))

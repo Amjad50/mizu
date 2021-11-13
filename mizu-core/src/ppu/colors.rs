@@ -28,7 +28,7 @@ impl Color {
         Self { r, g, b }
     }
 
-    pub fn to_raw(&self) -> u16 {
+    pub fn to_raw(self) -> u16 {
         let r = (self.r & 0x1F) as u16;
         let g = (self.g & 0x1F) as u16;
         let b = (self.b & 0x1F) as u16;

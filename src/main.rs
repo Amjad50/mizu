@@ -114,7 +114,7 @@ impl GameboyFront {
 
             self.window.clear(Color::BLACK);
 
-            convert_to_rgba(&self.gameboy.screen_buffer(), &mut self.pixels_buffer);
+            convert_to_rgba(self.gameboy.screen_buffer(), &mut self.pixels_buffer);
 
             let image =
                 Image::create_from_pixels(TV_WIDTH, TV_HEIGHT, &self.pixels_buffer).expect("image");

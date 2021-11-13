@@ -106,11 +106,11 @@ impl GameBoy {
     }
 
     pub fn game_title(&self) -> &str {
-        &self.bus.cartridge().game_title()
+        self.bus.cartridge().game_title()
     }
 
     pub fn file_path(&self) -> &Path {
-        &self.bus.cartridge().file_path()
+        self.bus.cartridge().file_path()
     }
 
     pub fn screen_buffer(&self) -> &[u8] {

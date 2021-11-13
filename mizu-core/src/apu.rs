@@ -328,7 +328,7 @@ impl Apu {
     }
 
     pub fn get_buffer(&mut self) -> Vec<f32> {
-        std::mem::replace(&mut self.buffer, Vec::new())
+        std::mem::take(&mut self.buffer)
     }
 
     /// The APU is clocked by the divider, on the falling edge of the bit 12

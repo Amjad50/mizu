@@ -114,17 +114,17 @@ fn get_fields_impl_size_sum(fields: &Fields, ident_prefix: TokenStream2) -> Toke
 
 fn impl_for_savables(container: &Container) -> Result<TokenStream2> {
     match &container.data {
-        ContainerData::Struct(fields) => impl_for_struct(container, &fields),
-        ContainerData::Enum(variants) => impl_for_enum(container, &variants),
+        ContainerData::Struct(fields) => impl_for_struct(container, fields),
+        ContainerData::Enum(variants) => impl_for_enum(container, variants),
     }
 }
 
 fn impl_for_struct(container: &Container, fields: &Fields) -> Result<TokenStream2> {
     let ident = &container.ident;
 
-    let save_fields = impl_fields_for_save(&fields, quote!(&self.));
-    let load_fields = impl_fields_for_load(&fields, quote!(&mut self.));
-    let size_sum = get_fields_impl_size_sum(&fields, quote!(&self.));
+    let save_fields = impl_fields_for_save(fields, quote!(&self.));
+    let load_fields = impl_fields_for_load(fields, quote!(&mut self.));
+    let size_sum = get_fields_impl_size_sum(fields, quote!(&self.));
     let (impl_generics, ty_generics, where_clause) = container.generics.split_for_impl();
 
     Ok(quote! {
