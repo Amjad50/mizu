@@ -680,6 +680,14 @@ impl Ppu {
 
         // change modes depending on cycle
         match (self.scanline, self.cycle) {
+            (0, 0) => {
+                // set to mode 2 on frame start
+                // This will not be executed if the lcd is just turned on, since
+                // it starts at cycle 4
+
+                self.mode_3_end_cycle = 0;
+                self.lcd_status.current_mode_set(2);
+            }
             (0, 4) => {
                 // if the lcd is not just turning on, then switch to mode 2,
                 // when the lcd is turning on it will start here, but will keep

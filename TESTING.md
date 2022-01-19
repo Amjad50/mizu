@@ -137,7 +137,7 @@ A documentation of all hardware tests tested on `mizu`.
 | Test                        | State |
 | --------------------------- | ----- |
 | hblank_ly_scx_timing-GS     | :x:   |
-| intr_1_2_timing-GS          | :x:   |
+| intr_1_2_timing-GS          | :+1:  |
 | intr_2_0_timing             | :+1:  |
 | intr_2_mode0_timing         | :x:   |
 | intr_2_mode3_timing         | :x:   |

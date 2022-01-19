@@ -171,7 +171,7 @@ mod acceptance {
     mod ppu {
         mooneye_tests!("acceptance/ppu";
             //hblank_ly_scx_timing-GS,
-            //intr_1_2_timing-GS,
+            intr_1_2_timing-GS for dmg,
             intr_2_0_timing,
             //intr_2_mode0_timing,
             //intr_2_mode0_timing_sprites,
