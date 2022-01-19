@@ -1,4 +1,6 @@
-fn mooneye_test(file_path: &str, is_dmg: bool) {
+use std::error::Error;
+
+fn mooneye_test(file_path: &str, is_dmg: bool) -> Result<(), Box<dyn Error>> {
     let mut gb = crate::tests::TestingGameBoy::new(file_path, is_dmg).unwrap();
 
     let regs = gb.clock_until_breakpoint();
@@ -7,11 +9,12 @@ fn mooneye_test(file_path: &str, is_dmg: bool) {
 
     // These checks are taken from mooneye emulator
     if regs.a != 0 {
-        panic!("mooneye test failed with A = {}", regs.a);
+        return Err(format!("mooneye test failed with A = {}", regs.a).into());
     }
     if regs.b != 3 || regs.c != 5 || regs.d != 8 || regs.e != 13 || regs.h != 21 || regs.l != 34 {
-        panic!("mooneye test failed regs = {:?}", regs);
+        return Err(format!("mooneye test failed regs = {:?}", regs).into());
     }
+    Ok(())
 }
 
 macro_rules! mooneye_tests {
@@ -20,7 +23,7 @@ macro_rules! mooneye_tests {
             /// Run the test and check registers values (take from mooneye)
             #[test]
             #[allow(unused_mut)]
-            fn $test_name() {
+            fn $test_name() -> ::std::result::Result<(), Box<dyn ::std::error::Error>> {
                 let file_path = concat!(
                     "../test_roms/mooneye-gb_hwtests/",
                     $prefix, "/",
@@ -35,13 +38,24 @@ macro_rules! mooneye_tests {
                 let is_dmg = true && emu != "cgb";
                 let is_cgb = true && emu != "dmg";
 
-                if is_dmg {
-                    crate::tests::mooneye_tests::mooneye_test(file_path, true);
+                // only dmg
+                if !is_cgb {
+                    crate::tests::mooneye_tests::mooneye_test(file_path, true)?;
+                    // make sure it fails on cgb
+                    assert!(crate::tests::mooneye_tests::mooneye_test(file_path, false).is_err());
                 }
-                if is_cgb {
-                    crate::tests::mooneye_tests::mooneye_test(file_path, false);
+                // only cgb
+                if !is_dmg {
+                    crate::tests::mooneye_tests::mooneye_test(file_path, false)?;
+                    // make sure it fails on dmg
+                    assert!(crate::tests::mooneye_tests::mooneye_test(file_path, true).is_err());
                 }
-
+                // both
+                if is_dmg && is_cgb {
+                    crate::tests::mooneye_tests::mooneye_test(file_path, true)?;
+                    crate::tests::mooneye_tests::mooneye_test(file_path, false)?;
+                }
+                Ok(())
             }
         )*
     };
