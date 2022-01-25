@@ -2,7 +2,7 @@
 name = "mizu"
 version = "0.2.0"
 authors = ["Amjad Alsharafi <amjadsharafi10@gmail.com>"]
-edition = "2018"
+edition = "2021"
 description = "An accurate gameboy(DMG) and gameboy color emulator. Front-end for mizu-core"
 readme = "README.md"
 repository = "https://github.com/Amjad50/mizu"
@@ -15,8 +15,8 @@ mizu-core = { version = "^0.2.0", path = "mizu-core" }
 sfml = { version = "^0.16.0", default-features = false, features = ["graphics"] }
 ringbuf = "0.2.2"
 cpal = "0.13.1"
-clap = "2.33.3"
-native-dialog = "0.5.4"
+clap = "3.0.12"
+native-dialog = "0.6.3"
 directories-next = "2.0.0"
 
 [workspace]

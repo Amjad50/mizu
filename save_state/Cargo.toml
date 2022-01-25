@@ -2,7 +2,7 @@
 name = "save_state"
 version = "0.1.0"
 authors = ["Amjad Alsharafi <amjadsharafi10@gmail.com>"]
-edition = "2018"
+edition = "2021"
 description = "Implementation for the save state mechanism in mizu"
 repository = "https://github.com/Amjad50/mizu"
 license = "MIT"
