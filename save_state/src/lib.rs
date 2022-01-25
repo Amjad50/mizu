@@ -2,12 +2,13 @@ pub use save_state_derive::*;
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use paste::paste;
-use serde_cbor::Error as serdeCborError;
 use std::convert::From;
 use std::io::{
-    Cursor, Error as ioError, ErrorKind as ioErrorKind, Read, Result as ioResult, Write,
+    self, Cursor, Error as ioError, ErrorKind as ioErrorKind, Read, Result as ioResult, Write,
 };
 
+type CiboriumSerIoError = ciborium::ser::Error<io::Error>;
+type CiboriumDeIoError = ciborium::de::Error<io::Error>;
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub fn serialize_into<W, T>(writer: W, value: &T) -> Result<()>
@@ -15,7 +16,7 @@ where
     W: std::io::Write,
     T: serde::Serialize,
 {
-    serde_cbor::to_writer(writer, value).map_err(|e| e.into())
+    ciborium::ser::into_writer(value, writer).map_err(|e| e.into())
 }
 
 pub fn deserialize_from<R, T>(reader: R) -> Result<T>
@@ -23,9 +24,7 @@ where
     R: std::io::Read,
     T: serde::de::DeserializeOwned,
 {
-    let mut deserializer = serde_cbor::de::Deserializer::from_reader(reader);
-    let value = serde::de::Deserialize::deserialize(&mut deserializer)?;
-    Ok(value)
+    ciborium::de::from_reader(reader).map_err(|e| e.into())
 }
 
 pub fn serialized_size<T>(value: &T) -> Result<u64>
@@ -33,7 +32,7 @@ where
     T: serde::Serialize,
 {
     let mut counter = Counter::default();
-    serde_cbor::to_writer(&mut counter, value)?;
+    ciborium::ser::into_writer(value, &mut counter)?;
     Ok(counter.counter)
 }
 
@@ -126,8 +125,10 @@ pub fn load_object<T: Savable>(object: &mut T, data: &[u8]) -> Result<()> {
 pub enum Error {
     #[error("Io Eror: {0}")]
     IoError(ioError),
-    #[error("Bincode Error: {0}")]
-    SerdeCobrError(serdeCborError),
+    #[error("Cobr Serialization Error: {0}")]
+    CiboriumSerialization(CiboriumSerIoError),
+    #[error("Cobr Deserialization Error: {0}")]
+    CiboriumDeserialization(CiboriumDeIoError),
     #[error("After loading an object, some data still remained ({0} bytes)")]
     TrailingData(u64),
     #[error("Enum could not be loaded correctly due to corrupted data ({0})")]
@@ -140,9 +141,15 @@ impl From<ioError> for Error {
     }
 }
 
-impl From<serdeCborError> for Error {
-    fn from(e: serdeCborError) -> Self {
-        Error::SerdeCobrError(e)
+impl From<CiboriumSerIoError> for Error {
+    fn from(e: CiboriumSerIoError) -> Self {
+        Self::CiboriumSerialization(e)
+    }
+}
+
+impl From<CiboriumDeIoError> for Error {
+    fn from(e: CiboriumDeIoError) -> Self {
+        Self::CiboriumDeserialization(e)
     }
 }
 
