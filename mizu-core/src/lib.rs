@@ -18,9 +18,9 @@ use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::rc::Rc;
 
-use apu::AudioBuffers;
 use save_state::Savable;
 
+pub use apu::AudioBuffers;
 pub use joypad::JoypadButton;
 pub use printer::Printer;
 pub use save_error::SaveError;
