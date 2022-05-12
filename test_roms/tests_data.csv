@@ -1,5 +1,5 @@
 #url,installation_type,destination_folder,[branch]
-https://gekkio.fi/files/mooneye-gb/latest/mooneye-gb_hwtests.zip,unzip_make_folder,mooneye-gb_hwtests
+https://gekkio.fi/files/mooneye-test-suite/mts-20220509-1908-c7d75b7/mts-20220509-1908-c7d75b7.zip,unzip_rename_inner_if_alone,mooneye-gb_hwtests
 https://github.com/Hacktix/scribbltests,git,scribbltests
 https://github.com/mattcurrie/dmg-acid2/releases/latest/download/dmg-acid2.gb,none,dmg-acid2.gb
 https://github.com/mattcurrie/cgb-acid2/releases/latest/download/cgb-acid2.gbc,none,cgb-acid2.gbc

@@ -57,6 +57,9 @@ fn blargg_oam_bug_all() {
         let screen_buffer = gb.raw_screen_buffer();
         gb.print_screen_buffer();
 
-        assert_eq!(crc::crc64::checksum_ecma(screen_buffer), crc);
+        assert_eq!(
+            crc::Crc::<u64>::new(&crc::CRC_64_XZ).checksum(screen_buffer),
+            crc
+        );
     }
 }
