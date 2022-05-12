@@ -13,6 +13,19 @@ handle_installation() {
     local dest_rename=$3
 
     case $install_type in
+        unzip_rename_inner_if_alone)
+            wget -O $dest_rename.zip $link
+            unzip $dest_rename.zip -d $dest_rename
+            folder_elements=($(ls $dest_rename))
+            if [[ ${#folder_elements[@]} -eq 1 ]]; then
+                mv $dest_rename/${folder_elements[0]} $dest_rename_${folder_elements[0]}
+                rm $dest_rename -r
+                mv $dest_rename_${folder_elements[0]} $dest_rename
+            else
+                echo "Could not rename the inner folder since it contain many folders"
+            fi
+            rm $dest_rename.zip
+            ;;
         unzip_make_folder)
             wget -O $dest_rename.zip $link
             unzip $dest_rename.zip -d $dest_rename

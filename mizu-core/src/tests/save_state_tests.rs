@@ -12,12 +12,14 @@ fn load_state() {
     gb.clock_for_frame();
     gb.clock_for_frame();
     let screen_buffer = gb.raw_screen_buffer();
-    assert_ne!(crc::crc64::checksum_ecma(screen_buffer), CGB_CRC);
+    let crc = crc::Crc::<u64>::new(&crc::CRC_64_XZ);
+
+    assert_ne!(crc.checksum(screen_buffer), CGB_CRC);
 
     gb = crate::tests::TestingGameBoy::new(file_path, false).unwrap();
     gb.clock_until_breakpoint();
     let screen_buffer = gb.raw_screen_buffer();
-    assert_eq!(crc::crc64::checksum_ecma(screen_buffer), CGB_CRC);
+    assert_eq!(crc.checksum(screen_buffer), CGB_CRC);
 
     // 2- save the state at which it was passing
     let saved_data = save_state::save_object(&gb).unwrap();
@@ -30,5 +32,5 @@ fn load_state() {
     gb.clock_for_frame();
     gb.clock_for_frame();
     let screen_buffer = gb.raw_screen_buffer();
-    assert_eq!(crc::crc64::checksum_ecma(screen_buffer), CGB_CRC);
+    assert_eq!(crc.checksum(screen_buffer), CGB_CRC);
 }

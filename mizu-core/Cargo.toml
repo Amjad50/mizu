@@ -21,4 +21,4 @@ sha2 = "0.10.1"
 save_state = { version = "^0.1.0", path = "../save_state" }
 
 [dev-dependencies]
-crc = "2.1.0"
+crc = "3.0.0"
