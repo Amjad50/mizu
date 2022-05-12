@@ -29,6 +29,26 @@ pub const TV_HEIGHT: u32 = 144;
 const DEFAULT_SCALE: u32 = 5;
 const DEFAULT_FPS: u32 = 60;
 
+enum AudioBufferOutput {
+    All,
+    Pulse1,
+    Pulse2,
+    Wave,
+    Noise,
+}
+
+impl AudioBufferOutput {
+    fn to_string(&self) -> &str {
+        match self {
+            AudioBufferOutput::All => "All",
+            AudioBufferOutput::Pulse1 => "Pulse 1",
+            AudioBufferOutput::Pulse2 => "Pulse 2",
+            AudioBufferOutput::Wave => "Wave",
+            AudioBufferOutput::Noise => "Noise",
+        }
+    }
+}
+
 struct GameboyFront {
     gameboy: GameBoy,
     window: RenderWindow,
@@ -37,6 +57,7 @@ struct GameboyFront {
     pixels_buffer: [u8; TV_HEIGHT as usize * TV_WIDTH as usize * 4],
     printer: Option<MizuPrinter>,
     notifications: Notifications,
+    audio_output: AudioBufferOutput,
 }
 
 impl GameboyFront {
@@ -67,6 +88,7 @@ impl GameboyFront {
             pixels_buffer,
             printer: None,
             notifications,
+            audio_output: AudioBufferOutput::All,
         };
 
         s.update_fps();
@@ -91,11 +113,12 @@ impl GameboyFront {
         loop {
             let elapsed = t.elapsed().as_secs_f32();
             self.window.set_title(&format!(
-                "mizu - {} - FPS: {} - printer {}connected",
+                "mizu - {} - FPS: {} - printer {}connected - Audio output: {}",
                 self.gameboy.game_title(),
                 (1. / elapsed).round(),
                 // the format! has "{}connected", so we just fill `"dis"` if needed
                 if self.printer.is_some() { "" } else { "dis" },
+                self.audio_output.to_string()
             ));
             self.notifications.update(elapsed);
 
@@ -108,9 +131,16 @@ impl GameboyFront {
 
             self.gameboy.clock_for_frame();
 
-            let buffer = self.gameboy.audio_buffer();
+            let buffers = self.gameboy.audio_buffers();
 
-            self.audio_player.queue(&buffer);
+            let audio_buffer = match self.audio_output {
+                AudioBufferOutput::All => buffers.all,
+                AudioBufferOutput::Pulse1 => buffers.pulse1,
+                AudioBufferOutput::Pulse2 => buffers.pulse2,
+                AudioBufferOutput::Wave => buffers.wave,
+                AudioBufferOutput::Noise => buffers.noise,
+            };
+            self.audio_player.queue(&audio_buffer);
 
             self.window.clear(Color::BLACK);
 
@@ -251,6 +281,22 @@ impl GameboyFront {
                     Key::S => self.gameboy.press_joypad(JoypadButton::Down),
                     Key::A => self.gameboy.press_joypad(JoypadButton::Left),
                     Key::D => self.gameboy.press_joypad(JoypadButton::Right),
+
+                    Key::C => {
+                        self.audio_output = AudioBufferOutput::All;
+                    }
+                    Key::V => {
+                        self.audio_output = AudioBufferOutput::Pulse1;
+                    }
+                    Key::B => {
+                        self.audio_output = AudioBufferOutput::Pulse2;
+                    }
+                    Key::N => {
+                        self.audio_output = AudioBufferOutput::Wave;
+                    }
+                    Key::M => {
+                        self.audio_output = AudioBufferOutput::Noise;
+                    }
 
                     _ if Self::num_key(key).is_some() && shift => {
                         let state_n = Self::num_key(key).unwrap();

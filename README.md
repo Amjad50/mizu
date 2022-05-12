@@ -43,14 +43,19 @@ The SFML front-end provide these keyboard bindings:
 
 ## Extra
 
-| Key                 | Function              |
-| ------------------- | --------------------- |
-| Enter               | A+B+Select+Start\*    |
-| +                   | Increase 5 to FPS\*\* |
-| -                   | Recude 5 from FPS\*\* |
-| P                   | Open Printer          |
-| (NUM1~NUM0)         | Save state            |
-| Shift + (NUM1~NUM0) | Load state            |
+| Key                 | Function                              |
+| ------------------- | ------------------------------------- |
+| Enter               | A+B+Select+Start\*                    |
+| +                   | Increase 5 to FPS\*\*                 |
+| -                   | Recude 5 from FPS\*\*                 |
+| P                   | Open Printer                          |
+| (NUM1~NUM0)         | Save state                            |
+| Shift + (NUM1~NUM0) | Load state                            |
+| C                   | Output `All` audio channels (default) |
+| V                   | Output `Pulse1` audio channel only    |
+| B                   | Output `Pulse2` audio channel only    |
+| N                   | Output `Wave` audio channel only      |
+| M                   | Output `Noise` audio channel only     |
 
 > \* I made this because in `Zelda: Link's awakening` you need to press
 > all of these buttons on the same frame to bring the save menu, which is annoying.

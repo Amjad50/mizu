@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 pub use interrupts::{InterruptManager, InterruptType};
 
-use crate::apu::Apu;
+use crate::apu::{Apu, AudioBuffers};
 use crate::cartridge::Cartridge;
 use crate::cpu::CpuBusProvider;
 use crate::joypad::{Joypad, JoypadButton};
@@ -327,8 +327,8 @@ impl Bus {
         self.ppu.raw_screen_buffer()
     }
 
-    pub fn audio_buffer(&mut self) -> Vec<f32> {
-        self.apu.get_buffer()
+    pub fn audio_buffers(&mut self) -> AudioBuffers {
+        self.apu.get_buffers()
     }
 
     pub fn press_joypad(&mut self, button: JoypadButton) {
@@ -378,11 +378,12 @@ impl Bus {
 
         // The mapper is independent of CPU clock speed, and a full second
         // for the mapper is 4194304/2 clocks
-        for _ in 0..t_clocks / 2 {
+        self.cartridge.clock_mapper();
+        if !double_speed {
             self.cartridge.clock_mapper();
         }
 
-        // APU stays at the same speed even if CPU is in double speed
+        // PPU stays at the same speed even if CPU is in double speed
         self.ppu.clock(&mut self.interrupts, t_clocks);
 
         // APU stays at the same speed even if CPU is in double speed,

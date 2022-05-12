@@ -13,6 +13,19 @@ use noise_channel::NoiseChannel;
 use pulse_channel::PulseChannel;
 use wave_channel::WaveChannel;
 
+/// Contains the flushed output buffer of the `APU`.
+/// The main buffer `all` is the summation of all of the other buffers/channels.
+/// If you want a combination of different channels, you can just add them together.
+/// All volume control is done before pushing to the buffers.
+pub struct AudioBuffers {
+    pub pulse1: Vec<f32>,
+    pub pulse2: Vec<f32>,
+    pub wave: Vec<f32>,
+    pub noise: Vec<f32>,
+
+    pub all: Vec<f32>,
+}
+
 bitflags! {
     #[derive(Savable)]
     struct ChannelsControl: u8 {
@@ -60,8 +73,17 @@ pub struct Apu {
     power: bool,
 
     sample_counter: f64,
+
     #[savable(skip)]
     buffer: Vec<f32>,
+    #[savable(skip)]
+    pulse1_buffers: Vec<f32>,
+    #[savable(skip)]
+    pulse2_buffers: Vec<f32>,
+    #[savable(skip)]
+    wave_buffers: Vec<f32>,
+    #[savable(skip)]
+    noise_buffers: Vec<f32>,
 
     /// Stores the value of the 4th bit (5th in double speed mode) of the divider
     /// as sequencer clocks are controlled by the divider
@@ -89,6 +111,12 @@ impl Apu {
             channels_selection: ChannelsSelection::from_bits_truncate(0),
             power: false,
             buffer: Vec::new(),
+
+            pulse1_buffers: Vec::new(),
+            pulse2_buffers: Vec::new(),
+            wave_buffers: Vec::new(),
+            noise_buffers: Vec::new(),
+
             sample_counter: 0.,
             pulse1: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
             pulse2: Dac::new(LengthCountedChannel::new(PulseChannel::default(), 64)),
@@ -327,8 +355,15 @@ impl Apu {
         (p2 << 4) | p1
     }
 
-    pub fn get_buffer(&mut self) -> Vec<f32> {
-        std::mem::take(&mut self.buffer)
+    pub fn get_buffers(&mut self) -> AudioBuffers {
+        AudioBuffers {
+            pulse1: std::mem::take(&mut self.pulse1_buffers),
+            pulse2: std::mem::take(&mut self.pulse2_buffers),
+            wave: std::mem::take(&mut self.wave_buffers),
+            noise: std::mem::take(&mut self.noise_buffers),
+
+            all: std::mem::take(&mut self.buffer),
+        }
     }
 
     /// The APU is clocked by the divider, on the falling edge of the bit 12
@@ -351,11 +386,7 @@ impl Apu {
 
         self.sample_counter += 1.;
         if self.sample_counter >= SAMPLE_EVERY_N_CLOCKS {
-            let (right_sample, left_sample) = self.get_outputs();
-
-            // one for the right, one for the left
-            self.buffer.push(right_sample);
-            self.buffer.push(left_sample);
+            self.push_output();
 
             self.sample_counter -= SAMPLE_EVERY_N_CLOCKS;
         }
@@ -406,75 +437,105 @@ impl Apu {
 }
 
 impl Apu {
-    fn get_outputs(&mut self) -> (f32, f32) {
-        let mut right = 0.;
-        let mut left = 0.;
+    fn push_output(&mut self) {
+        let right_vol = self.channels_control.vol_right() as f32 + 1.;
+        let left_vol = self.channels_control.vol_left() as f32 + 1.;
 
         let pulse1 = self.pulse1.dac_output() / 8.;
         let pulse2 = self.pulse2.dac_output() / 8.;
         let wave = self.wave.dac_output() / 8.;
         let noise = self.noise.dac_output() / 8.;
 
-        if self
-            .channels_selection
-            .contains(ChannelsSelection::PULSE1_LEFT)
-        {
-            left += pulse1;
-        }
-
-        if self
-            .channels_selection
-            .contains(ChannelsSelection::PULSE2_LEFT)
-        {
-            left += pulse2;
-        }
-
-        if self
-            .channels_selection
-            .contains(ChannelsSelection::WAVE_LEFT)
-        {
-            left += wave;
-        }
-
-        if self
-            .channels_selection
-            .contains(ChannelsSelection::NOISE_LEFT)
-        {
-            left += noise;
-        }
-
-        if self
+        let right_pulse1 = if self
             .channels_selection
             .contains(ChannelsSelection::PULSE1_RIGHT)
         {
-            right += pulse1;
-        }
+            pulse1 * right_vol
+        } else {
+            0.
+        };
 
-        if self
+        let right_pulse2 = if self
             .channels_selection
             .contains(ChannelsSelection::PULSE2_RIGHT)
         {
-            right += pulse2;
-        }
+            pulse2 * right_vol
+        } else {
+            0.
+        };
 
-        if self
+        let right_wave = if self
             .channels_selection
             .contains(ChannelsSelection::WAVE_RIGHT)
         {
-            right += wave;
-        }
+            wave * right_vol
+        } else {
+            0.
+        };
 
-        if self
+        let right_noise = if self
             .channels_selection
             .contains(ChannelsSelection::NOISE_RIGHT)
         {
-            right += noise;
-        }
+            noise * right_vol
+        } else {
+            0.
+        };
 
-        let right_vol = self.channels_control.vol_right() as f32 + 1.;
-        let left_vol = self.channels_control.vol_left() as f32 + 1.;
+        let left_pulse1 = if self
+            .channels_selection
+            .contains(ChannelsSelection::PULSE1_LEFT)
+        {
+            pulse1 * left_vol
+        } else {
+            0.
+        };
 
-        (right * right_vol, left * left_vol)
+        let left_pulse2 = if self
+            .channels_selection
+            .contains(ChannelsSelection::PULSE2_LEFT)
+        {
+            pulse2 * left_vol
+        } else {
+            0.
+        };
+
+        let left_wave = if self
+            .channels_selection
+            .contains(ChannelsSelection::WAVE_LEFT)
+        {
+            wave * left_vol
+        } else {
+            0.
+        };
+
+        let left_noise = if self
+            .channels_selection
+            .contains(ChannelsSelection::NOISE_LEFT)
+        {
+            noise * left_vol
+        } else {
+            0.
+        };
+
+        // one sample for the right, one for the left
+
+        self.pulse1_buffers.push(right_pulse1);
+        self.pulse1_buffers.push(left_pulse1);
+
+        self.pulse2_buffers.push(right_pulse2);
+        self.pulse2_buffers.push(left_pulse2);
+
+        self.wave_buffers.push(right_wave);
+        self.wave_buffers.push(left_wave);
+
+        self.noise_buffers.push(right_noise);
+        self.noise_buffers.push(left_noise);
+
+        let right_sample = right_pulse1 + right_pulse2 + right_wave + right_noise;
+        let left_sample = left_pulse1 + left_pulse2 + left_wave + left_noise;
+        self.buffer.push(right_sample);
+        self.buffer.push(left_sample);
     }
 
     fn power_off(&mut self) {

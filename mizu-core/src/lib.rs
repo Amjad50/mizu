@@ -20,6 +20,7 @@ use std::rc::Rc;
 
 use save_state::Savable;
 
+pub use apu::AudioBuffers;
 pub use joypad::JoypadButton;
 pub use printer::Printer;
 pub use save_error::SaveError;
@@ -117,8 +118,8 @@ impl GameBoy {
         self.bus.screen_buffer()
     }
 
-    pub fn audio_buffer(&mut self) -> Vec<f32> {
-        self.bus.audio_buffer()
+    pub fn audio_buffers(&mut self) -> AudioBuffers {
+        self.bus.audio_buffers()
     }
 
     pub fn press_joypad(&mut self, button: JoypadButton) {
