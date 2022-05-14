@@ -456,6 +456,12 @@ fn main() {
         .arg(Arg::new("rom").required(true))
         .arg(Arg::new("boot_rom"))
         .arg(
+            Arg::new("sav")
+             .long("sav")
+             .takes_value(true)
+             .help("A custom location of the `.sav` SRAM file, by default we will use the file with the same name as the rom file with `.sav` extension")
+        )
+        .arg(
             Arg::new("dmg")
                 .long("dmg")
                 .short('d')
@@ -481,6 +487,7 @@ fn main() {
 
     let is_dmg = matches.is_present("dmg");
     let rom_file = matches.value_of("rom").expect("rom file argument");
+    let sav_file = matches.value_of("sav");
     let boot_rom_file = matches.value_of("boot_rom");
     let scale = matches.value_of("scale");
     let fps = matches.value_of("fps");
@@ -513,7 +520,7 @@ fn main() {
 
     let config = GameboyConfig { is_dmg };
 
-    let gameboy = GameBoy::new(rom_file, boot_rom_file, config).unwrap();
+    let gameboy = GameBoy::new(rom_file, boot_rom_file, sav_file, config).unwrap();
 
     let mut gameboy_front = GameboyFront::new(gameboy, fps, scale);
 
