@@ -56,12 +56,13 @@ pub struct GameBoy {
 }
 
 impl GameBoy {
-    pub fn new<P: AsRef<Path>>(
-        file_path: P,
-        boot_rom_file: Option<P>,
+    pub fn new<RomP: AsRef<Path>, BootP: AsRef<Path>, SavP: AsRef<Path>>(
+        file_path: RomP,
+        boot_rom_file: Option<BootP>,
+        sav_file_path: Option<SavP>,
         config: GameboyConfig,
     ) -> Result<Self, CartridgeError> {
-        let cartridge = Cartridge::from_file(file_path)?;
+        let cartridge = Cartridge::from_file(file_path, sav_file_path)?;
 
         let (bus, cpu) = if let Some(boot_rom_file) = boot_rom_file {
             let mut boot_rom_file = File::open(boot_rom_file)?;

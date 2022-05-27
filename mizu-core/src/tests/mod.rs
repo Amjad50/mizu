@@ -76,7 +76,7 @@ struct TestingGameBoy {
 
 impl TestingGameBoy {
     pub fn new<P: AsRef<Path>>(file_path: P, is_dmg: bool) -> Result<Self, CartridgeError> {
-        let cartridge = Cartridge::from_file(file_path)?;
+        let cartridge = Cartridge::from_file::<_, String>(file_path, None)?;
 
         let config = GameboyConfig { is_dmg };
 
