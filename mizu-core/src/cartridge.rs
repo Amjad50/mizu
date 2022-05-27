@@ -194,7 +194,8 @@ impl CartridgeType {
 
 pub struct Cartridge {
     file_path: Box<Path>,
-    sav_path: Box<Path>,
+    sram_file_path: Box<Path>,
+    save_on_shutdown: bool,
     game_title: String,
     cartridge_type: CartridgeType,
     target_device: TargetDevice,
@@ -207,7 +208,8 @@ pub struct Cartridge {
 impl Cartridge {
     pub fn from_file<RomP: AsRef<Path>, SavP: AsRef<Path>>(
         file_path: RomP,
-        sav_file_path: Option<SavP>,
+        sram_file_path: Option<SavP>,
+        save_on_shutdown: bool,
     ) -> Result<Self, CartridgeError> {
         let extension = file_path
             .as_ref()
@@ -219,8 +221,8 @@ impl Cartridge {
         }
 
         let file_path = file_path.as_ref().to_path_buf().into_boxed_path();
-        let sav_path = if let Some(sav_file_path) = sav_file_path {
-            sav_file_path.as_ref().to_path_buf().into_boxed_path()
+        let sram_file_path = if let Some(sram_file_path) = sram_file_path {
+            sram_file_path.as_ref().to_path_buf().into_boxed_path()
         } else {
             Self::get_save_file(&file_path).into_boxed_path()
         };
@@ -330,7 +332,7 @@ impl Cartridge {
         mapper.init((rom_size / 0x4000) as u16, ram_size);
 
         if cartridge_type.battery {
-            match Self::load_sram_file(&sav_path, ram_size, mapper.save_battery_size()) {
+            match Self::load_sram_file(&sram_file_path, ram_size, mapper.save_battery_size()) {
                 Ok((saved_ram, extra)) => {
                     ram = saved_ram;
                     mapper.load_battery(&extra);
@@ -341,7 +343,8 @@ impl Cartridge {
 
         Ok(Self {
             file_path,
-            sav_path,
+            sram_file_path,
+            save_on_shutdown,
             game_title,
             cartridge_type,
             target_device,
@@ -422,13 +425,13 @@ impl Cartridge {
     }
 
     fn load_sram_file<P: AsRef<Path>>(
-        sav_path: P,
+        sram_file_path: P,
         sram_size: usize,
         extra_size: usize,
     ) -> Result<(Vec<u8>, Vec<u8>), SramError> {
-        println!("Loading SRAM file data from {:?}", sav_path.as_ref());
+        println!("Loading SRAM file data from {:?}", sram_file_path.as_ref());
 
-        let mut file = File::open(sav_path)?;
+        let mut file = File::open(sram_file_path)?;
         let mut result = vec![0; sram_size];
         let mut extra = vec![0; extra_size];
 
@@ -448,17 +451,17 @@ impl Cartridge {
 
     fn save_sram_file(&self) -> Result<(), SramError> {
         //let path = Self::get_save_file(&self.file_path);
-        let sav_path = &self.sav_path;
-        println!("Writing SRAM file data to {:?}", sav_path);
+        let sram_file_path = &self.sram_file_path;
+        println!("Writing SRAM file data to {:?}", sram_file_path);
 
-        let mut file = File::create(sav_path)?;
+        let mut file = File::create(sram_file_path)?;
 
         let size = file.write(&self.ram)?;
 
         if size != self.ram.len() {
             file.sync_all()?;
             // remove the file so it will not be loaded next time the game is run
-            std::fs::remove_file(sav_path).expect("Could not remove `gb.sav` file");
+            std::fs::remove_file(sram_file_path).expect("Could not remove `gb.sav` file");
             return Err(SramError::FailedToSaveSramFile);
         }
 
@@ -469,7 +472,7 @@ impl Cartridge {
         if size != extra.len() {
             file.sync_all()?;
             // remove the file so it will not be loaded next time the game is run
-            std::fs::remove_file(sav_path).expect("Could not remove `gb.sav` file");
+            std::fs::remove_file(sram_file_path).expect("Could not remove `gb.sav` file");
             return Err(SramError::FailedToSaveSramFile);
         }
 
@@ -479,7 +482,7 @@ impl Cartridge {
 
 impl Drop for Cartridge {
     fn drop(&mut self) {
-        if self.cartridge_type.battery {
+        if self.cartridge_type.battery && self.save_on_shutdown {
             if let Err(err) = self.save_sram_file() {
                 eprintln!("Error while saving sram file: {}", err);
             }

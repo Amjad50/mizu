@@ -462,6 +462,11 @@ fn main() {
              .help("A custom location of the `.sav` SRAM file, by default we will use the file with the same name as the rom file with `.sav` extension")
         )
         .arg(
+            Arg::new("dont_save")
+             .long("dont-save")
+             .help("Don't save the SRAM of the game on shutdown")
+        )
+        .arg(
             Arg::new("dmg")
                 .long("dmg")
                 .short('d')
@@ -491,6 +496,7 @@ fn main() {
     let boot_rom_file = matches.value_of("boot_rom");
     let scale = matches.value_of("scale");
     let fps = matches.value_of("fps");
+    let dont_save = matches.is_present("dont_save");
 
     let scale = scale
         .and_then(|s| {
@@ -520,7 +526,18 @@ fn main() {
 
     let config = GameboyConfig { is_dmg };
 
-    let gameboy = GameBoy::new(rom_file, boot_rom_file, sav_file, config).unwrap();
+    let mut builder = GameBoy::builder(rom_file)
+        .config(config)
+        .save_on_shutdown(!dont_save);
+
+    if let Some(boot_rom_file) = boot_rom_file {
+        builder = builder.boot_rom_file(boot_rom_file);
+    }
+    if let Some(sav_file) = sav_file {
+        builder = builder.sram_file(sav_file);
+    }
+
+    let gameboy = builder.build().unwrap();
 
     let mut gameboy_front = GameboyFront::new(gameboy, fps, scale);
 
