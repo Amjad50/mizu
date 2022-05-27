@@ -19,19 +19,10 @@ use crate::GameBoyConfig;
 use dma::{BusType, Hdma, OamDma};
 use interrupts::Interrupts;
 
-#[derive(Savable)]
+#[derive(Default, Savable)]
 struct BootRom {
     enabled: bool,
     data: Vec<u8>,
-}
-
-impl Default for BootRom {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            data: Vec::new(),
-        }
-    }
 }
 
 #[derive(Clone, Copy, PartialEq, Debug, Savable)]

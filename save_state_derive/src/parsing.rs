@@ -355,10 +355,7 @@ impl Container {
                 }
             }
             ContainerData::Enum(variants) => {
-                let all_fields = variants
-                    .iter()
-                    .map(|v| &v.fields.unskipped_fields)
-                    .flatten();
+                let all_fields = variants.iter().flat_map(|v| &v.fields.unskipped_fields);
 
                 if attrs.use_serde {
                     all_fields.for_each(|f| serde_visitor.visit_type(&f.ty));

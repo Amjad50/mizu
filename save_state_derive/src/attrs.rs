@@ -19,12 +19,7 @@ impl ContainerAttrs {
     pub fn new(input: &DeriveInput) -> Result<Self> {
         let mut use_serde = false;
 
-        for meta_item in input
-            .attrs
-            .iter()
-            .flat_map(|attr| parse_savable_attr(attr))
-            .flatten()
-        {
+        for meta_item in input.attrs.iter().flat_map(parse_savable_attr).flatten() {
             match &meta_item {
                 NestedMeta::Meta(Meta::Path(path)) if path.is_ident("serde") => {
                     use_serde = true;
@@ -56,12 +51,7 @@ impl FieldAttrs {
         let mut use_serde = false;
         let mut skip = false;
 
-        for meta_item in input
-            .attrs
-            .iter()
-            .flat_map(|attr| parse_savable_attr(attr))
-            .flatten()
-        {
+        for meta_item in input.attrs.iter().flat_map(parse_savable_attr).flatten() {
             match &meta_item {
                 NestedMeta::Meta(Meta::Path(path)) if path.is_ident("serde") => {
                     if skip {
