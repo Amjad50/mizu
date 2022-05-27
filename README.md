@@ -11,6 +11,7 @@ Mizu is an accurate Gameboy emulator built in Rust.
 - Emulating The original gameboy (DMG) and gameboy color hardware.
 - Passing most hardware tests (see [TESTING.md](./TESTING.md)).
 - Bettery save support.
+- Control SRAM save file and ability to disable SRAM save.
 - Accurate RTC emulation for MBC3 mapper.
 - Accurate APU emulation with 48KHz audio.
 - SFML gui front-end.

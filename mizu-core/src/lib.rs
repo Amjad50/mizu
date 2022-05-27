@@ -15,7 +15,7 @@ mod tests;
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use save_state::Savable;
@@ -50,21 +50,66 @@ impl GameboyConfig {
     }
 }
 
+pub struct GameBoyBuilder {
+    config: GameboyConfig,
+    rom_file: PathBuf,
+    boot_rom_file: Option<PathBuf>,
+    sram_file: Option<PathBuf>,
+    save_on_shutdown: bool,
+}
+
+impl GameBoyBuilder {
+    pub fn config(mut self, config: GameboyConfig) -> Self {
+        self.config = config;
+        self
+    }
+
+    pub fn boot_rom_file<P: AsRef<Path>>(mut self, boot_rom_file: P) -> Self {
+        self.boot_rom_file = Some(boot_rom_file.as_ref().to_path_buf());
+        self
+    }
+
+    pub fn sram_file<P: AsRef<Path>>(mut self, save_file: P) -> Self {
+        self.sram_file = Some(save_file.as_ref().to_path_buf());
+        self
+    }
+
+    pub fn save_on_shutdown(mut self, save_on_shutdown: bool) -> Self {
+        self.save_on_shutdown = save_on_shutdown;
+        self
+    }
+
+    pub fn build(self) -> Result<GameBoy, CartridgeError> {
+        GameBoy::build(self)
+    }
+}
+
 pub struct GameBoy {
     cpu: Cpu,
     bus: Bus,
 }
 
 impl GameBoy {
-    pub fn new<RomP: AsRef<Path>, BootP: AsRef<Path>, SavP: AsRef<Path>>(
-        file_path: RomP,
-        boot_rom_file: Option<BootP>,
-        sav_file_path: Option<SavP>,
-        config: GameboyConfig,
-    ) -> Result<Self, CartridgeError> {
-        let cartridge = Cartridge::from_file(file_path, sav_file_path)?;
+    pub fn builder<RomP: AsRef<Path>>(rom_file: RomP) -> GameBoyBuilder {
+        GameBoyBuilder {
+            config: GameboyConfig::default(),
+            rom_file: rom_file.as_ref().to_path_buf(),
+            boot_rom_file: None,
+            sram_file: None,
+            save_on_shutdown: true,
+        }
+    }
 
-        let (bus, cpu) = if let Some(boot_rom_file) = boot_rom_file {
+    fn build(builder: GameBoyBuilder) -> Result<Self, CartridgeError> {
+        let file_path = builder.rom_file;
+        let sram_file_path = builder.sram_file;
+        let boot_rom_file_path = builder.boot_rom_file;
+        let config = builder.config;
+        let save_on_shutdown = builder.save_on_shutdown;
+
+        let cartridge = Cartridge::from_file(file_path, sram_file_path, save_on_shutdown)?;
+
+        let (bus, cpu) = if let Some(boot_rom_file) = boot_rom_file_path {
             let mut boot_rom_file = File::open(boot_rom_file)?;
             let mut data = vec![0; config.boot_rom_len()];
 
