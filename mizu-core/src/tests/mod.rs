@@ -3,7 +3,7 @@
 use super::cartridge::{Cartridge, CartridgeError};
 use super::cpu::{Cpu, CpuRegisters, CpuState};
 use super::memory::Bus;
-use super::GameboyConfig;
+use super::GameBoyConfig;
 
 use std::path::Path;
 
@@ -78,7 +78,7 @@ impl TestingGameBoy {
     pub fn new<P: AsRef<Path>>(file_path: P, is_dmg: bool) -> Result<Self, CartridgeError> {
         let cartridge = Cartridge::from_file::<_, String>(file_path, None, false)?;
 
-        let config = GameboyConfig { is_dmg };
+        let config = GameBoyConfig { is_dmg };
 
         let is_cartridge_color = cartridge.is_cartridge_color();
         Ok(Self {

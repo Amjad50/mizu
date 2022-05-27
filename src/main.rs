@@ -3,6 +3,7 @@ mod notification;
 mod printer_front;
 
 use std::{
+    fmt,
     fs::{self, File},
     io::Write,
     path::{Path, PathBuf},
@@ -13,7 +14,7 @@ use directories_next::ProjectDirs;
 use notification::Notifications;
 use printer_front::MizuPrinter;
 
-use mizu_core::{GameBoy, GameboyConfig, JoypadButton, SaveError};
+use mizu_core::{GameBoy, GameBoyConfig, JoypadButton, SaveError};
 
 use sfml::{
     graphics::{Color, FloatRect, Image, RenderTarget, RenderWindow, Sprite, Texture, View},
@@ -46,6 +47,37 @@ impl AudioBufferOutput {
             AudioBufferOutput::Wave => "Wave",
             AudioBufferOutput::Noise => "Noise",
         }
+    }
+}
+
+#[derive(Debug)]
+enum FrontSaveError {
+    SaveError(SaveError),
+    FileError(std::io::Error),
+    NotFound,
+}
+
+impl std::error::Error for FrontSaveError {}
+
+impl fmt::Display for FrontSaveError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FrontSaveError::SaveError(e) => write!(f, "Save error: {}", e),
+            FrontSaveError::FileError(e) => write!(f, "File error: {}", e),
+            FrontSaveError::NotFound => write!(f, "Save file could not be opened/created"),
+        }
+    }
+}
+
+impl From<SaveError> for FrontSaveError {
+    fn from(err: SaveError) -> Self {
+        FrontSaveError::SaveError(err)
+    }
+}
+
+impl From<std::io::Error> for FrontSaveError {
+    fn from(err: std::io::Error) -> Self {
+        FrontSaveError::FileError(err)
     }
 }
 
@@ -214,8 +246,8 @@ impl GameboyFront {
         }
     }
 
-    fn save_state(&self, slot: u8) -> Result<(), SaveError> {
-        let file_path = self.save_state_file(slot).ok_or(SaveError::SaveFileError)?;
+    fn save_state(&self, slot: u8) -> Result<(), FrontSaveError> {
+        let file_path = self.save_state_file(slot).ok_or(FrontSaveError::NotFound)?;
         println!("saving state file {}", file_path.to_string_lossy());
         let mut file = File::create(file_path)?;
 
@@ -230,8 +262,8 @@ impl GameboyFront {
     }
 
     /// return `true` if the file is loaded, `false` otherwize in case of no errors
-    fn load_state(&mut self, slot: u8) -> Result<bool, SaveError> {
-        let file_path = self.save_state_file(slot).ok_or(SaveError::SaveFileError)?;
+    fn load_state(&mut self, slot: u8) -> Result<bool, FrontSaveError> {
+        let file_path = self.save_state_file(slot).ok_or(FrontSaveError::NotFound)?;
         println!("trying to load state file {}", file_path.to_string_lossy());
 
         if file_path.exists() {
@@ -524,7 +556,7 @@ fn main() {
         })
         .unwrap_or(DEFAULT_FPS);
 
-    let config = GameboyConfig { is_dmg };
+    let config = GameBoyConfig { is_dmg };
 
     let mut builder = GameBoy::builder(rom_file)
         .config(config)

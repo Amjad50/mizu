@@ -58,6 +58,11 @@ impl Packet {
     }
 }
 
+/// A custom GameBoy [`SerialDevice`] that emulates
+/// how the [GameBoy printer](https://en.wikipedia.org/wiki/Game_Boy_Printer) operated.
+///
+/// This device can be used to display printed images by games, check
+/// a sample implementation in `mizu` frontend crate.
 pub struct Printer {
     ram: [u8; 0x2000],
     ram_next_write_pointer: usize,
@@ -100,14 +105,19 @@ impl Default for Printer {
 }
 
 impl Printer {
+    /// Returns the current printer image buffer
+    ///
+    /// The format is in RGB. i.e. 3 bytes per pixel.
     pub fn get_image_buffer(&self) -> &[u8] {
         &self.image_buffer
     }
 
+    /// Returns the current printer image size (width, height)
     pub fn get_image_size(&self) -> (u32, u32) {
         self.image_size
     }
 
+    /// Clear the current image buffer of the printer.
     pub fn clear_image_buffer(&mut self) {
         self.image_buffer.clear();
         self.image_size = (0, 0);
