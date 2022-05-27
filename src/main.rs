@@ -23,7 +23,7 @@ use sfml::{
     SfBox,
 };
 
-use clap::{App, Arg};
+use clap::{Arg, Command};
 
 pub const TV_WIDTH: u32 = 160;
 pub const TV_HEIGHT: u32 = 144;
@@ -481,7 +481,7 @@ fn main() {
     let default_scale_str = format!("{}", DEFAULT_SCALE);
     let default_fps_str = format!("{}", DEFAULT_FPS);
 
-    let matches = App::new("mizu")
+    let matches = Command::new("mizu")
         .version("1.0")
         .author("Amjad Alsharafi")
         .about("Gameboy DMG and Gameboy Color emulator")
