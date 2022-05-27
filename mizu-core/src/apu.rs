@@ -7,7 +7,7 @@ mod wave_channel;
 use bitflags::bitflags;
 use save_state::Savable;
 
-use crate::GameboyConfig;
+use crate::GameBoyConfig;
 use channel::{ApuChannel, Dac, LengthCountedChannel};
 use noise_channel::NoiseChannel;
 use pulse_channel::PulseChannel;
@@ -101,11 +101,11 @@ pub struct Apu {
     // this is to keep working normally even in CPU double speed mode
     clocks_counter: u8,
 
-    config: GameboyConfig,
+    config: GameBoyConfig,
 }
 
 impl Apu {
-    pub fn new(config: GameboyConfig) -> Self {
+    pub fn new(config: GameBoyConfig) -> Self {
         Self {
             channels_control: ChannelsControl::from_bits_truncate(0),
             channels_selection: ChannelsSelection::from_bits_truncate(0),
@@ -130,7 +130,7 @@ impl Apu {
         }
     }
 
-    pub fn new_skip_boot_rom(config: GameboyConfig) -> Self {
+    pub fn new_skip_boot_rom(config: GameBoyConfig) -> Self {
         let mut apu = Self::new(config);
 
         // after boot_rom state

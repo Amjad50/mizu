@@ -1,15 +1,9 @@
 use super::{Mapper, MappingResult};
 use save_state::Savable;
 
-#[derive(Savable)]
+#[derive(Default, Savable)]
 pub struct NoMapper {
     ram_size: usize,
-}
-
-impl Default for NoMapper {
-    fn default() -> Self {
-        Self { ram_size: 0 }
-    }
 }
 
 impl Mapper for NoMapper {

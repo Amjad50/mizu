@@ -9,7 +9,7 @@ use bitflags::bitflags;
 use save_state::Savable;
 
 use crate::memory::{InterruptManager, InterruptType};
-use crate::GameboyConfig;
+use crate::GameBoyConfig;
 
 use bg_attribs::BgAttribute;
 use colors::{Color, ColorPalette, ColorPalettesCollection};
@@ -213,11 +213,11 @@ pub struct Ppu {
 
     is_cgb_mode: bool,
 
-    config: GameboyConfig,
+    config: GameBoyConfig,
 }
 
 impl Ppu {
-    pub fn new(config: GameboyConfig) -> Self {
+    pub fn new(config: GameBoyConfig) -> Self {
         let mut cgb_bg_palettes = ColorPalettesCollection::default();
         let mut cgb_sprite_palettes = ColorPalettesCollection::default();
 
@@ -300,7 +300,7 @@ impl Ppu {
     }
     /// create a ppu instance that match the one the ppu would have when the
     /// boot_rom finishes execution
-    pub fn new_skip_boot_rom(mut cgb_mode: bool, config: GameboyConfig) -> Self {
+    pub fn new_skip_boot_rom(mut cgb_mode: bool, config: GameBoyConfig) -> Self {
         let mut s = Self::new(config);
         // set I/O registers to the value which would have if boot_rom ran
         s.write_lcd_control(0x91);

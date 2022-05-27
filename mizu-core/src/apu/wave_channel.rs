@@ -1,7 +1,7 @@
 use save_state::Savable;
 
 use super::ApuChannel;
-use crate::GameboyConfig;
+use crate::GameBoyConfig;
 
 const VOLUME_SHIFT_TABLE: [u8; 4] = [4, 0, 1, 2];
 
@@ -21,11 +21,11 @@ pub struct WaveChannel {
 
     dac_enable: bool,
 
-    config: GameboyConfig,
+    config: GameBoyConfig,
 }
 
 impl WaveChannel {
-    pub fn new(config: GameboyConfig) -> Self {
+    pub fn new(config: GameBoyConfig) -> Self {
         Self {
             config,
             ..Self::default()

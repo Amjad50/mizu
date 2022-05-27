@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2022-05-27
+### Added
+- Ability to access `AudioBuffers` for each individual channel.
+- Allowed to specify the SRAM save file and whether or not to save on shutdown.
+- Documenting all public APIs and now its easier to use the library as backend emulation.
+
+### Changed
+- Changes in the PPU and passed some tests.
+- Used `ciborium` instead of `serde_cbor` for SaveState. ([7091c3c])
+- Moved to Rust edition 2021.
+
 ## [0.2.0] - 2021-02-18
 ### Added
 - Save states with the [`save_state`](./save_state) library.
@@ -32,11 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - This is the first release and has **SO** many rewrites and bug fixes.
 
-[Unreleased]: https://github.com/Amjad50/mizu/compare/v0.1.2...HEAD
-[0.1.2]: https://github.com/Amjad50/mizu/compare/v0.1.1...v0.1.2
+[Unreleased]: https://github.com/Amjad50/mizu/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Amjad50/mizu/compare/v0.2.0...v1.0.0
+[0.2.0]: https://github.com/Amjad50/mizu/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/Amjad50/mizu/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Amjad50/mizu/compare/d3539ab...v0.1.1
 
-[c6d446c]: https://github.com/Amjad50/mizu/commit/c6d446c
+[c6d446c]: https://github.com/Amjad50/mizu/commit/c6d446c 
+[7091c3c]: https://github.com/Amjad50/mizu/commit/7091c3c
 
 [SFML]: https://www.sfml-dev.org/

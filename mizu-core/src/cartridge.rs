@@ -21,7 +21,7 @@ const NINTENDO_LOGO_DATA: &[u8; 48] = &[
 
 #[derive(Debug, PartialEq)]
 enum TargetDevice {
-    DMG,
+    Dmg,
     Color,
 }
 
@@ -265,7 +265,7 @@ impl Cartridge {
         let target_device = if data[0x143] & 0x80 != 0 {
             TargetDevice::Color
         } else {
-            TargetDevice::DMG
+            TargetDevice::Dmg
         };
 
         println!("target gameboy {:?}", target_device);

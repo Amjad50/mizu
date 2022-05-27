@@ -37,15 +37,9 @@ impl Color {
     }
 }
 
-#[derive(Clone, Copy, Savable)]
+#[derive(Default, Clone, Copy, Savable)]
 pub struct ColorPalette {
     data: [u16; 4],
-}
-
-impl Default for ColorPalette {
-    fn default() -> Self {
-        Self { data: [0; 4] }
-    }
 }
 
 impl ColorPalette {

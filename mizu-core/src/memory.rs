@@ -15,23 +15,14 @@ use crate::joypad::{Joypad, JoypadButton};
 use crate::ppu::Ppu;
 use crate::serial::{Serial, SerialDevice};
 use crate::timer::Timer;
-use crate::GameboyConfig;
+use crate::GameBoyConfig;
 use dma::{BusType, Hdma, OamDma};
 use interrupts::Interrupts;
 
-#[derive(Savable)]
+#[derive(Default, Savable)]
 struct BootRom {
     enabled: bool,
     data: Vec<u8>,
-}
-
-impl Default for BootRom {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            data: Vec::new(),
-        }
-    }
 }
 
 #[derive(Clone, Copy, PartialEq, Debug, Savable)]
@@ -242,11 +233,11 @@ pub struct Bus {
     /// when the frontend gets the elapsed value, its reset to 0
     elapsed_ppu_cycles: u32,
 
-    config: GameboyConfig,
+    config: GameBoyConfig,
 }
 
 impl Bus {
-    pub fn new_without_boot_rom(cartridge: Cartridge, config: GameboyConfig) -> Self {
+    pub fn new_without_boot_rom(cartridge: Cartridge, config: GameBoyConfig) -> Self {
         let cgb_mode = cartridge.is_cartridge_color();
         let mut lock = Lock::default();
 
@@ -287,7 +278,7 @@ impl Bus {
     pub fn new_with_boot_rom(
         cartridge: Cartridge,
         boot_rom_data: Vec<u8>,
-        config: GameboyConfig,
+        config: GameBoyConfig,
     ) -> Self {
         let mut s = Self::new_without_boot_rom(cartridge, config);
         s.timer = Timer::default();

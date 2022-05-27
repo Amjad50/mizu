@@ -20,27 +20,34 @@ use std::rc::Rc;
 
 use save_state::Savable;
 
+use cartridge::Cartridge;
+use cpu::Cpu;
+use memory::Bus;
+
 pub use apu::AudioBuffers;
+pub use cartridge::CartridgeError;
 pub use joypad::JoypadButton;
 pub use printer::Printer;
 pub use save_error::SaveError;
+pub use serial::SerialDevice;
 
-use cartridge::{Cartridge, CartridgeError};
-use cpu::Cpu;
-use memory::Bus;
-use serial::SerialDevice;
-
+/// The current version of state saved/loaded by
+/// [`GameBoy::save_state`] / [`GameBoy::load_state`].
+///
+/// Loading a state that is not compatible with this version, results
+/// in [`SaveError::UnmatchedSaveErrorVersion`]
+pub const SAVE_STATE_VERSION: usize = 2;
 const SAVE_STATE_MAGIC: &[u8; 4] = b"MST\xee";
-const SAVE_STATE_VERSION: usize = 2;
 const SAVE_STATE_ZSTD_COMPRESSION_LEVEL: i32 = 0; // default compression
 
+/// Custom configuration for the [`GameBoy`] emulation inner workings
 #[derive(Debug, Default, Clone, Copy, Savable)]
-pub struct GameboyConfig {
+pub struct GameBoyConfig {
     /// Should the gameboy run in DMG mode? default is in CGB mode
     pub is_dmg: bool,
 }
 
-impl GameboyConfig {
+impl GameBoyConfig {
     pub fn boot_rom_len(&self) -> usize {
         if self.is_dmg {
             0x100
@@ -50,8 +57,9 @@ impl GameboyConfig {
     }
 }
 
+/// Builder struct container for [`GameBoy`] configurations and options.
 pub struct GameBoyBuilder {
-    config: GameboyConfig,
+    config: GameBoyConfig,
     rom_file: PathBuf,
     boot_rom_file: Option<PathBuf>,
     sram_file: Option<PathBuf>,
@@ -59,40 +67,51 @@ pub struct GameBoyBuilder {
 }
 
 impl GameBoyBuilder {
-    pub fn config(mut self, config: GameboyConfig) -> Self {
+    /// Add custom [`GameBoyConfig`]
+    pub fn config(mut self, config: GameBoyConfig) -> Self {
         self.config = config;
         self
     }
 
+    /// Add boot rom file
     pub fn boot_rom_file<P: AsRef<Path>>(mut self, boot_rom_file: P) -> Self {
         self.boot_rom_file = Some(boot_rom_file.as_ref().to_path_buf());
         self
     }
 
+    /// Add custom sram file,
+    /// if this is not specified, the sram will be stored in the same directory
+    /// as the rom file.
     pub fn sram_file<P: AsRef<Path>>(mut self, save_file: P) -> Self {
         self.sram_file = Some(save_file.as_ref().to_path_buf());
         self
     }
 
+    /// Should the SRAM be saved on shutdown? (default: true)
     pub fn save_on_shutdown(mut self, save_on_shutdown: bool) -> Self {
         self.save_on_shutdown = save_on_shutdown;
         self
     }
 
+    /// Builds a [`GameBoy`] instance.
     pub fn build(self) -> Result<GameBoy, CartridgeError> {
         GameBoy::build(self)
     }
 }
 
+/// The GameBoy is the main interface to the emulator.
+///
+/// Everything regarding emulation can be controlled from here.
 pub struct GameBoy {
     cpu: Cpu,
     bus: Bus,
 }
 
 impl GameBoy {
+    /// Initiate a builder object with a cartridge file.
     pub fn builder<RomP: AsRef<Path>>(rom_file: RomP) -> GameBoyBuilder {
         GameBoyBuilder {
-            config: GameboyConfig::default(),
+            config: GameBoyConfig::default(),
             rom_file: rom_file.as_ref().to_path_buf(),
             boot_rom_file: None,
             sram_file: None,
@@ -137,12 +156,10 @@ impl GameBoy {
         Ok(Self { bus, cpu })
     }
 
-    /// Synced to PPU
+    /// Clocks the Gameboy clock for the duration of one PPU frame.
     ///
-    /// Not sure if this is an accurate apporach, but it looks good, as the
-    /// number of PPU cycles per frame is fixed, counting for the number
-    /// of ppu cycles is better than waiting for Vblank, as if the lcd
-    /// is off, Vblank is not coming
+    /// This is good for timing emulation, you can call this function once
+    /// and then render it.
     pub fn clock_for_frame(&mut self) {
         const PPU_CYCLES_PER_FRAME: u32 = 456 * 154;
         let mut cycles = 0u32;
@@ -152,31 +169,43 @@ impl GameBoy {
         }
     }
 
+    /// Return the game title string extracted from the cartridge.
     pub fn game_title(&self) -> &str {
         self.bus.cartridge().game_title()
     }
 
+    /// The cartridge file path.
     pub fn file_path(&self) -> &Path {
         self.bus.cartridge().file_path()
     }
 
+    /// Return the pixels buffer of the PPU at the current state.
+    ///
+    /// The format of the pixel buffer is RGB, i.e. 3 bytes per pixel.
     pub fn screen_buffer(&self) -> &[u8] {
         self.bus.screen_buffer()
     }
 
+    /// Return the audio buffer of the APU at the current state.
     pub fn audio_buffers(&mut self) -> AudioBuffers {
         self.bus.audio_buffers()
     }
 
+    /// Change the state of the joypad button to `pressed`.
     pub fn press_joypad(&mut self, button: JoypadButton) {
         self.bus.press_joypad(button);
     }
 
+    /// Change the state of the joypad button to `released`.
     pub fn release_joypad(&mut self, button: JoypadButton) {
         self.bus.release_joypad(button);
     }
 
     // TODO: Not sure if using RefCell is the best option here
+    /// Connect a serial device to the Gameboy.
+    ///
+    /// Currently the gameboy can only be `master`, so the other device
+    /// must be implemented as `slave`.
     pub fn connect_device(&mut self, device: Rc<RefCell<dyn SerialDevice>>) {
         self.bus.connect_device(device);
     }
@@ -186,6 +215,7 @@ impl GameBoy {
         self.bus.disconnect_device();
     }
 
+    /// Saves the whole current state of the emulator.
     pub fn save_state<W: Write>(&self, mut writer: W) -> Result<(), SaveError> {
         SAVE_STATE_MAGIC.save(&mut writer)?;
         SAVE_STATE_VERSION.save(&mut writer)?;
@@ -202,6 +232,9 @@ impl GameBoy {
         Ok(())
     }
 
+    /// Loads the whole state of the emulator, if an error happened in the middle
+    /// the emulator will keep functioning like normal, as it stores a backup recovery state before
+    /// loading the new state.
     pub fn load_state<R: Read + Seek>(&mut self, mut reader: R) -> Result<(), SaveError> {
         // save state, so that if an error occured we will restore it back.
         let mut recovery_save_state = Vec::new();

@@ -33,6 +33,7 @@ fn impl_for_serde_full(container: &Container) -> Result<TokenStream2> {
 
     Ok(quote! {
         #[automatically_derived]
+        #[allow(clippy::needless_question_mark)]
         impl #impl_generics ::save_state::Savable for #ident #ty_generics #where_clause {
             #[inline]
             fn save<W: ::std::io::Write>(
@@ -129,6 +130,7 @@ fn impl_for_struct(container: &Container, fields: &Fields) -> Result<TokenStream
 
     Ok(quote! {
         #[automatically_derived]
+        #[allow(clippy::needless_question_mark)]
         impl #impl_generics ::save_state::Savable for #ident #ty_generics #where_clause {
             #[inline]
             fn save<W: ::std::io::Write>(
@@ -221,6 +223,7 @@ fn impl_for_enum(container: &Container, variants: &[Variant]) -> Result<TokenStr
 
     Ok(quote! {
         #[automatically_derived]
+        #[allow(clippy::needless_question_mark)]
         impl #impl_generics ::save_state::Savable for #ident #ty_generics #where_clause {
             #[inline]
             fn save<W: ::std::io::Write>(

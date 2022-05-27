@@ -5,6 +5,7 @@ use std::convert::From;
 
 use crate::memory::{InterruptManager, InterruptType};
 
+/// Joypad button types of the GameBoy.
 pub enum JoypadButton {
     Start,
     Select,

@@ -1,8 +1,13 @@
 use crate::memory::{InterruptManager, InterruptType};
-use crate::GameboyConfig;
+use crate::GameBoyConfig;
 use bitflags::bitflags;
 use save_state::Savable;
 
+/// A [`GameBoy`](crate::GameBoy) custom serial device, which can be used to communicate
+/// between the GameBoy and any other device.
+///
+/// Check [`Printer`](crate::Printer) for a sample implementation of the
+/// [GameBoy printer](https://en.wikipedia.org/wiki/Game_Boy_Printer) device.
 pub trait SerialDevice {
     /// A device implemnts this, when receiving a call from this function will
     /// send a bit (return) and get a bit from the sender (`bit` argument)
@@ -50,11 +55,11 @@ pub struct Serial {
     transfere_data: u8,
     bits_remaining: u8,
     pub internal_timer: u8,
-    config: GameboyConfig,
+    config: GameBoyConfig,
 }
 
 impl Serial {
-    pub fn new(config: GameboyConfig) -> Self {
+    pub fn new(config: GameBoyConfig) -> Self {
         Self {
             serial_control: SerialControl::from_bits_truncate(0),
             transfere_data: 0,
@@ -64,7 +69,7 @@ impl Serial {
         }
     }
 
-    pub fn new_skip_boot_rom(config: GameboyConfig) -> Self {
+    pub fn new_skip_boot_rom(config: GameBoyConfig) -> Self {
         Self {
             /// FIXME: the internal_timer is not constant for CGB games
             ///  This is done temporary for testing, as testing properly should

@@ -5,7 +5,7 @@ use bitflags::bitflags;
 use save_state::Savable;
 
 use crate::memory::InterruptType;
-use crate::GameboyConfig;
+use crate::GameBoyConfig;
 use instruction::{Condition, Instruction, Opcode, OperandType};
 
 pub trait CpuBusProvider {
@@ -93,11 +93,11 @@ pub struct Cpu {
     ime: bool,
     halt_mode: HaltMode,
 
-    config: GameboyConfig,
+    config: GameBoyConfig,
 }
 
 impl Cpu {
-    pub fn new(config: GameboyConfig) -> Self {
+    pub fn new(config: GameBoyConfig) -> Self {
         Self {
             reg_a: 0,
             reg_b: 0,
@@ -120,7 +120,7 @@ impl Cpu {
 
     /// create a new cpu, with states that match the ones the CPU would have
     /// if the boot-rom would run (default values for registers)
-    pub fn new_without_boot_rom(config: GameboyConfig, is_cart_cgb: bool) -> Self {
+    pub fn new_without_boot_rom(config: GameBoyConfig, is_cart_cgb: bool) -> Self {
         let mut cpu = Self::new(config);
 
         if cpu.config.is_dmg {
