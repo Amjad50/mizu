@@ -9,7 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use audio::AudioPlayer;
+use audio::{AudioPlayer, AudioPlayerError};
 use directories_next::ProjectDirs;
 use notification::Notifications;
 use printer_front::MizuPrinter;
@@ -93,7 +93,12 @@ struct GameboyFront {
 }
 
 impl GameboyFront {
-    fn new(gameboy: GameBoy, fps: u32, scale: u32, enable_audio: bool) -> Self {
+    fn new(
+        gameboy: GameBoy,
+        fps: u32,
+        scale: u32,
+        enable_audio: bool,
+    ) -> Result<Self, AudioPlayerError> {
         let mut window = RenderWindow::new(
             (TV_WIDTH * scale, TV_HEIGHT * scale),
             "",
@@ -108,7 +113,7 @@ impl GameboyFront {
         notifications.update_size(size.x, size.y);
 
         let audio_player = if enable_audio {
-            let a = AudioPlayer::new(44100);
+            let a = AudioPlayer::new(44100)?;
             a.play();
             Some(a)
         } else {
@@ -129,7 +134,7 @@ impl GameboyFront {
         };
 
         s.update_fps();
-        s
+        Ok(s)
     }
 
     fn connect_printer(&mut self) {
@@ -591,7 +596,7 @@ fn main() {
 
     let gameboy = builder.build().unwrap();
 
-    let mut gameboy_front = GameboyFront::new(gameboy, fps, scale, !disable_audio);
+    let mut gameboy_front = GameboyFront::new(gameboy, fps, scale, !disable_audio).unwrap();
 
     gameboy_front.run_loop();
 }
