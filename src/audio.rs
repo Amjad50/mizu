@@ -73,7 +73,7 @@ impl AudioPlayer {
                         sample_rate.0 as usize,
                         def_conf.sample_rate().0 as usize,
                         // the number of samples for one video frame in 60 FPS
-                        sample_rate.0 as usize * 60,
+                        sample_rate.0 as usize / 60,
                         2,
                     )
                     .unwrap(),
