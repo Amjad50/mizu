@@ -22,7 +22,10 @@ impl std::fmt::Display for AudioPlayerError {
 pub struct AudioPlayer {
     buffer_producer: Producer<f32>,
     resampler: Option<FftFixedInOut<f32>>,
-    resample_buffer: Vec<f32>,
+    pre_resampled_buffer: Vec<f32>,
+    pre_resampled_split_buffers: [Vec<f32>; 2],
+    resample_process_buffers: [Vec<f32>; 2],
+    resampled_buffer: Vec<f32>,
     output_stream: cpal::Stream,
 }
 
@@ -110,7 +113,10 @@ impl AudioPlayer {
         Ok(Self {
             buffer_producer,
             output_stream,
-            resample_buffer: Vec::new(),
+            pre_resampled_buffer: Vec::new(),
+            pre_resampled_split_buffers: [Vec::new(), Vec::new()],
+            resample_process_buffers: [Vec::new(), Vec::new()],
+            resampled_buffer: Vec::new(),
             resampler,
         })
     }
@@ -128,54 +134,75 @@ impl AudioPlayer {
 
     pub fn queue(&mut self, data: &[f32]) {
         // helper method to split channels into separate vectors
-        fn read_frames(inbuffer: &Vec<f32>, n_frames: usize, channels: usize) -> Vec<Vec<f32>> {
-            let mut wfs = Vec::with_capacity(channels);
-            for _chan in 0..channels {
-                wfs.push(Vec::with_capacity(n_frames));
+        fn read_frames(inbuffer: &[f32], n_frames: usize, outputs: &mut [Vec<f32>]) {
+            for output in outputs.iter_mut() {
+                output.clear();
+                output.reserve(n_frames);
             }
             let mut value: f32;
             let mut inbuffer_iter = inbuffer.iter();
             for _ in 0..n_frames {
-                for wf in wfs.iter_mut().take(channels) {
+                for output in outputs.iter_mut() {
                     value = *inbuffer_iter.next().unwrap();
-                    wf.push(value);
+                    output.push(value);
                 }
             }
-            wfs
         }
 
         /// Helper to merge channels into a single vector
-        fn write_frames(waves: Vec<Vec<f32>>, outbuffer: &mut Vec<f32>, channels: usize) {
+        /// the number of channels is the size of `waves` slice
+        fn write_frames(waves: &[Vec<f32>], outbuffer: &mut Vec<f32>) {
             let nbr = waves[0].len();
             for frame in 0..nbr {
-                for chan in 0..channels {
-                    let value = waves[chan][frame];
-                    outbuffer.push(value);
+                for wave in waves.iter() {
+                    outbuffer.push(wave[frame]);
                 }
             }
         }
 
         if let Some(resampler) = &mut self.resampler {
-            self.resample_buffer.extend_from_slice(data);
+            self.pre_resampled_buffer.extend_from_slice(data);
             // finish all the frames, as sometimes after appending many data
             // we might get 2 loops worth of unprocessed audio
             loop {
                 let frames = resampler.input_frames_next();
 
-                if self.resample_buffer.len() < frames * 2 {
+                if self.pre_resampled_buffer.len() < frames * 2 {
                     return;
                 }
 
                 // only read the needed frames
-                let input = read_frames(&mut self.resample_buffer, frames, 2);
-                let output = resampler.process(&input, None).unwrap();
+                read_frames(
+                    &self.pre_resampled_buffer,
+                    frames,
+                    &mut self.pre_resampled_split_buffers,
+                );
 
-                let mut resampled = Vec::with_capacity(output[0].len() * 2);
-                write_frames(output, &mut resampled, 2);
+                self.resample_process_buffers[0].clear();
+                self.resample_process_buffers[0].clear();
 
-                self.buffer_producer.push_slice(&resampled);
+                let output_frames = resampler.output_frames_next();
+                self.resample_process_buffers[0].reserve(output_frames);
+                self.resample_process_buffers[1].reserve(output_frames);
 
-                self.resample_buffer = self.resample_buffer.split_off(frames * 2);
+                resampler
+                    .process_into_buffer(
+                        &self.pre_resampled_split_buffers,
+                        &mut self.resample_process_buffers,
+                        None,
+                    )
+                    .unwrap();
+
+                if self.resampled_buffer.len() < output_frames * 2 {
+                    self.resampled_buffer
+                        .reserve(output_frames * 2 - self.resampled_buffer.len());
+                }
+                self.resampled_buffer.clear();
+                write_frames(&self.resample_process_buffers, &mut self.resampled_buffer);
+
+                self.buffer_producer.push_slice(&self.resampled_buffer);
+
+                self.pre_resampled_buffer = self.pre_resampled_buffer.split_off(frames * 2);
             }
         } else {
             // no resampling
