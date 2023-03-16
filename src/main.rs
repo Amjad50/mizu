@@ -9,7 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use audio::AudioPlayer;
+use audio::{AudioPlayer, AudioPlayerError};
 use directories_next::ProjectDirs;
 use notification::Notifications;
 use printer_front::MizuPrinter;
@@ -85,7 +85,7 @@ struct GameboyFront {
     gameboy: GameBoy,
     window: RenderWindow,
     fps: u32,
-    audio_player: AudioPlayer,
+    audio_player: Option<AudioPlayer>,
     pixels_buffer: [u8; TV_HEIGHT as usize * TV_WIDTH as usize * 4],
     printer: Option<MizuPrinter>,
     notifications: Notifications,
@@ -93,7 +93,12 @@ struct GameboyFront {
 }
 
 impl GameboyFront {
-    fn new(gameboy: GameBoy, fps: u32, scale: u32) -> Self {
+    fn new(
+        gameboy: GameBoy,
+        fps: u32,
+        scale: u32,
+        enable_audio: bool,
+    ) -> Result<Self, AudioPlayerError> {
         let mut window = RenderWindow::new(
             (TV_WIDTH * scale, TV_HEIGHT * scale),
             "",
@@ -107,8 +112,13 @@ impl GameboyFront {
         update_window_view(&mut window, size.x, size.y);
         notifications.update_size(size.x, size.y);
 
-        let audio_player = AudioPlayer::new(44100);
-        audio_player.play();
+        let audio_player = if enable_audio {
+            let a = AudioPlayer::new(44100)?;
+            a.play();
+            Some(a)
+        } else {
+            None
+        };
 
         let pixels_buffer = [0xFF; TV_HEIGHT as usize * TV_WIDTH as usize * 4];
 
@@ -124,7 +134,7 @@ impl GameboyFront {
         };
 
         s.update_fps();
-        s
+        Ok(s)
     }
 
     fn connect_printer(&mut self) {
@@ -144,13 +154,19 @@ impl GameboyFront {
 
         loop {
             let elapsed = t.elapsed().as_secs_f32();
+            let additional_audio_info = if self.audio_player.is_some() {
+                format!(" - Audio output: {}", self.audio_output.to_string())
+            } else {
+                "".to_string()
+            };
+
             self.window.set_title(&format!(
-                "mizu - {} - FPS: {} - printer {}connected - Audio output: {}",
+                "mizu - {} - FPS: {} - printer {}connected{}",
                 self.gameboy.game_title(),
                 (1. / elapsed).round(),
                 // the format! has "{}connected", so we just fill `"dis"` if needed
                 if self.printer.is_some() { "" } else { "dis" },
-                self.audio_output.to_string()
+                additional_audio_info
             ));
             self.notifications.update(elapsed);
 
@@ -165,14 +181,16 @@ impl GameboyFront {
 
             let buffers = self.gameboy.audio_buffers();
 
-            let audio_buffer = match self.audio_output {
-                AudioBufferOutput::All => buffers.all,
-                AudioBufferOutput::Pulse1 => buffers.pulse1,
-                AudioBufferOutput::Pulse2 => buffers.pulse2,
-                AudioBufferOutput::Wave => buffers.wave,
-                AudioBufferOutput::Noise => buffers.noise,
-            };
-            self.audio_player.queue(&audio_buffer);
+            if let Some(audio_player) = self.audio_player.as_mut() {
+                let audio_buffer = match self.audio_output {
+                    AudioBufferOutput::All => buffers.all,
+                    AudioBufferOutput::Pulse1 => buffers.pulse1,
+                    AudioBufferOutput::Pulse2 => buffers.pulse2,
+                    AudioBufferOutput::Wave => buffers.wave,
+                    AudioBufferOutput::Noise => buffers.noise,
+                };
+                audio_player.queue(&audio_buffer);
+            }
 
             self.window.clear(Color::BLACK);
 
@@ -509,16 +527,22 @@ fn main() {
                 .long("scale")
                 .short('s')
                 .default_value(&default_scale_str)
-                .takes_value(true).
-                help("Specify the amount to scale the initial display from the gameboy size of 160x144"),
+                .takes_value(true)
+                .help("Specify the amount to scale the initial display from the gameboy size of 160x144"),
         )
         .arg(
             Arg::new("fps")
                 .long("fps")
                 .short('f')
                 .default_value(&default_fps_str)
-                .takes_value(true).
-                help("Specify the starting emulation speed in FPS, 0 for unlimited"),
+                .takes_value(true)
+                .help("Specify the starting emulation speed in FPS, 0 for unlimited"),
+        )
+        .arg(
+            Arg::new("disable-audio")
+                .long("disable-audio")
+                .short('a')
+                .help("Disable the audio system"),
         )
         .get_matches();
 
@@ -529,6 +553,7 @@ fn main() {
     let scale = matches.value_of("scale");
     let fps = matches.value_of("fps");
     let dont_save = matches.is_present("dont_save");
+    let disable_audio = matches.is_present("disable-audio");
 
     let scale = scale
         .and_then(|s| {
@@ -571,7 +596,7 @@ fn main() {
 
     let gameboy = builder.build().unwrap();
 
-    let mut gameboy_front = GameboyFront::new(gameboy, fps, scale);
+    let mut gameboy_front = GameboyFront::new(gameboy, fps, scale, !disable_audio).unwrap();
 
     gameboy_front.run_loop();
 }
