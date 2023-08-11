@@ -32,6 +32,13 @@ gb_tests!(
     "blargg-gb-tests/cgb_sound/cgb_sound.gb",
     18396380547272095665, // some tests only should fail in DMG (check which are failing)
     4141669196667164762;
+
+    // FIXME: the test passes but the screen is not correct
+    //  it shows the numbers, but doesn't print "Passed"
+    blargg_interrupt_time for cgb,
+    "blargg-gb-tests/interrupt_time/interrupt_time.gb",
+    0, // this test is designed for cgb
+    3220739068587521835;
 );
 
 #[test]

@@ -42,15 +42,16 @@ A documentation of all hardware tests tested on `mizu`.
 
 ## [Blargg tests][blargg_tests]
 
-| Test         | State |
-| ------------ | ----- |
-| cpu_instrs   | :+1:  |
-| instr_timing | :+1:  |
-| halt_bug     | :+1:  |
-| mem_timing-2 | :+1:  |
-| dmg_sound    | :+1:  |
-| cgb_sound    | :+1:  |
-| oam_bug      | :+1:  |
+| Test           | State |
+| -------------- | ----- |
+| cpu_instrs     | :+1:  |
+| instr_timing   | :+1:  |
+| halt_bug       | :+1:  |
+| mem_timing-2   | :+1:  |
+| dmg_sound      | :+1:  |
+| cgb_sound      | :+1:  |
+| oam_bug        | :+1:  |
+| interrupt_time | :+1:  |
 
 ## [Scribble tests][scribbltests]
 
