@@ -289,14 +289,14 @@ mod tests {
     #[test]
     fn available_instructions() {
         for i in 0..=255u8 {
-            Instruction::from_byte(i as u8, 0);
+            Instruction::from_byte(i, 0);
         }
     }
 
     #[test]
     fn available_instructions_with_prefix_cb() {
         for i in 0..=255u8 {
-            Instruction::from_prefix(i as u8, 0);
+            Instruction::from_prefix(i, 0);
         }
     }
 }

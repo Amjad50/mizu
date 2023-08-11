@@ -927,9 +927,7 @@ impl Ppu {
             let bg_priority = bg_pixel.bg_priority;
             let oam_bg_priority = sprite_pixel.oam_bg_priority;
 
-            if (master_priority
-                || ((!bg_priority || bg_pixel.color == 0)
-                    && (!oam_bg_priority || bg_pixel.color == 0)))
+            if (master_priority || bg_pixel.color == 0 || (!bg_priority && !oam_bg_priority))
                 && sprite_pixel.color != 0
             {
                 // sprite wins

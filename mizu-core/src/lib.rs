@@ -165,7 +165,7 @@ impl GameBoy {
         let mut cycles = 0u32;
         while cycles < PPU_CYCLES_PER_FRAME {
             self.cpu.next_instruction(&mut self.bus);
-            cycles += self.bus.elapsed_ppu_cycles() as u32;
+            cycles += self.bus.elapsed_ppu_cycles();
         }
     }
 

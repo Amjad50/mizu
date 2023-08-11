@@ -72,7 +72,7 @@ impl Lcd {
     }
 
     pub fn screen_buffer(&self) -> &[u8] {
-        &self.buf[self.selected_buffer as usize]
+        &self.buf[self.selected_buffer]
     }
 
     #[cfg(test)]

@@ -180,9 +180,9 @@ impl CartridgeType {
 
     fn get_mapper(&self) -> Option<Box<dyn Mapper>> {
         let mapper: Box<dyn Mapper> = match self.mapper_type {
-            MapperType::NoMapper => Box::new(mappers::NoMapper::default()),
+            MapperType::NoMapper => Box::<mappers::NoMapper>::default(),
             MapperType::Mbc1 { multicart } => Box::new(mappers::Mbc1::new(multicart)),
-            MapperType::Mbc2 => Box::new(mappers::Mbc2::default()),
+            MapperType::Mbc2 => Box::<mappers::Mbc2>::default(),
             MapperType::Mbc3 { timer } => Box::new(mappers::Mbc3::new(timer)),
             MapperType::Mbc5 { rumble } => Box::new(mappers::Mbc5::new(rumble)),
             _ => return None,

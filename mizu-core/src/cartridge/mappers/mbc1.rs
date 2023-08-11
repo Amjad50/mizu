@@ -67,7 +67,7 @@ impl Mapper for Mbc1 {
         let bank = (self.rom_bank1 | (self.two_bit_bank2 << self.bank2_shift())) as usize;
         let bank = bank % self.rom_banks as usize;
 
-        bank as usize * 0x4000 + addr as usize
+        bank * 0x4000 + addr as usize
     }
 
     fn map_ram_read(&mut self, addr: u16) -> MappingResult {
@@ -77,14 +77,12 @@ impl Mapper for Mbc1 {
 
         if self.is_2k_ram {
             MappingResult::Addr(addr as usize & 0x7FF)
+        } else if self.ram_banks == 0 {
+            MappingResult::NotMapped
         } else {
-            if self.ram_banks == 0 {
-                MappingResult::NotMapped
-            } else {
-                let addr = addr & 0x1FFF;
-                let bank = if self.mode { self.two_bit_bank2 } else { 0 } % self.ram_banks;
-                MappingResult::Addr(bank as usize * 0x2000 + addr as usize)
-            }
+            let addr = addr & 0x1FFF;
+            let bank = if self.mode { self.two_bit_bank2 } else { 0 } % self.ram_banks;
+            MappingResult::Addr(bank as usize * 0x2000 + addr as usize)
         }
     }
 

@@ -314,7 +314,7 @@ impl Bus {
     }
 
     #[cfg(test)]
-    pub(in crate) fn raw_screen_buffer(&self) -> &[u8] {
+    pub(crate) fn raw_screen_buffer(&self) -> &[u8] {
         self.ppu.raw_screen_buffer()
     }
 

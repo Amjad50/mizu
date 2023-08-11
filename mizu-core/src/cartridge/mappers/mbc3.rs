@@ -233,15 +233,13 @@ impl Mbc3 {
     fn map_ram(&self, addr: u16) -> MappingResult {
         if self.ram_banks == 0 {
             MappingResult::NotMapped
+        } else if self.is_2k_ram {
+            MappingResult::Addr(addr as usize & 0x7FF)
         } else {
-            if self.is_2k_ram {
-                MappingResult::Addr(addr as usize & 0x7FF)
-            } else {
-                let addr = addr & 0x1FFF;
-                let bank = self.ram_bank % self.ram_banks;
+            let addr = addr & 0x1FFF;
+            let bank = self.ram_bank % self.ram_banks;
 
-                MappingResult::Addr(bank as usize * 0x2000 + addr as usize)
-            }
+            MappingResult::Addr(bank as usize * 0x2000 + addr as usize)
         }
     }
 
@@ -279,12 +277,10 @@ impl Mapper for Mbc3 {
         if self.ram_block_enable {
             if self.is_reading_ram {
                 self.map_ram(addr)
+            } else if self.rtc_present {
+                MappingResult::Value(self.rtc_read())
             } else {
-                if self.rtc_present {
-                    MappingResult::Value(self.rtc_read())
-                } else {
-                    MappingResult::NotMapped
-                }
+                MappingResult::NotMapped
             }
         } else {
             MappingResult::NotMapped

@@ -52,14 +52,12 @@ impl Mapper for Mbc5 {
 
         if self.is_2k_ram {
             MappingResult::Addr(addr as usize & 0x7FF)
+        } else if self.ram_banks == 0 {
+            MappingResult::NotMapped
         } else {
-            if self.ram_banks == 0 {
-                MappingResult::NotMapped
-            } else {
-                let addr = addr & 0x1FFF;
-                let bank = self.ram_bank % self.ram_banks;
-                MappingResult::Addr(bank as usize * 0x2000 + addr as usize)
-            }
+            let addr = addr & 0x1FFF;
+            let bank = self.ram_bank % self.ram_banks;
+            MappingResult::Addr(bank as usize * 0x2000 + addr as usize)
         }
     }
 
