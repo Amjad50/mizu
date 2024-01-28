@@ -4,7 +4,8 @@ use bitflags::bitflags;
 use save_state::Savable;
 
 bitflags! {
-    #[derive(Default, Savable)]
+    #[derive(Savable)]
+    #[savable(bitflags)]
     struct TimerControl: u8 {
         const TIMER_ENABLE = 1 <<  2;
         const FREQ_DIVIDER = 0b11;
@@ -18,7 +19,7 @@ impl TimerControl {
 
     fn freq_divider_selection_bit(&self) -> u16 {
         // which bit to check for falling edge when incrementing
-        match self.bits() & Self::FREQ_DIVIDER.bits {
+        match self.bits() & Self::FREQ_DIVIDER.bits() {
             0 => 9,
             1 => 3,
             2 => 5,
@@ -113,8 +114,7 @@ impl Timer {
         let old_enable = self.timer_control.timer_enabled();
         let old_divider_bit = old_enable && self.divider_bit();
 
-        self.timer_control
-            .clone_from(&TimerControl::from_bits_truncate(data));
+        self.timer_control = TimerControl::from_bits_truncate(data);
 
         let new_enable = self.timer_control.timer_enabled();
         let new_divider_bit = new_enable && self.divider_bit();

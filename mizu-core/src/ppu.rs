@@ -19,6 +19,7 @@ use sprite::{SelectedSprite, Sprite};
 
 bitflags! {
     #[derive(Savable)]
+    #[savable(bitflags)]
     struct LcdControl: u8 {
         const DISPLAY_ENABLE          = 1 << 7;
         const WINDOW_TILEMAP          = 1 << 6;
@@ -89,6 +90,7 @@ impl LcdControl {
 
 bitflags! {
     #[derive(Savable)]
+    #[savable(bitflags)]
     struct LcdStatus: u8 {
         const LYC_LY_INTERRUPT        = 1 << 6;
         const MODE_2_OAM_INTERRUPT    = 1 << 5;
@@ -121,13 +123,14 @@ impl LcdStatus {
     }
 
     fn current_mode(&self) -> u8 {
-        self.bits() & Self::MODE_FLAG.bits
+        self.bits() & Self::MODE_FLAG.bits()
     }
 
     fn current_mode_set(&mut self, data: u8) {
-        self.clone_from(&Self::from_bits_truncate(
-            (self.bits() & !0b11) | data & 0b11,
-        ));
+        let _ = core::mem::replace(
+            self,
+            Self::from_bits_truncate((self.bits() & !0b11) | data & 0b11),
+        );
         assert!(self.current_mode() == data & 0b11);
     }
 }
@@ -488,8 +491,7 @@ impl Ppu {
     pub fn write_lcd_control(&mut self, data: u8) {
         let old_disply_enable = self.lcd_control.display_enable();
 
-        self.lcd_control
-            .clone_from(&LcdControl::from_bits_truncate(data));
+        self.lcd_control = LcdControl::from_bits_truncate(data);
 
         if !self.lcd_control.display_enable() && old_disply_enable {
             if self.scanline < 144 {
@@ -514,9 +516,8 @@ impl Ppu {
     }
 
     pub fn write_lcd_status(&mut self, data: u8) {
-        self.lcd_status.clone_from(&LcdStatus::from_bits_truncate(
-            (self.lcd_status.bits() & !0x78) | (data & 0x78),
-        ));
+        self.lcd_status =
+            LcdStatus::from_bits_truncate((self.lcd_status.bits() & !0x78) | (data & 0x78));
     }
 
     pub fn read_scroll_y(&self) -> u8 {

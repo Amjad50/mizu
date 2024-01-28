@@ -17,8 +17,8 @@ ringbuf = "0.3"
 cpal = "0.15"
 clap = { version = "4.0", features = ["string"] }
 native-dialog = "0.7"
-directories-next = "2.0.0"
-rubato = "0.12"
+directories-next = "2.0"
+rubato = "0.14"
 
 [workspace]
 members = [

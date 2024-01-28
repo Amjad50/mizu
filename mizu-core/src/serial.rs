@@ -15,7 +15,8 @@ pub trait SerialDevice {
 }
 
 bitflags! {
-    #[derive(Default, Savable)]
+    #[derive(Savable)]
+    #[savable(bitflags)]
     struct SerialControl: u8 {
         const IN_TRANSFER  = 1 << 7;
         const CLOCK_SPEED  = 1 << 1;
@@ -97,8 +98,7 @@ impl Serial {
             data &= 0x81;
         }
 
-        self.serial_control
-            .clone_from(&SerialControl::from_bits_truncate(data));
+        self.serial_control = SerialControl::from_bits_truncate(data);
         // should start transfere
         if self.serial_control.in_transfer() {
             self.bits_remaining = 8;

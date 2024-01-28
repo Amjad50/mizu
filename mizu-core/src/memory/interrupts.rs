@@ -32,6 +32,7 @@ pub trait InterruptManager {
 
 bitflags! {
     #[derive(Savable)]
+    #[savable(bitflags)]
     struct InterruptsFlags: u8 {
         /// This is only used when reading `interrupt_enable` only
         const UNUSED   = 0b111 << 5;
@@ -72,8 +73,7 @@ impl Default for Interrupts {
 
 impl Interrupts {
     pub fn write_interrupt_enable(&mut self, data: u8) {
-        self.enabled
-            .clone_from(&InterruptsFlags::from_bits_truncate(data));
+        self.enabled = InterruptsFlags::from_bits_truncate(data);
     }
 
     pub fn read_interrupt_enable(&self) -> u8 {
@@ -81,8 +81,7 @@ impl Interrupts {
     }
 
     pub fn write_interrupt_flags(&mut self, data: u8) {
-        self.requested
-            .clone_from(&InterruptsFlags::from_bits_truncate(data));
+        self.requested = InterruptsFlags::from_bits_truncate(data);
     }
 
     pub fn read_interrupt_flags(&self) -> u8 {

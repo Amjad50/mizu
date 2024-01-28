@@ -2,7 +2,8 @@ use bitflags::bitflags;
 use save_state::Savable;
 
 bitflags! {
-    #[derive(Default, Savable)]
+    #[derive(Default, Savable, Debug, Copy, Clone)]
+    #[savable(bitflags)]
     struct SpriteFlags: u8 {
         const PRIORITY    = 1 << 7;
         const Y_FLIP      = 1 << 6;
@@ -57,9 +58,7 @@ impl Sprite {
             0 => self.y = data,
             1 => self.x = data,
             2 => self.tile = data,
-            3 => self
-                .flags
-                .clone_from(&SpriteFlags::from_bits_truncate(data)),
+            3 => self.flags = SpriteFlags::from_bits_truncate(data),
             _ => unreachable!(),
         }
     }
@@ -104,7 +103,7 @@ impl Sprite {
     }
 
     pub fn cgb_palette(&self) -> u8 {
-        self.flags.bits() & SpriteFlags::CGB_PALETTE.bits
+        self.flags.bits() & SpriteFlags::CGB_PALETTE.bits()
     }
 
     pub fn bank(&self) -> u8 {

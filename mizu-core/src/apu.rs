@@ -28,6 +28,7 @@ pub struct AudioBuffers {
 
 bitflags! {
     #[derive(Savable)]
+    #[savable(bitflags)]
     struct ChannelsControl: u8 {
         const VIN_LEFT  = 1 << 7;
         const VOL_LEFT  = 7 << 4;
@@ -48,6 +49,7 @@ impl ChannelsControl {
 
 bitflags! {
     #[derive(Savable)]
+    #[savable(bitflags)]
     struct ChannelsSelection: u8 {
         const NOISE_LEFT   = 1 << 7;
         const WAVE_LEFT    = 1 << 6;
@@ -308,12 +310,8 @@ impl Apu {
                 );
             }
 
-            0xFF24 => self
-                .channels_control
-                .clone_from(&ChannelsControl::from_bits_truncate(data)),
-            0xFF25 => self
-                .channels_selection
-                .clone_from(&ChannelsSelection::from_bits_truncate(data)),
+            0xFF24 => self.channels_control = ChannelsControl::from_bits_truncate(data),
+            0xFF25 => self.channels_selection = ChannelsSelection::from_bits_truncate(data),
 
             0xFF26 => {
                 let new_power = data & 0x80 != 0;
