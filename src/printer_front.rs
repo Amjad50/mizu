@@ -63,7 +63,8 @@ impl MizuPrinter {
         let printer = self.printer.borrow();
         let printer_image_buffer = printer.get_image_buffer();
 
-        let mut texture = Texture::new(TV_WIDTH, TV_HEIGHT).expect("texture");
+        let mut texture = Texture::new().expect("texture");
+        assert!(texture.create(TV_WIDTH, TV_HEIGHT),);
 
         // the number of pixels to skip on scroll, each row is 160 pixels, each
         // pixel is 3 bytes
@@ -77,10 +78,13 @@ impl MizuPrinter {
         // and zip will group two values until one of the two lists finish
         convert_to_rgba(printer_image_buffer_view, &mut self.pixels_buffer);
 
-        let image =
-            Image::create_from_pixels(TV_WIDTH, TV_HEIGHT, &self.pixels_buffer).expect("image");
-
-        texture.update_from_image(&image, 0, 0);
+        unsafe {
+            // Safety: we know the `pixels_buffer` is valid for the width and height of the image.
+            let image =
+                Image::create_from_pixels(TV_WIDTH, TV_HEIGHT, &self.pixels_buffer).expect("image");
+            // Safety: we know the size of the image is valid, since its the same size of the texture
+            texture.update_from_image(&image, 0, 0);
+        }
         let sprite = Sprite::with_texture(&texture);
 
         self.window.clear(Color::BLACK);
@@ -167,8 +171,11 @@ impl MizuPrinter {
 
             convert_to_rgba(printer_image_buffer, &mut result_image_buffer);
 
-            let image =
-                Image::create_from_pixels(width, height, &result_image_buffer).expect("image");
+            let image = unsafe {
+                // Safety: we know the `result_image_buffer` is valid for the width and height of the image.
+                //         its just being created above.
+                Image::create_from_pixels(width, height, &result_image_buffer).expect("image")
+            };
 
             let did_save = image.save_to_file(file_path.to_str().expect("PathBuf to_str"));
 

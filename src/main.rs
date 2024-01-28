@@ -149,7 +149,8 @@ impl GameboyFront {
     }
 
     fn run_loop(&mut self) {
-        let mut texture = Texture::new(TV_WIDTH, TV_HEIGHT).expect("texture");
+        let mut texture = Texture::new().expect("texture");
+        assert!(texture.create(TV_WIDTH, TV_HEIGHT));
         let mut t = std::time::Instant::now();
 
         loop {
@@ -196,10 +197,14 @@ impl GameboyFront {
 
             convert_to_rgba(self.gameboy.screen_buffer(), &mut self.pixels_buffer);
 
-            let image =
-                Image::create_from_pixels(TV_WIDTH, TV_HEIGHT, &self.pixels_buffer).expect("image");
+            unsafe {
+                // Safety: we know the `pixels_buffer` is valid for the width and height of the image.
+                let image = Image::create_from_pixels(TV_WIDTH, TV_HEIGHT, &self.pixels_buffer)
+                    .expect("image");
 
-            texture.update_from_image(&image, 0, 0);
+                // Safety: we know the size of the image is valid, since its the same size of the texture
+                texture.update_from_image(&image, 0, 0);
+            }
 
             self.window.draw(&Sprite::with_texture(&texture));
 
@@ -299,16 +304,16 @@ impl GameboyFront {
 
     fn num_key(key: Key) -> Option<u8> {
         match key {
-            Key::NUM1 => Some(0),
-            Key::NUM2 => Some(1),
-            Key::NUM3 => Some(2),
-            Key::NUM4 => Some(3),
-            Key::NUM5 => Some(4),
-            Key::NUM6 => Some(5),
-            Key::NUM7 => Some(6),
-            Key::NUM8 => Some(7),
-            Key::NUM9 => Some(8),
-            Key::NUM0 => Some(9),
+            Key::Num1 => Some(0),
+            Key::Num2 => Some(1),
+            Key::Num3 => Some(2),
+            Key::Num4 => Some(3),
+            Key::Num5 => Some(4),
+            Key::Num6 => Some(5),
+            Key::Num7 => Some(6),
+            Key::Num8 => Some(7),
+            Key::Num9 => Some(8),
+            Key::Num0 => Some(9),
             _ => None,
         }
     }
@@ -384,7 +389,7 @@ impl GameboyFront {
                         self.notify(&notification_msg);
                     }
 
-                    Key::ENTER => {
+                    Key::Enter => {
                         self.gameboy.press_joypad(JoypadButton::A);
                         self.gameboy.press_joypad(JoypadButton::B);
                         self.gameboy.press_joypad(JoypadButton::Start);
@@ -392,11 +397,11 @@ impl GameboyFront {
                     }
 
                     // change FPS
-                    Key::EQUAL => {
+                    Key::Equal => {
                         self.fps += 5;
                         self.update_fps();
                     }
-                    Key::HYPHEN => {
+                    Key::Hyphen => {
                         self.fps -= 5;
                         self.update_fps();
                     }
@@ -420,7 +425,7 @@ impl GameboyFront {
                     Key::A => self.gameboy.release_joypad(JoypadButton::Left),
                     Key::D => self.gameboy.release_joypad(JoypadButton::Right),
 
-                    Key::ENTER => {
+                    Key::Enter => {
                         self.gameboy.release_joypad(JoypadButton::A);
                         self.gameboy.release_joypad(JoypadButton::B);
                         self.gameboy.release_joypad(JoypadButton::Start);
@@ -468,7 +473,7 @@ fn get_new_view(
         Vector2f::new((target_width) as f32, (target_height) as f32),
     );
 
-    view.set_viewport(&viewport);
+    view.set_viewport(viewport);
 
     view
 }

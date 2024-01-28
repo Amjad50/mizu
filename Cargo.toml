@@ -11,8 +11,8 @@ keywords = ["gameboy", "emulator"]
 categories = ["emulators"]
 
 [dependencies]
-mizu-core = { version = "^1.0.0", path = "mizu-core" }
-sfml = { version = "^0.16.0", default-features = false, features = ["graphics"] }
+mizu-core = { version = "1.0.0", path = "mizu-core" }
+sfml = { version = "0.21", default-features = false, features = ["graphics"] }
 ringbuf = "0.2.2"
 cpal = "0.13.1"
 clap = "3.0.12"
