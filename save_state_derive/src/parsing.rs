@@ -43,8 +43,8 @@ impl Fields {
         // remove all skipped fields
         let unskipped_fields = all_fields
             .iter()
+            .filter(|&f| !f.attrs.skip)
             .cloned()
-            .filter(|f| !f.attrs.skip)
             .collect();
 
         Ok(Self {
@@ -307,7 +307,7 @@ impl Container {
                         qself: None,
                         path: id.into(),
                     })
-                    .chain(self.associated_type_usage.into_iter())
+                    .chain(self.associated_type_usage)
                     .map::<WherePredicate, _>(|bounded_ty| parse_quote!(#bounded_ty: #(#bounds)+*))
                     .collect()
             }

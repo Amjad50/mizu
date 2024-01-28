@@ -71,9 +71,9 @@ impl Serial {
 
     pub fn new_skip_boot_rom(config: GameBoyConfig) -> Self {
         Self {
-            /// FIXME: the internal_timer is not constant for CGB games
-            ///  This is done temporary for testing, as testing properly should
-            ///  use the bootrom
+            // FIXME: the internal_timer is not constant for CGB games
+            //  This is done temporary for testing, as testing properly should
+            //  use the bootrom
             internal_timer: if config.is_dmg { 0xF3 } else { 0 },
             ..Self::new(config)
         }
