@@ -15,7 +15,7 @@ handle_installation() {
     case $install_type in
         unzip_rename_inner_if_alone)
             wget -O $dest_rename.zip $link
-            unzip $dest_rename.zip -d $dest_rename
+            unzip -o $dest_rename.zip -d $dest_rename
             folder_elements=($(ls $dest_rename))
             if [[ ${#folder_elements[@]} -eq 1 ]]; then
                 mv $dest_rename/${folder_elements[0]} $dest_rename_${folder_elements[0]}
@@ -28,20 +28,30 @@ handle_installation() {
             ;;
         unzip_make_folder)
             wget -O $dest_rename.zip $link
-            unzip $dest_rename.zip -d $dest_rename
+            unzip -o $dest_rename.zip -d $dest_rename
             rm $dest_rename.zip
             ;;
         git)
-            git clone $link $dest_rename
+            if ! git clone $link $dest_rename && [ -d $dest_rename ]; then
+                cd $dest_rename
+                git pull
+                cd ..
+            fi
             ;;
         git_make)
-            git clone $link $dest_rename
+            if ! git clone $link $dest_rename && [ -d $dest_rename ]; then
+                cd $dest_rename
+                git pull
+                cd ..
+            fi
             cd $dest_rename
             make
             cd ..
             ;;
         git_make_install)
-            git clone $link $dest_rename
+            if ! git clone $link $dest_rename && [ -d $dest_rename ]; then
+                echo "Already cloned"
+            fi
             cd $dest_rename
             if [[ $4 ]]; then
                 git checkout $4
