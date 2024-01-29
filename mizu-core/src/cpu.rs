@@ -58,6 +58,7 @@ pub enum CpuState {
 
 bitflags! {
     #[derive(Savable)]
+    #[savable(bitflags)]
     struct CpuFlags: u8 {
         const Z = 1 << 7;
         const N = 1 << 6;
@@ -254,8 +255,7 @@ impl Cpu {
     #[inline]
     fn reg_af_write(&mut self, data: u16) {
         self.reg_a = (data >> 8) as u8;
-        self.reg_f
-            .clone_from(&CpuFlags::from_bits_truncate(data as u8));
+        self.reg_f = CpuFlags::from_bits_truncate(data as u8);
     }
 
     #[inline]

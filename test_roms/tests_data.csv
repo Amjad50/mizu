@@ -4,7 +4,9 @@ https://github.com/Hacktix/scribbltests,git,scribbltests
 https://github.com/mattcurrie/dmg-acid2/releases/latest/download/dmg-acid2.gb,none,dmg-acid2.gb
 https://github.com/mattcurrie/cgb-acid2/releases/latest/download/cgb-acid2.gbc,none,cgb-acid2.gbc
 https://github.com/retrio/gb-test-roms,git,blargg-gb-tests
-#dependancy_for_SameSuite_and_rtc3tests
-https://github.com/gbdev/rgbds,git_make_install,rgbds,v0.4.2
+#dependancy_for_SameSuite
+https://github.com/gbdev/rgbds,git_make_install,rgbds,v0.6.1
 https://github.com/LIJI32/SameSuite,git_make,SameSuite
+#dependancy_for_rtc3test_diff_version
+https://github.com/gbdev/rgbds,git_make_install,rgbds,v0.4.2
 https://github.com/Amjad50/rtc3test,git_make,rtc3test

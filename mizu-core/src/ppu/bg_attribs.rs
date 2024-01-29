@@ -2,7 +2,8 @@ use bitflags::bitflags;
 use save_state::Savable;
 
 bitflags! {
-    #[derive(Default, Savable)]
+    #[derive(Savable, Default)]
+    #[savable(bitflags)]
     pub struct BgAttribute: u8 {
         const PRIORITY = 1 << 7;
         const VER_FLIP = 1 << 6;
@@ -23,7 +24,7 @@ impl BgAttribute {
     }
 
     pub fn palette(&self) -> u8 {
-        self.bits() & Self::PALETTE.bits
+        self.bits() & Self::PALETTE.bits()
     }
 
     pub fn is_horizontal_flip(&self) -> bool {

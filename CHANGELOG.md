@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - ...
+### Added
+- Audio resampling
+- Added the test `blargg interrupt_time`
+- Updated SFML to `0.21`
+
 ## [1.0.0] - 2022-05-27
 ### Added
 - Ability to access `AudioBuffers` for each individual channel.

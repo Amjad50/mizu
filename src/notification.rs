@@ -24,7 +24,8 @@ impl Notifications {
     pub fn new() -> Self {
         Self {
             messages: Vec::new(),
-            font: Font::from_memory(FONT_TTF_FILE).unwrap(),
+            // Safety: the `font` data is `'static` so its valid until the `Font` is used
+            font: unsafe { Font::from_memory(FONT_TTF_FILE).unwrap() },
             width: TV_WIDTH,
             height: TV_HEIGHT,
         }
@@ -66,7 +67,7 @@ impl Drawable for Notifications {
         let mut gb_viewport = gb_view.viewport();
         gb_viewport.width = 1.;
         gb_viewport.height = 1.;
-        text_rendring_view.set_viewport(&gb_viewport);
+        text_rendring_view.set_viewport(gb_viewport);
 
         // get the length of the gameboy rendering by using `target` as reference measures
         // this will give us the distance, the text need to be offsetted in order
@@ -148,10 +149,10 @@ impl Drawable for Notifications {
                 let alpha_decrease = (ratio * (NOTIF_DISAPPEAR_REMAIN_TIME - *c)).min(255.) as u8;
 
                 let mut color = text.outline_color();
-                *color.alpha_mut() -= alpha_decrease;
+                color.a -= alpha_decrease;
                 text.set_outline_color(color);
                 let mut color = text.fill_color();
-                *color.alpha_mut() -= alpha_decrease;
+                color.a -= alpha_decrease;
                 text.set_fill_color(color);
             }
             target.draw_text(&text, states);

@@ -23,7 +23,7 @@ use sfml::{
     SfBox,
 };
 
-use clap::{Arg, Command};
+use clap::{Arg, ArgAction, Command};
 
 pub const TV_WIDTH: u32 = 160;
 pub const TV_HEIGHT: u32 = 144;
@@ -149,7 +149,8 @@ impl GameboyFront {
     }
 
     fn run_loop(&mut self) {
-        let mut texture = Texture::new(TV_WIDTH, TV_HEIGHT).expect("texture");
+        let mut texture = Texture::new().expect("texture");
+        assert!(texture.create(TV_WIDTH, TV_HEIGHT));
         let mut t = std::time::Instant::now();
 
         loop {
@@ -196,10 +197,14 @@ impl GameboyFront {
 
             convert_to_rgba(self.gameboy.screen_buffer(), &mut self.pixels_buffer);
 
-            let image =
-                Image::create_from_pixels(TV_WIDTH, TV_HEIGHT, &self.pixels_buffer).expect("image");
+            unsafe {
+                // Safety: we know the `pixels_buffer` is valid for the width and height of the image.
+                let image = Image::create_from_pixels(TV_WIDTH, TV_HEIGHT, &self.pixels_buffer)
+                    .expect("image");
 
-            texture.update_from_image(&image, 0, 0);
+                // Safety: we know the size of the image is valid, since its the same size of the texture
+                texture.update_from_image(&image, 0, 0);
+            }
 
             self.window.draw(&Sprite::with_texture(&texture));
 
@@ -299,16 +304,16 @@ impl GameboyFront {
 
     fn num_key(key: Key) -> Option<u8> {
         match key {
-            Key::NUM1 => Some(0),
-            Key::NUM2 => Some(1),
-            Key::NUM3 => Some(2),
-            Key::NUM4 => Some(3),
-            Key::NUM5 => Some(4),
-            Key::NUM6 => Some(5),
-            Key::NUM7 => Some(6),
-            Key::NUM8 => Some(7),
-            Key::NUM9 => Some(8),
-            Key::NUM0 => Some(9),
+            Key::Num1 => Some(0),
+            Key::Num2 => Some(1),
+            Key::Num3 => Some(2),
+            Key::Num4 => Some(3),
+            Key::Num5 => Some(4),
+            Key::Num6 => Some(5),
+            Key::Num7 => Some(6),
+            Key::Num8 => Some(7),
+            Key::Num9 => Some(8),
+            Key::Num0 => Some(9),
             _ => None,
         }
     }
@@ -384,7 +389,7 @@ impl GameboyFront {
                         self.notify(&notification_msg);
                     }
 
-                    Key::ENTER => {
+                    Key::Enter => {
                         self.gameboy.press_joypad(JoypadButton::A);
                         self.gameboy.press_joypad(JoypadButton::B);
                         self.gameboy.press_joypad(JoypadButton::Start);
@@ -392,11 +397,11 @@ impl GameboyFront {
                     }
 
                     // change FPS
-                    Key::EQUAL => {
+                    Key::Equal => {
                         self.fps += 5;
                         self.update_fps();
                     }
-                    Key::HYPHEN => {
+                    Key::Hyphen => {
                         self.fps -= 5;
                         self.update_fps();
                     }
@@ -420,7 +425,7 @@ impl GameboyFront {
                     Key::A => self.gameboy.release_joypad(JoypadButton::Left),
                     Key::D => self.gameboy.release_joypad(JoypadButton::Right),
 
-                    Key::ENTER => {
+                    Key::Enter => {
                         self.gameboy.release_joypad(JoypadButton::A);
                         self.gameboy.release_joypad(JoypadButton::B);
                         self.gameboy.release_joypad(JoypadButton::Start);
@@ -468,7 +473,7 @@ fn get_new_view(
         Vector2f::new((target_width) as f32, (target_height) as f32),
     );
 
-    view.set_viewport(&viewport);
+    view.set_viewport(viewport);
 
     view
 }
@@ -496,9 +501,6 @@ pub fn convert_to_rgba(data: &[u8], output: &mut [u8]) {
 }
 
 fn main() {
-    let default_scale_str = format!("{}", DEFAULT_SCALE);
-    let default_fps_str = format!("{}", DEFAULT_FPS);
-
     let matches = Command::new("mizu")
         .version("1.0")
         .author("Amjad Alsharafi")
@@ -508,78 +510,60 @@ fn main() {
         .arg(
             Arg::new("sav")
              .long("sav")
-             .takes_value(true)
+             .action(ArgAction::Set)
              .help("A custom location of the `.sav` SRAM file, by default we will use the file with the same name as the rom file with `.sav` extension")
         )
         .arg(
             Arg::new("dont_save")
              .long("dont-save")
+             .action(ArgAction::SetTrue)
              .help("Don't save the SRAM of the game on shutdown")
         )
         .arg(
             Arg::new("dmg")
                 .long("dmg")
                 .short('d')
+                .action(ArgAction::SetTrue)
                 .help("Operate the emulator in DMG mode"),
         )
         .arg(
             Arg::new("scale")
                 .long("scale")
                 .short('s')
-                .default_value(&default_scale_str)
-                .takes_value(true)
+                .default_value(format!("{}", DEFAULT_SCALE))
+                .action(ArgAction::Set)
+                .value_parser(clap::value_parser!(u32))
                 .help("Specify the amount to scale the initial display from the gameboy size of 160x144"),
         )
         .arg(
             Arg::new("fps")
                 .long("fps")
                 .short('f')
-                .default_value(&default_fps_str)
-                .takes_value(true)
+                .default_value(format!("{}", DEFAULT_FPS))
+                .action(ArgAction::Set)
+                .value_parser(clap::value_parser!(u32))
                 .help("Specify the starting emulation speed in FPS, 0 for unlimited"),
         )
         .arg(
             Arg::new("disable-audio")
                 .long("disable-audio")
                 .short('a')
+                .action(ArgAction::SetTrue)
                 .help("Disable the audio system"),
         )
         .get_matches();
 
-    let is_dmg = matches.is_present("dmg");
-    let rom_file = matches.value_of("rom").expect("rom file argument");
-    let sav_file = matches.value_of("sav");
-    let boot_rom_file = matches.value_of("boot_rom");
-    let scale = matches.value_of("scale");
-    let fps = matches.value_of("fps");
-    let dont_save = matches.is_present("dont_save");
-    let disable_audio = matches.is_present("disable-audio");
+    let is_dmg = matches.get_flag("dmg");
+    let rom_file = matches.get_one::<String>("rom").expect("rom file argument");
+    let sav_file = matches.get_one::<String>("sav");
+    let boot_rom_file = matches.get_one::<String>("boot_rom");
+    let scale = matches.get_one::<u32>("scale");
+    let fps = matches.get_one::<u32>("fps");
+    let dont_save = matches.get_flag("dont_save");
+    let disable_audio = matches.get_flag("disable-audio");
 
-    let scale = scale
-        .and_then(|s| {
-            let s = s.parse::<u32>().ok();
-            if s.is_none() {
-                eprintln!(
-                    "[WARN] scale must be a positive integer, using default value ({})...",
-                    DEFAULT_SCALE
-                )
-            }
-            s
-        })
-        .unwrap_or(DEFAULT_SCALE);
-
-    let fps = fps
-        .and_then(|s| {
-            let s = s.parse::<u32>().ok();
-            if s.is_none() {
-                eprintln!(
-                    "[WARN] FPS must be a positive integer, using default value ({})...",
-                    DEFAULT_FPS
-                )
-            }
-            s
-        })
-        .unwrap_or(DEFAULT_FPS);
+    let scale = *scale.unwrap_or(&DEFAULT_SCALE);
+    let fps = *fps.unwrap_or(&DEFAULT_FPS);
 
     let config = GameBoyConfig { is_dmg };
 

@@ -58,7 +58,11 @@ fn impl_for_serde_full(container: &Container) -> Result<TokenStream2> {
     })
 }
 
-fn impl_fields_for_save(fields: &Fields, ident_prefix: TokenStream2) -> Vec<TokenStream2> {
+fn impl_fields_for_save(
+    fields: &Fields,
+    ident_prefix: TokenStream2,
+    is_bitflags: bool,
+) -> Vec<TokenStream2> {
     let idents = fields.unskipped_idents();
 
     fields
@@ -69,13 +73,19 @@ fn impl_fields_for_save(fields: &Fields, ident_prefix: TokenStream2) -> Vec<Toke
             if f.attrs.use_serde {
                 quote!(::save_state::serialize_into(&mut writer, #ident_prefix #ident)?;)
             } else {
-                quote!(::save_state::Savable::save(#ident_prefix #ident, &mut writer)?;)
+                // bitflags Flag is in the form of `Flag(InternalFlag)` and `InternalFlag` is the integer inside
+                let extra = if is_bitflags { quote!(.0) } else { quote!() };
+                quote!(::save_state::Savable::save(#ident_prefix #ident #extra, &mut writer)?;)
             }
         })
         .collect()
 }
 
-fn impl_fields_for_load(fields: &Fields, ident_prefix: TokenStream2) -> Vec<TokenStream2> {
+fn impl_fields_for_load(
+    fields: &Fields,
+    ident_prefix: TokenStream2,
+    is_bitflags: bool,
+) -> Vec<TokenStream2> {
     let idents = fields.unskipped_idents();
 
     fields.unskipped_fields
@@ -85,13 +95,23 @@ fn impl_fields_for_load(fields: &Fields, ident_prefix: TokenStream2) -> Vec<Toke
             if f.attrs.use_serde {
                 quote!(let _ = ::std::mem::replace(#ident_prefix #ident, ::save_state::deserialize_from(&mut reader)?);)
             } else {
-                quote!(::save_state::Savable::load(#ident_prefix #ident, &mut reader)?;)
+                // bitflags Flag is in the form of `Flag(InternalFlag)` and `InternalFlag` is the integer inside
+                let extra = if is_bitflags {
+                    quote!(.0)
+                } else {
+                    quote!()
+                };
+                quote!(::save_state::Savable::load(#ident_prefix #ident #extra, &mut reader)?;)
             }
         })
         .collect()
 }
 
-fn get_fields_impl_size_sum(fields: &Fields, ident_prefix: TokenStream2) -> TokenStream2 {
+fn get_fields_impl_size_sum(
+    fields: &Fields,
+    ident_prefix: TokenStream2,
+    is_bitflags: bool,
+) -> TokenStream2 {
     let idents = fields.unskipped_idents();
 
     let all_fields = fields
@@ -102,7 +122,9 @@ fn get_fields_impl_size_sum(fields: &Fields, ident_prefix: TokenStream2) -> Toke
             if f.attrs.use_serde {
                 quote!(::save_state::serialized_size(#ident_prefix #ident)?)
             } else {
-                quote!(::save_state::Savable::save_size(#ident_prefix #ident)?)
+                // bitflags Flag is in the form of `Flag(InternalFlag)` and `InternalFlag` is the integer inside
+                let extra = if is_bitflags { quote!(.0) } else { quote!() };
+                quote!(::save_state::Savable::save_size(#ident_prefix #ident #extra)?)
             }
         });
 
@@ -123,9 +145,9 @@ fn impl_for_savables(container: &Container) -> Result<TokenStream2> {
 fn impl_for_struct(container: &Container, fields: &Fields) -> Result<TokenStream2> {
     let ident = &container.ident;
 
-    let save_fields = impl_fields_for_save(fields, quote!(&self.));
-    let load_fields = impl_fields_for_load(fields, quote!(&mut self.));
-    let size_sum = get_fields_impl_size_sum(fields, quote!(&self.));
+    let save_fields = impl_fields_for_save(fields, quote!(&self.), container.attrs.bitflags);
+    let load_fields = impl_fields_for_load(fields, quote!(&mut self.), container.attrs.bitflags);
+    let size_sum = get_fields_impl_size_sum(fields, quote!(&self.), container.attrs.bitflags);
     let (impl_generics, ty_generics, where_clause) = container.generics.split_for_impl();
 
     Ok(quote! {
@@ -167,7 +189,8 @@ fn impl_for_enum(container: &Container, variants: &[Variant]) -> Result<TokenStr
         let all_fields = v.fields.all_idents();
 
         // only save fields that are not skipped
-        let save_fields = impl_fields_for_save(&v.fields, quote!());
+        // enums can't be in bitflags mode
+        let save_fields = impl_fields_for_save(&v.fields, quote!(), container.attrs.bitflags);
 
         let fields_part = match v.fields.fields_type {
             FieldsType::Named => {
@@ -198,7 +221,8 @@ fn impl_for_enum(container: &Container, variants: &[Variant]) -> Result<TokenStr
             .map(|ident| quote!(let mut #ident = ::std::default::Default::default();));
 
         // only perform load for the unskipped fields
-        let load_fields = impl_fields_for_load(&v.fields, quote!(&mut));
+        // enums can't be in bitflags mode
+        let load_fields = impl_fields_for_load(&v.fields, quote!(&mut), container.attrs.bitflags);
 
         let result = match v.fields.fields_type {
             FieldsType::Named => {

@@ -13,16 +13,21 @@ fn parse_savable_attr(attr: &Attribute) -> Result<Vec<NestedMeta>> {
 
 pub struct ContainerAttrs {
     pub use_serde: bool,
+    pub bitflags: bool,
 }
 
 impl ContainerAttrs {
     pub fn new(input: &DeriveInput) -> Result<Self> {
         let mut use_serde = false;
+        let mut bitflags = false;
 
         for meta_item in input.attrs.iter().flat_map(parse_savable_attr).flatten() {
             match &meta_item {
                 NestedMeta::Meta(Meta::Path(path)) if path.is_ident("serde") => {
                     use_serde = true;
+                }
+                NestedMeta::Meta(Meta::Path(path)) if path.is_ident("bitflags") => {
+                    bitflags = true;
                 }
                 NestedMeta::Meta(other) => {
                     return Err(syn::Error::new_spanned(other, "exected #[savable(serde)]"));
@@ -36,7 +41,18 @@ impl ContainerAttrs {
             }
         }
 
-        Ok(Self { use_serde })
+        // bitflags and serde are mutex
+        if bitflags && use_serde {
+            return Err(syn::Error::new_spanned(
+                input,
+                "cannot have `bitflags` and `serde` at the same time",
+            ));
+        }
+
+        Ok(Self {
+            use_serde,
+            bitflags,
+        })
     }
 }
 

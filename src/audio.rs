@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use ringbuf::{Producer, RingBuffer};
+use ringbuf::{HeapProducer, HeapRb};
 use rubato::{FftFixedInOut, Resampler};
 
 #[derive(Debug)]
@@ -20,7 +20,7 @@ impl std::fmt::Display for AudioPlayerError {
 }
 
 pub struct AudioPlayer {
-    buffer_producer: Producer<f32>,
+    buffer_producer: HeapProducer<f32>,
     resampler: Option<FftFixedInOut<f32>>,
     pre_resampled_buffer: Vec<f32>,
     pre_resampled_split_buffers: [Vec<f32>; 2],
@@ -96,7 +96,7 @@ impl AudioPlayer {
         // The buffer holds only audio for 1/4 second, which is good enough for delays,
         // It can be reduced more, but it might cause noise(?) for slower machines
         // or if any CPU intensive process started while the emulator is running
-        let buffer = RingBuffer::new(output_sample_rate.0 as usize / 2);
+        let buffer = HeapRb::new(output_sample_rate.0 as usize / 2);
         let (buffer_producer, mut buffer_consumer) = buffer.split();
 
         let output_data_fn = move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
@@ -107,7 +107,7 @@ impl AudioPlayer {
         };
 
         let output_stream = output_device
-            .build_output_stream(&config, output_data_fn, Self::err_fn)
+            .build_output_stream(&config, output_data_fn, Self::err_fn, None)
             .expect("failed to build an output audio stream");
 
         Ok(Self {
