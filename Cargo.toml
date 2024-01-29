@@ -1,6 +1,6 @@
 [package]
 name = "mizu"
-version = "1.0.0"
+version = "1.0.1"
 authors = ["Amjad Alsharafi <amjadsharafi10@gmail.com>"]
 edition = "2021"
 description = "An accurate gameboy(DMG) and gameboy color emulator. Front-end for mizu-core"

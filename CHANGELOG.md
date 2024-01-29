@@ -6,11 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.1] - ...
+## [1.0.1] - 2024-01-29
 ### Added
 - Audio resampling
 - Added the test `blargg interrupt_time`
-- Updated SFML to `0.21`
+- Used `dynwave` for audio player
+- Added option to disable audio `--disable-audio/-a`
+
+### Changed
+- Updated `SFML` to `0.21`
+- Updated `bitflags` and other deps
 
 ## [1.0.0] - 2022-05-27
 ### Added
@@ -49,7 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - This is the first release and has **SO** many rewrites and bug fixes.
 
-[Unreleased]: https://github.com/Amjad50/mizu/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Amjad50/mizu/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/Amjad50/mizu/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Amjad50/mizu/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/Amjad50/mizu/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/Amjad50/mizu/compare/v0.1.1...v0.1.2
