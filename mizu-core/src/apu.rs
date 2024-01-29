@@ -518,6 +518,15 @@ impl Apu {
 
         // one sample for the right, one for the left
 
+        let right_pulse1 = right_pulse1 / 5.0;
+        let left_pulse1 = left_pulse1 / 5.0;
+        let right_pulse2 = right_pulse2 / 5.0;
+        let left_pulse2 = left_pulse2 / 5.0;
+        let right_wave = right_wave / 5.0;
+        let left_wave = left_wave / 5.0;
+        let right_noise = right_noise / 5.0;
+        let left_noise = left_noise / 5.0;
+
         self.pulse1_buffers.push(right_pulse1);
         self.pulse1_buffers.push(left_pulse1);
 

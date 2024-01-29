@@ -488,6 +488,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "dynwave"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "daabe4015db7e0b48e5140e45b43414027a498b99206226feda5e61405782ef5"
+dependencies = [
+ "cpal",
+ "ringbuf",
+ "rubato",
+]
+
+[[package]]
 name = "either"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -770,12 +781,11 @@ name = "mizu"
 version = "1.0.0"
 dependencies = [
  "clap",
- "cpal",
  "directories-next",
+ "dynwave",
  "mizu-core",
  "native-dialog",
  "ringbuf",
- "rubato",
  "sfml",
 ]
 

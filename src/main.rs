@@ -1,4 +1,3 @@
-mod audio;
 mod notification;
 mod printer_front;
 
@@ -9,8 +8,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use audio::{AudioPlayer, AudioPlayerError};
 use directories_next::ProjectDirs;
+use dynwave::{error::AudioPlayerError, AudioPlayer, BufferSize};
 use notification::Notifications;
 use printer_front::MizuPrinter;
 
@@ -85,7 +84,7 @@ struct GameboyFront {
     gameboy: GameBoy,
     window: RenderWindow,
     fps: u32,
-    audio_player: Option<AudioPlayer>,
+    audio_player: Option<AudioPlayer<f32>>,
     pixels_buffer: [u8; TV_HEIGHT as usize * TV_WIDTH as usize * 4],
     printer: Option<MizuPrinter>,
     notifications: Notifications,
@@ -113,8 +112,8 @@ impl GameboyFront {
         notifications.update_size(size.x, size.y);
 
         let audio_player = if enable_audio {
-            let a = AudioPlayer::new(44100)?;
-            a.play();
+            let a = AudioPlayer::new(44100, BufferSize::QuarterSecond)?;
+            a.play().unwrap();
             Some(a)
         } else {
             None
