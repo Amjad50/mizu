@@ -179,17 +179,19 @@ impl GameboyFront {
 
             self.gameboy.clock_for_frame();
 
-            let buffers = self.gameboy.audio_buffers();
+            {
+                let buffers = self.gameboy.audio_buffers();
 
-            if let Some(audio_player) = self.audio_player.as_mut() {
-                let audio_buffer = match self.audio_output {
-                    AudioBufferOutput::All => buffers.all,
-                    AudioBufferOutput::Pulse1 => buffers.pulse1,
-                    AudioBufferOutput::Pulse2 => buffers.pulse2,
-                    AudioBufferOutput::Wave => buffers.wave,
-                    AudioBufferOutput::Noise => buffers.noise,
-                };
-                audio_player.queue(&audio_buffer);
+                if let Some(audio_player) = self.audio_player.as_mut() {
+                    let audio_buffer = match self.audio_output {
+                        AudioBufferOutput::All => buffers.all(),
+                        AudioBufferOutput::Pulse1 => buffers.pulse1(),
+                        AudioBufferOutput::Pulse2 => buffers.pulse2(),
+                        AudioBufferOutput::Wave => buffers.wave(),
+                        AudioBufferOutput::Noise => buffers.noise(),
+                    };
+                    audio_player.queue(audio_buffer);
+                }
             }
 
             self.window.clear(Color::BLACK);

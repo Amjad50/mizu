@@ -17,13 +17,45 @@ use wave_channel::WaveChannel;
 /// The main buffer `all` is the summation of all of the other buffers/channels.
 /// If you want a combination of different channels, you can just add them together.
 /// All volume control is done before pushing to the buffers.
-pub struct AudioBuffers {
-    pub pulse1: Vec<f32>,
-    pub pulse2: Vec<f32>,
-    pub wave: Vec<f32>,
-    pub noise: Vec<f32>,
+pub struct AudioBuffers<'a> {
+    pulse1: &'a mut Vec<f32>,
+    pulse2: &'a mut Vec<f32>,
+    wave: &'a mut Vec<f32>,
+    noise: &'a mut Vec<f32>,
 
-    pub all: Vec<f32>,
+    all: &'a mut Vec<f32>,
+}
+
+impl AudioBuffers<'_> {
+    pub fn pulse1(&self) -> &[f32] {
+        self.pulse1
+    }
+
+    pub fn pulse2(&self) -> &[f32] {
+        self.pulse2
+    }
+
+    pub fn wave(&self) -> &[f32] {
+        self.wave
+    }
+
+    pub fn noise(&self) -> &[f32] {
+        self.noise
+    }
+
+    pub fn all(&self) -> &[f32] {
+        self.all
+    }
+}
+
+impl Drop for AudioBuffers<'_> {
+    fn drop(&mut self) {
+        self.pulse1.clear();
+        self.pulse2.clear();
+        self.wave.clear();
+        self.noise.clear();
+        self.all.clear();
+    }
 }
 
 bitflags! {
@@ -353,14 +385,14 @@ impl Apu {
         (p2 << 4) | p1
     }
 
-    pub fn get_buffers(&mut self) -> AudioBuffers {
+    pub fn get_buffers(&mut self) -> AudioBuffers<'_> {
         AudioBuffers {
-            pulse1: std::mem::take(&mut self.pulse1_buffers),
-            pulse2: std::mem::take(&mut self.pulse2_buffers),
-            wave: std::mem::take(&mut self.wave_buffers),
-            noise: std::mem::take(&mut self.noise_buffers),
+            pulse1: &mut self.pulse1_buffers,
+            pulse2: &mut self.pulse2_buffers,
+            wave: &mut self.wave_buffers,
+            noise: &mut self.noise_buffers,
 
-            all: std::mem::take(&mut self.buffer),
+            all: &mut self.buffer,
         }
     }
 

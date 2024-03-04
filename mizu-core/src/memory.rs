@@ -318,7 +318,7 @@ impl Bus {
         self.ppu.raw_screen_buffer()
     }
 
-    pub fn audio_buffers(&mut self) -> AudioBuffers {
+    pub fn audio_buffers(&mut self) -> AudioBuffers<'_> {
         self.apu.get_buffers()
     }
 

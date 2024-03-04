@@ -187,6 +187,8 @@ impl GameBoy {
     }
 
     /// Return the audio buffer of the APU at the current state.
+    ///
+    /// We use `&mut` as it will also reset the buffers after using them
     pub fn audio_buffers(&mut self) -> AudioBuffers {
         self.bus.audio_buffers()
     }
