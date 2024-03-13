@@ -568,5 +568,4 @@ gbmicrotest_tests!(
     win9_a,
     // win9_b,
     // write_to_x8000: "000-write_to_x8000.gb",
-
 );
