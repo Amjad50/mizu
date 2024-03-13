@@ -887,6 +887,7 @@ a single table
 | [rtc3test]       | :+1:  |
 | [bullyGB] in DMG | :question:* |
 | [bullyGB] in CGB | :question:* |
+| [MBC3-Tester]    | :+1:  |
 
 > \* previusly passed, but now it fails, it needs to be retested and fix the issues
 
@@ -901,4 +902,5 @@ a single table
 [rtc3test]: https://github.com/aaaaaa123456789/rtc3test
 [bullyGB]: https://github.com/Hacktix/BullyGB
 [GBMicrotest]: https://github.com/aappleby/GBMicrotest
+[MBC3-Tester]: https://github.com/EricKirschenmann/MBC3-Tester-gb
 
