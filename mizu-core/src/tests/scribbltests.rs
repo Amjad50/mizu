@@ -32,7 +32,7 @@ fn statcount_auto() {
         let is_dmg = i == 0;
 
         let mut gb = TestingGameBoy::new(
-            "../test_roms/scribbltests/statcount/statcount-auto.gb",
+            "../test_roms/game-boy-test-roms/scribbltests/statcount/statcount-auto.gb",
             is_dmg,
         )
         .unwrap();

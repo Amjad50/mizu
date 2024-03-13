@@ -37,7 +37,7 @@ macro_rules! gb_tests {
                 }
 
 
-                let file_path = concat!("../test_roms/", $file_path);
+                let file_path = concat!("../test_roms/game-boy-test-roms/", $file_path);
 
                 let mut emu = String::new();
                 $(emu += stringify!($emu);)?
