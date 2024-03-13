@@ -62,6 +62,7 @@ macro_rules! gb_tests {
 // defined after the macro so that it can use it
 mod acid2_test;
 mod blargg_tests;
+mod gbmicrotest;
 mod mooneye_tests;
 mod rtc3;
 mod samesuite_tests;
