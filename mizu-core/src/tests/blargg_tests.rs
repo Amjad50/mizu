@@ -18,6 +18,11 @@ gb_tests!(
     3778129031474618196,
     3778129031474618196;
 
+    blargg_mem_timing,
+    "blargg-gb-tests/mem_timing/mem_timing.gb",
+    12641521912361914783,
+    12641521912361914783;
+
     blargg_mem_timing_2,
     "blargg-gb-tests/mem_timing-2/mem_timing.gb",
     12164226896603567743,
