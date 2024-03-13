@@ -207,7 +207,7 @@ mod acceptance {
         mooneye_tests!("misc";
             boot_div-cgbABCDE for cgb,
             // FIXME: pass but require bootrom
-            //boot_hwio-C,
+            // boot_hwio-C,
             boot_regs-cgb for cgb,
         );
 

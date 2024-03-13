@@ -5,7 +5,7 @@
 fn load_state() {
     // 0- perform normal test (this part should always pass)
     const CGB_CRC: u64 = 4378550468433865064;
-    let file_path = "../test_roms/cgb-acid2.gbc";
+    let file_path = "../test_roms/game-boy-test-roms/cgb-acid2/cgb-acid2.gbc";
 
     // 1- make sure after start and advancing 2 frames does not pass the test
     let mut gb = crate::tests::TestingGameBoy::new(file_path, false).unwrap();
