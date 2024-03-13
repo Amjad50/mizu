@@ -7,18 +7,29 @@ use super::GameBoyConfig;
 
 use std::path::Path;
 
+enum ClockType {
+    InfiniteLoop,
+    Breakpoint,
+    FrameCount(usize),
+}
+
 macro_rules! gb_tests {
     // clock until infinite loop
     (inf; $($test_name: ident $(for $emu: ident)?, $file_path: expr, $dmg_crc: expr, $cgb_crc: expr;)*) => {
-        gb_tests!($($test_name $(for $emu)?, $file_path, $dmg_crc, $cgb_crc;)*, clock_until_infinte_loop);
+        gb_tests!($($test_name $(for $emu)?, $file_path, $dmg_crc, $cgb_crc;)*, super::ClockType::InfiniteLoop);
     };
 
     // clock until breakpoint
     (brk; $($test_name: ident $(for $emu: ident)?, $file_path: expr, $dmg_crc: expr, $cgb_crc: expr;)*) => {
-        gb_tests!($($test_name $(for $emu)?, $file_path, $dmg_crc, $cgb_crc;)*, clock_until_breakpoint);
+        gb_tests!($($test_name $(for $emu)?, $file_path, $dmg_crc, $cgb_crc;)*, super::ClockType::Breakpoint);
     };
 
-    ($($test_name: ident $(for $emu: ident)?, $file_path: expr, $dmg_crc: expr, $cgb_crc: expr;)*, $looping_statement: tt) => {
+    // clock for a number of frames
+    (frames $n: expr; $($test_name: ident $(for $emu: ident)?, $file_path: expr, $dmg_crc: expr, $cgb_crc: expr;)*) => {
+        gb_tests!($($test_name $(for $emu)?, $file_path, $dmg_crc, $cgb_crc;)*, super::ClockType::FrameCount($n));
+    };
+
+    ($($test_name: ident $(for $emu: ident)?, $file_path: expr, $dmg_crc: expr, $cgb_crc: expr;)*, $clock_type: expr) => {
         $(
             /// Run the test and check the checksum of the screen buffer
             #[test]
@@ -28,7 +39,19 @@ macro_rules! gb_tests {
                 fn test(file_path: &str, is_dmg: bool, crc_checksum: u64) {
                     let mut gb = crate::tests::TestingGameBoy::new(file_path, is_dmg).unwrap();
 
-                    gb.$looping_statement();
+                    match $clock_type {
+                        super::ClockType::InfiniteLoop => {
+                            gb.clock_until_infinte_loop();
+                        }
+                        super::ClockType::Breakpoint => {
+                            gb.clock_until_breakpoint();
+                        }
+                        super::ClockType::FrameCount(frame_count) => {
+                            for _ in 0..frame_count {
+                                gb.clock_for_frame();
+                            }
+                        }
+                    }
 
                     let screen_buffer = gb.raw_screen_buffer();
                     gb.print_screen_buffer();
@@ -60,15 +83,13 @@ macro_rules! gb_tests {
 }
 
 // defined after the macro so that it can use it
-mod acid2_test;
 mod blargg_tests;
 mod gbmicrotest;
-mod mbc3_tester;
 mod mooneye_tests;
-mod rtc3;
 mod samesuite_tests;
 mod save_state_tests;
 mod scribbltests;
+mod small_tests;
 
 #[derive(save_state::Savable)]
 struct TestingGameBoy {

@@ -877,6 +877,12 @@ A documentation of all hardware tests tested on `mizu`.
 | win9_b | :x: |
 | 000-write_to_x8000 | :x: |
 
+## [TurtleTests]
+
+| Test             | State |
+| ---------------- | ----- |
+| window_y_trigger | :x: |
+| window_y_trigger_wx_offscreen | :+1: |
 
 ## Extra
 These are valuable tests, they come in a single rom, so they were grouped into
@@ -903,4 +909,5 @@ a single table
 [bullyGB]: https://github.com/Hacktix/BullyGB
 [GBMicrotest]: https://github.com/aappleby/GBMicrotest
 [MBC3-Tester]: https://github.com/EricKirschenmann/MBC3-Tester-gb
+[TurtleTests]: https://github.com/Powerlated/TurtleTests
 
