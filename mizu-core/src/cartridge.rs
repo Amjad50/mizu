@@ -281,10 +281,27 @@ impl Cartridge {
             return Err(CartridgeError::InvalidRomSizeIndex(data[0x148]));
         }
 
-        let rom_size = 0x8000 << num_rom_banks;
+        let mut rom_size = 0x8000 << num_rom_banks;
 
         if rom_size != data.len() {
-            return Err(CartridgeError::InvalidRomSize(rom_size));
+            // try to fix it, sometimes the rom will have `0` as the num_rom_banks
+            let mut fixed = false;
+            if rom_size < data.len() && data.len() % rom_size == 0 {
+                let div = data.len() / rom_size;
+                if div.is_power_of_two() && div.ilog2() < 8 {
+                    println!(
+                        "WARN: invalid cartridge header. Using rom size {:X} instead of {:X}",
+                        data.len(),
+                        rom_size,
+                    );
+                    rom_size = data.len();
+                    fixed = true;
+                }
+            }
+
+            if !fixed {
+                return Err(CartridgeError::InvalidRomSize(rom_size));
+            }
         }
 
         let ram_size = match data[0x149] {

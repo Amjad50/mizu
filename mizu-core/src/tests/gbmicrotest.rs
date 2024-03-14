@@ -278,7 +278,7 @@ gbmicrotest_tests!(
     // lyc2_int_halt_a,
     lyc2_int_halt_b,
     mbc1_ram_banks,
-    // mbc1_rom_banks,
+    mbc1_rom_banks,
     // minimal,
     // mode2_stat_int_to_oam_unlock,
     // oam_int_halt_a,
