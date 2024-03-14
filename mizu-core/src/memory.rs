@@ -424,7 +424,7 @@ impl Bus {
         }
     }
 
-    fn read_not_ticked(&mut self, addr: u16, block_for_dma: Option<BusType>) -> u8 {
+    pub(crate) fn read_not_ticked(&mut self, addr: u16, block_for_dma: Option<BusType>) -> u8 {
         let dma_value = if block_for_dma.is_some() {
             self.oam_dma.current_value()
         } else {

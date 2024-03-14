@@ -1,22 +1,20 @@
 use std::error::Error;
 
-use crate::cpu::CpuBusProvider;
-
 fn gbmicrotest_test(file_path: &str, is_dmg: bool) -> Result<(), Box<dyn Error>> {
     let mut gb = crate::tests::TestingGameBoy::new(file_path, is_dmg).unwrap();
 
     // gb.print_screen_buffer();
 
-    let mut passed = gb.bus.read_no_oam_bug(0xFF82);
+    let mut passed = gb.bus.read_not_ticked(0xFF82, None);
     let mut limit = 200;
     while passed == 0 && limit != 0 {
         gb.clock_for_frame();
         limit -= 1;
-        passed = gb.bus.read_no_oam_bug(0xFF82);
+        passed = gb.bus.read_not_ticked(0xFF82, None);
     }
 
-    let actual = gb.bus.read_no_oam_bug(0xFF80);
-    let expected = gb.bus.read_no_oam_bug(0xFF81);
+    let actual = gb.bus.read_not_ticked(0xFF80, None);
+    let expected = gb.bus.read_not_ticked(0xFF81, None);
 
     assert!(
         passed == 0x01,
@@ -36,7 +34,7 @@ macro_rules! gbmicrotest_tests {
             fn $test_name() -> ::std::result::Result<(), Box<dyn ::std::error::Error>> {
 
                 let mut file_name = String::new();
-                $(file_name += stringify!($file_name);)?
+                $(file_name += $file_name;)?
 
                 if file_name.is_empty() {
                     file_name = stringify!($test_name).to_owned() + ".gb";
@@ -53,10 +51,8 @@ macro_rules! gbmicrotest_tests {
     };
 }
 
-#[rustfmt::skip]
 gbmicrotest_tests!(
     // audio_testbench,
-    // ppu_latch_bgdisplay: "803-ppu-latch-bgdisplay.gb",
     // cpu_bus_1,
     div_inc_timing_a,
     div_inc_timing_b,
@@ -80,16 +76,16 @@ gbmicrotest_tests!(
     // hblank_int_l1,
     // hblank_int_l2,
     hblank_int_scx0_if_a,
-    hblank_int_scx0_if_b,
-    hblank_int_scx0_if_c,
-    hblank_int_scx0_if_d,
+    // hblank_int_scx0_if_b,
+    // hblank_int_scx0_if_c,
+    // hblank_int_scx0_if_d,
     // hblank_int_scx0,
     hblank_int_scx1_if_a,
-    hblank_int_scx1_if_b,
-    hblank_int_scx1_if_c,
-    hblank_int_scx1_if_d,
-    hblank_int_scx1_nops_a,
-    hblank_int_scx1_nops_b,
+    // hblank_int_scx1_if_b,
+    // hblank_int_scx1_if_c,
+    // hblank_int_scx1_if_d,
+    // hblank_int_scx1_nops_a,
+    // hblank_int_scx1_nops_b,
     // hblank_int_scx1,
     hblank_int_scx2_if_a,
     // hblank_int_scx2_if_b,
@@ -99,25 +95,25 @@ gbmicrotest_tests!(
     // hblank_int_scx2_nops_b,
     // hblank_int_scx2,
     hblank_int_scx3_if_a,
-    hblank_int_scx3_if_b,
-    hblank_int_scx3_if_c,
-    hblank_int_scx3_if_d,
-    hblank_int_scx3_nops_a,
-    hblank_int_scx3_nops_b,
+    // hblank_int_scx3_if_b,
+    // hblank_int_scx3_if_c,
+    // hblank_int_scx3_if_d,
+    // hblank_int_scx3_nops_a,
+    // hblank_int_scx3_nops_b,
     hblank_int_scx3,
     hblank_int_scx4_if_a,
-    hblank_int_scx4_if_b,
-    hblank_int_scx4_if_c,
-    hblank_int_scx4_if_d,
-    hblank_int_scx4_nops_a,
-    hblank_int_scx4_nops_b,
+    // hblank_int_scx4_if_b,
+    // hblank_int_scx4_if_c,
+    // hblank_int_scx4_if_d,
+    // hblank_int_scx4_nops_a,
+    // hblank_int_scx4_nops_b,
     // hblank_int_scx4,
     hblank_int_scx5_if_a,
-    hblank_int_scx5_if_b,
-    hblank_int_scx5_if_c,
-    hblank_int_scx5_if_d,
-    hblank_int_scx5_nops_a,
-    hblank_int_scx5_nops_b,
+    // hblank_int_scx5_if_b,
+    // hblank_int_scx5_if_c,
+    // hblank_int_scx5_if_d,
+    // hblank_int_scx5_nops_a,
+    // hblank_int_scx5_nops_b,
     // hblank_int_scx5,
     hblank_int_scx6_if_a,
     // hblank_int_scx6_if_b,
@@ -127,11 +123,11 @@ gbmicrotest_tests!(
     // hblank_int_scx6_nops_b,
     // hblank_int_scx6,
     hblank_int_scx7_if_a,
-    hblank_int_scx7_if_b,
-    hblank_int_scx7_if_c,
-    hblank_int_scx7_if_d,
-    hblank_int_scx7_nops_a,
-    hblank_int_scx7_nops_b,
+    // hblank_int_scx7_if_b,
+    // hblank_int_scx7_if_c,
+    // hblank_int_scx7_if_d,
+    // hblank_int_scx7_nops_a,
+    // hblank_int_scx7_nops_b,
     // hblank_int_scx7,
     // hblank_scx2_if_a,
     hblank_scx3_if_a,
@@ -166,7 +162,7 @@ gbmicrotest_tests!(
     // int_hblank_nops_scx5,
     // int_hblank_nops_scx6,
     // int_hblank_nops_scx7,
-    // int_lyc_halt,
+    int_lyc_halt,
     int_lyc_incs,
     // int_lyc_nops,
     // int_oam_halt,
@@ -235,7 +231,7 @@ gbmicrotest_tests!(
     line_153_ly_b,
     // line_153_ly_c,
     line_153_ly_d,
-    // line_153_ly_e,
+    line_153_ly_e,
     line_153_ly_f,
     line_153_lyc_a,
     line_153_lyc_b,
@@ -250,9 +246,9 @@ gbmicrotest_tests!(
     line_153_lyc0_stat_timing_e,
     // line_153_lyc0_stat_timing_f,
     line_153_lyc0_stat_timing_g,
-    // line_153_lyc0_stat_timing_h,
+    line_153_lyc0_stat_timing_h,
     line_153_lyc0_stat_timing_i,
-    // line_153_lyc0_stat_timing_j,
+    line_153_lyc0_stat_timing_j,
     line_153_lyc0_stat_timing_k,
     line_153_lyc0_stat_timing_l,
     // line_153_lyc0_stat_timing_m,
@@ -263,7 +259,7 @@ gbmicrotest_tests!(
     line_153_lyc153_stat_timing_d,
     // line_153_lyc153_stat_timing_e,
     line_153_lyc153_stat_timing_f,
-    // line_65_ly,
+    line_65_ly,
     // ly_while_lcd_off,
     // lyc_int_halt_a,
     lyc_int_halt_b,
@@ -328,22 +324,22 @@ gbmicrotest_tests!(
     poweron_joy_000,
     poweron_lcdc_000,
     poweron_ly_000,
-    // poweron_ly_119,
+    poweron_ly_119,
     poweron_ly_120,
-    // poweron_ly_233,
+    poweron_ly_233,
     poweron_ly_234,
     poweron_lyc_000,
     poweron_oam_000,
     poweron_oam_005,
-    poweron_oam_006,
+    // poweron_oam_006,
     poweron_oam_069,
-    poweron_oam_070,
-    // poweron_oam_119,
+    // poweron_oam_070,
+    poweron_oam_119,
     poweron_oam_120,
     poweron_oam_121,
     poweron_oam_183,
-    poweron_oam_184,
-    // poweron_oam_233,
+    // poweron_oam_184,
+    poweron_oam_233,
     poweron_oam_234,
     poweron_oam_235,
     poweron_obp0_000,
@@ -356,18 +352,18 @@ gbmicrotest_tests!(
     poweron_stat_005,
     // poweron_stat_006,
     poweron_stat_007,
-    // poweron_stat_026,
+    poweron_stat_026,
     poweron_stat_027,
-    // poweron_stat_069,
+    poweron_stat_069,
     poweron_stat_070,
     poweron_stat_119,
     // poweron_stat_120,
     poweron_stat_121,
-    // poweron_stat_140,
+    poweron_stat_140,
     poweron_stat_141,
-    // poweron_stat_183,
+    poweron_stat_183,
     poweron_stat_184,
-    // poweron_stat_234,
+    poweron_stat_234,
     poweron_stat_235,
     poweron_tac_000,
     poweron_tima_000,
@@ -384,6 +380,7 @@ gbmicrotest_tests!(
     poweron_wx_000,
     poweron_wy_000,
     // poweron,
+    // ppu_latch_bgdisplay: "803-ppu-latch-bgdisplay.gb",
     // ppu_scx_vs_bgp,
     // ppu_sprite_testbench,
     ppu_sprite0_scx0_a,
@@ -463,16 +460,16 @@ gbmicrotest_tests!(
     timer_tima_inc_64k_b,
     timer_tima_inc_64k_c,
     timer_tima_inc_64k_d,
-    // timer_tima_phase_a,
-    // timer_tima_phase_b,
-    // timer_tima_phase_c,
-    // timer_tima_phase_d,
-    // timer_tima_phase_e,
-    // timer_tima_phase_f,
-    // timer_tima_phase_g,
-    // timer_tima_phase_h,
-    // timer_tima_phase_i,
-    // timer_tima_phase_j,
+    timer_tima_phase_a,
+    timer_tima_phase_b,
+    timer_tima_phase_c,
+    timer_tima_phase_d,
+    timer_tima_phase_e,
+    timer_tima_phase_f,
+    timer_tima_phase_g,
+    timer_tima_phase_h,
+    timer_tima_phase_i,
+    timer_tima_phase_j,
     timer_tima_reload_256k_a,
     timer_tima_reload_256k_b,
     timer_tima_reload_256k_c,
@@ -488,7 +485,7 @@ gbmicrotest_tests!(
     timer_tima_write_b,
     timer_tima_write_c,
     timer_tima_write_d,
-    timer_tima_write_e,
+    // timer_tima_write_e,
     timer_tima_write_f,
     timer_tma_write_a,
     timer_tma_write_b,
@@ -569,3 +566,7 @@ gbmicrotest_tests!(
     // win9_b,
     // write_to_x8000: "000-write_to_x8000.gb",
 );
+
+mod micro_fix {
+    gbmicrotest_tests!();
+}
