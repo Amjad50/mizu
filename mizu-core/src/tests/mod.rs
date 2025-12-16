@@ -149,12 +149,12 @@ impl TestingGameBoy {
     }
 
     pub fn clock_until_infinte_loop(&mut self) {
-        while self.cpu.next_instruction(&mut self.bus) != CpuState::InfiniteLoop {}
+        while self.cpu.next_instruction(&mut self.bus).unwrap() != CpuState::InfiniteLoop {}
     }
 
     pub fn clock_until_breakpoint(&mut self) -> CpuRegisters {
         loop {
-            if let CpuState::Breakpoint(regs) = self.cpu.next_instruction(&mut self.bus) {
+            if let CpuState::Breakpoint(regs) = self.cpu.next_instruction(&mut self.bus).unwrap() {
                 return regs;
             }
         }

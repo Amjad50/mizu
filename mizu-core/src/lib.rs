@@ -164,7 +164,7 @@ impl GameBoy {
         const PPU_CYCLES_PER_FRAME: u32 = 456 * 154;
         let mut cycles = 0u32;
         while cycles < PPU_CYCLES_PER_FRAME {
-            self.cpu.next_instruction(&mut self.bus);
+            self.cpu.next_instruction(&mut self.bus).unwrap();
             cycles += self.bus.elapsed_ppu_cycles();
         }
     }

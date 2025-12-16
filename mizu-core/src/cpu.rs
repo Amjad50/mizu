@@ -46,6 +46,11 @@ pub struct CpuRegisters {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub enum RunError {
+    IllegalInstruction
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CpuState {
     Normal,
     InfiniteLoop,
@@ -151,15 +156,15 @@ impl Cpu {
         cpu
     }
 
-    pub fn next_instruction<P: CpuBusProvider>(&mut self, bus: &mut P) -> CpuState {
+    pub fn next_instruction<P: CpuBusProvider>(&mut self, bus: &mut P) -> Result<CpuState, RunError> {
         if bus.stopped() {
             self.advance_bus(bus);
-            return CpuState::Stopped;
+            return Ok(CpuState::Stopped);
         }
 
         if bus.is_hdma_running() {
             self.advance_bus(bus);
-            return CpuState::RunningHDMA;
+            return Ok(CpuState::RunningHDMA);
         }
 
         if self.halt_mode == HaltMode::HaltRunInterrupt
@@ -174,7 +179,7 @@ impl Cpu {
                     self.advance_bus(bus);
                 }
             } else {
-                return CpuState::Halting;
+                return Ok(CpuState::Halting);
             }
         }
 
@@ -207,7 +212,7 @@ impl Cpu {
             self.advance_bus(bus);
             self.advance_bus(bus);
             self.advance_bus(bus);
-            return cpu_state;
+            return Ok(cpu_state);
         }
 
         if self.enable_interrupt_next {
@@ -228,7 +233,14 @@ impl Cpu {
             instruction = Instruction::from_prefix(self.fetch_next_pc(bus), pc);
         }
 
-        self.exec_instruction(instruction, bus)
+        match self.exec_instruction(instruction, bus) {
+            Err(e) => {
+                // do not add pc from the last fetch ^
+                self.reg_pc = pc;
+                Err(e)
+            }
+            Ok(r) => Ok(r)
+        }
     }
 }
 
@@ -450,26 +462,26 @@ impl Cpu {
         &mut self,
         instruction: Instruction,
         bus: &mut P,
-    ) -> CpuState {
+    ) -> Result<CpuState, RunError> {
         let src = self.read_operand(instruction.src, bus);
 
         let mut cpu_state = CpuState::Normal;
 
         let result = match instruction.opcode {
-            Opcode::Nop => 0,
-            Opcode::Ld => src,
+            Opcode::Nop => Ok(0),
+            Opcode::Ld => Ok(src),
             Opcode::LdBB => {
                 // self.reg_b = self.reg_b;
                 println!("Break point at {:04X} was hit", instruction.pc);
 
                 cpu_state = CpuState::Breakpoint(self.registers());
 
-                0
+                Ok(0)
             }
             Opcode::LdSPHL => {
                 self.advance_bus(bus);
                 self.reg_sp = self.reg_hl_read();
-                0
+                Ok(0)
             }
             Opcode::LdHLSPSigned8 => {
                 self.advance_bus(bus);
@@ -480,18 +492,18 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, (self.reg_sp & 0xf) + (src & 0xf) > 0xf);
                 self.flag_set(CpuFlags::C, (self.reg_sp & 0xff) + (src & 0xff) > 0xff);
 
-                result
+                Ok(result)
             }
             Opcode::Push => {
                 self.advance_bus(bus);
                 self.stack_push(src, bus);
-                0
+                Ok(0)
             }
-            Opcode::Pop => self.stack_pop(bus),
+            Opcode::Pop => Ok(self.stack_pop(bus)),
             Opcode::Inc16 => {
                 self.advance_bus(bus);
                 bus.trigger_write_oam_bug(src);
-                src.wrapping_add(1)
+                Ok(src.wrapping_add(1))
             }
 
             Opcode::Inc => {
@@ -501,19 +513,19 @@ impl Cpu {
                 self.flag_set(CpuFlags::N, false);
                 self.flag_set(CpuFlags::H, result & 0x0f == 0);
 
-                result
+                Ok(result)
             }
             Opcode::Dec16 => {
                 self.advance_bus(bus);
                 bus.trigger_write_oam_bug(src);
-                src.wrapping_sub(1)
+                Ok(src.wrapping_sub(1))
             }
             Opcode::Dec => {
                 let result = src.wrapping_sub(1);
                 self.flag_set(CpuFlags::Z, result == 0);
                 self.flag_set(CpuFlags::N, true);
                 self.flag_set(CpuFlags::H, result & 0x0f == 0x0f);
-                result
+                Ok(result)
             }
             Opcode::Add => {
                 let dest = self.read_operand(instruction.dest, bus);
@@ -524,7 +536,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, (dest & 0xf) + (src & 0xf) > 0xf);
                 self.flag_set(CpuFlags::C, result & 0xff00 != 0);
 
-                result & 0xFF
+                Ok(result & 0xFF)
             }
             Opcode::Add16 => {
                 self.advance_bus(bus);
@@ -535,7 +547,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, (dest & 0xfff) + (src & 0xfff) > 0xfff);
                 self.flag_set(CpuFlags::C, result & 0xffff0000 != 0);
 
-                result as u16
+                Ok(result as u16)
             }
             Opcode::AddSPSigned8 => {
                 self.advance_bus(bus);
@@ -548,7 +560,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, (dest & 0xf) + (src & 0xf) > 0xf);
                 self.flag_set(CpuFlags::C, (dest & 0xff) + (src & 0xff) > 0xff);
 
-                result
+                Ok(result)
             }
             Opcode::Adc => {
                 let dest = self.read_operand(instruction.dest, bus);
@@ -560,7 +572,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, (dest & 0xf) + (src & 0xf) + carry > 0xf);
                 self.flag_set(CpuFlags::C, result & 0xff00 != 0);
 
-                result
+                Ok(result)
             }
             Opcode::Sub => {
                 let dest = self.read_operand(instruction.dest, bus);
@@ -571,7 +583,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, (dest & 0xf) < (src & 0xf));
                 self.flag_set(CpuFlags::C, result & 0xff00 != 0);
 
-                result & 0xFF
+                Ok(result & 0xFF)
             }
             Opcode::Cp => {
                 let dest = self.reg_a as u16;
@@ -583,7 +595,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::C, result & 0xff00 != 0);
 
                 // will be ignored
-                result & 0xFF
+                Ok(result & 0xFF)
             }
             Opcode::Sbc => {
                 let dest = self.read_operand(instruction.dest, bus);
@@ -598,7 +610,7 @@ impl Cpu {
                 );
                 self.flag_set(CpuFlags::C, result & 0xff00 != 0);
 
-                result & 0xFF
+                Ok(result & 0xFF)
             }
             Opcode::And => {
                 let dest = self.read_operand(instruction.dest, bus);
@@ -609,7 +621,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, true);
                 self.flag_set(CpuFlags::C, false);
 
-                result
+                Ok(result)
             }
             Opcode::Xor => {
                 let dest = self.read_operand(instruction.dest, bus);
@@ -620,7 +632,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, false);
                 self.flag_set(CpuFlags::C, false);
 
-                result
+                Ok(result)
             }
             Opcode::Or => {
                 let dest = self.read_operand(instruction.dest, bus);
@@ -631,7 +643,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, false);
                 self.flag_set(CpuFlags::C, false);
 
-                result
+                Ok(result)
             }
             Opcode::Jp(cond) => {
                 if self.check_cond(cond) {
@@ -642,7 +654,7 @@ impl Cpu {
 
                     self.reg_pc = src;
                 }
-                0
+                Ok(0)
             }
             Opcode::JpHL => {
                 if src == instruction.pc {
@@ -650,7 +662,7 @@ impl Cpu {
                 }
 
                 self.reg_pc = src;
-                0
+                Ok(0)
             }
             Opcode::Jr(cond) => {
                 if self.check_cond(cond) {
@@ -663,7 +675,7 @@ impl Cpu {
 
                     self.reg_pc = new_pc;
                 }
-                0
+                Ok(0)
             }
             Opcode::Call(cond) => {
                 if self.check_cond(cond) {
@@ -671,7 +683,7 @@ impl Cpu {
                     self.stack_push(self.reg_pc, bus);
                     self.reg_pc = src;
                 }
-                0
+                Ok(0)
             }
             Opcode::Ret(cond) => {
                 if cond != Condition::Unconditional {
@@ -681,39 +693,39 @@ impl Cpu {
                     self.reg_pc = self.stack_pop(bus);
                     self.advance_bus(bus);
                 }
-                0
+                Ok(0)
             }
             Opcode::Reti => {
                 self.reg_pc = self.stack_pop(bus);
                 self.advance_bus(bus);
                 self.ime = true;
-                0
+                Ok(0)
             }
             Opcode::Rst(loc) => {
                 self.advance_bus(bus);
                 self.stack_push(self.reg_pc, bus);
                 self.reg_pc = loc as u16;
-                0
+                Ok(0)
             }
             Opcode::Di => {
                 self.ime = false;
-                0
+                Ok(0)
             }
             Opcode::Ei => {
                 self.enable_interrupt_next = true;
-                0
+                Ok(0)
             }
             Opcode::Ccf => {
                 self.flag_set(CpuFlags::N, false);
                 self.flag_set(CpuFlags::H, false);
                 self.flag_set(CpuFlags::C, !self.flag_get(CpuFlags::C));
-                0
+                Ok(0)
             }
             Opcode::Scf => {
                 self.flag_set(CpuFlags::N, false);
                 self.flag_set(CpuFlags::H, false);
                 self.flag_set(CpuFlags::C, true);
-                0
+                Ok(0)
             }
             Opcode::Daa => {
                 let carry = self.flag_get(CpuFlags::C);
@@ -741,7 +753,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::Z, self.reg_a == 0);
                 self.flag_set(CpuFlags::H, false);
 
-                0
+                Ok(0)
             }
             Opcode::Cpl => {
                 self.reg_a = !self.reg_a;
@@ -749,7 +761,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::N, true);
                 self.flag_set(CpuFlags::H, true);
 
-                0
+                Ok(0)
             }
             Opcode::Rlca => {
                 let carry = (self.reg_a >> 7) & 1;
@@ -760,7 +772,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, false);
                 self.flag_set(CpuFlags::C, carry == 1);
 
-                0
+                Ok(0)
             }
             Opcode::Rla => {
                 let carry = (self.reg_a >> 7) & 1;
@@ -771,7 +783,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, false);
                 self.flag_set(CpuFlags::C, carry == 1);
 
-                0
+                Ok(0)
             }
             Opcode::Rrca => {
                 let carry = self.reg_a & 1;
@@ -782,7 +794,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, false);
                 self.flag_set(CpuFlags::C, carry == 1);
 
-                0
+                Ok(0)
             }
             Opcode::Rra => {
                 let carry = self.reg_a & 1;
@@ -793,7 +805,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, false);
                 self.flag_set(CpuFlags::C, carry == 1);
 
-                0
+                Ok(0)
             }
             Opcode::Rlc => {
                 let carry = (src >> 7) & 1;
@@ -804,7 +816,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, false);
                 self.flag_set(CpuFlags::C, carry == 1);
 
-                result
+                Ok(result)
             }
             Opcode::Rrc => {
                 let carry = src & 1;
@@ -815,7 +827,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, false);
                 self.flag_set(CpuFlags::C, carry == 1);
 
-                result
+                Ok(result)
             }
             Opcode::Rl => {
                 let carry = (src >> 7) & 1;
@@ -826,7 +838,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, false);
                 self.flag_set(CpuFlags::C, carry == 1);
 
-                result
+                Ok(result)
             }
             Opcode::Rr => {
                 let carry = src & 1;
@@ -838,7 +850,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, false);
                 self.flag_set(CpuFlags::C, carry == 1);
 
-                result
+                Ok(result)
             }
             Opcode::Sla => {
                 let carry = (src >> 7) & 1;
@@ -849,7 +861,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, false);
                 self.flag_set(CpuFlags::C, carry == 1);
 
-                result
+                Ok(result)
             }
             Opcode::Sra => {
                 let carry = src & 1;
@@ -860,7 +872,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, false);
                 self.flag_set(CpuFlags::C, carry == 1);
 
-                result
+                Ok(result)
             }
             Opcode::Swap => {
                 let result = ((src >> 4) & 0xf) | ((src & 0xf) << 4);
@@ -870,7 +882,7 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, false);
                 self.flag_set(CpuFlags::C, false);
 
-                result
+                Ok(result)
             }
             Opcode::Srl => {
                 let carry = src & 1;
@@ -881,16 +893,16 @@ impl Cpu {
                 self.flag_set(CpuFlags::H, false);
                 self.flag_set(CpuFlags::C, carry == 1);
 
-                result
+                Ok(result)
             }
             Opcode::Bit(bit) => {
                 self.flag_set(CpuFlags::Z, (src >> bit) & 1 == 0);
                 self.flag_set(CpuFlags::N, false);
                 self.flag_set(CpuFlags::H, true);
-                0
+                Ok(0)
             }
-            Opcode::Res(bit) => src & !((1 << bit) as u16),
-            Opcode::Set(bit) => src | ((1 << bit) as u16),
+            Opcode::Res(bit) => Ok(src & !((1 << bit) as u16)),
+            Opcode::Set(bit) => Ok(src | ((1 << bit) as u16)),
             Opcode::Halt => {
                 // When halt instruction is executed several outcomes might occur:
                 // - When IME = 1:
@@ -917,16 +929,16 @@ impl Cpu {
                     HaltMode::HaltNoRunInterrupt
                 };
 
-                0
+                Ok(0)
             }
             Opcode::Stop => {
                 // TODO: respect wait time for speed switch
                 bus.enter_stop_mode();
-                0
+                Ok(0)
             }
-            Opcode::Illegal => todo!(),
+            Opcode::Illegal => Err(RunError::IllegalInstruction),
             Opcode::Prefix => unreachable!(),
-        };
+        }?;
 
         // DEBUG
         // println!(
@@ -936,6 +948,6 @@ impl Cpu {
 
         self.write_operand(instruction.dest, result, bus);
 
-        cpu_state
+        Ok(cpu_state)
     }
 }
