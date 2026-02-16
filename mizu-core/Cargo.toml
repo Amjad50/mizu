@@ -10,7 +10,7 @@ keywords = ["gameboy", "emulator"]
 categories = ["emulators"]
 
 [dependencies]
-bitflags = "2.4"
+bitflags = "2.11"
 fixed-vec-deque = "0.1"
 byteorder = "1.3"
 thiserror = "2.0"
